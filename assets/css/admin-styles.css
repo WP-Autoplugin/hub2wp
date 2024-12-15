@@ -1,0 +1,42 @@
+/* Admin Styles for GitHub Plugin Browser */
+.gpb-plugin-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.gpb-plugin-item {
+    background: #fff;
+    border: 1px solid #ccc;
+    width: 300px;
+    box-sizing: border-box;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.gpb-plugin-item h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 10px;
+}
+
+.gpb-plugin-item p {
+    margin: 0 0 10px 0;
+}
+
+.gpb-install-button {
+    display: inline-block;
+    padding: 6px 10px;
+    background: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 3px;
+    font-size: 14px;
+}
+
+.gpb-install-button:hover {
+    background: #005d8f;
+}

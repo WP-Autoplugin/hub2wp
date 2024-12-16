@@ -89,7 +89,14 @@ class GPB_Settings {
 		$access_token = isset( $options['access_token'] ) ? $options['access_token'] : '';
 		?>
 		<input type="text" name="gpb_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
-		<p class="description"><?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'github-plugin-installer' ); ?></p>
+		<p class="description">
+			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'github-plugin-installer' ); ?>
+			<?php printf(
+				/* translators: %s: URL to create a personal access token */
+				__( 'Get a free token from %s.', 'github-plugin-installer' ),
+				'<a href="https://github.com/settings/tokens" target="_blank">GitHub</a>'
+			); ?>
+		</p>
 		<?php
 	}
 

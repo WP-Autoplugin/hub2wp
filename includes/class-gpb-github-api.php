@@ -38,20 +38,20 @@ class GPB_GitHub_API {
 	 * @param int    $page  Page number.
 	 * @return array Results or WP_Error.
 	 */
-	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1 ) {
-		$cache_key = 'search_' . md5( $query . $page . $this->access_token );
+	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
+		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
 		$cached    = GPB_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
-
+	
 		$url = add_query_arg(
 			array(
-				'q'     => $query,
-				'page'  => $page,
-				'per_page' => 10,
-				'sort'  => 'stars',
-				'order' => 'desc',
+				'q'         => $query,
+				'page'      => $page,
+				'per_page'  => 10,
+				'sort'      => $sort,
+				'order'     => $order,
 			),
 			$this->base_url . '/search/repositories'
 		);

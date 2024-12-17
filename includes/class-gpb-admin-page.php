@@ -109,144 +109,132 @@ class GPB_Admin_Page {
 		if ( ! current_user_can( 'install_plugins' ) ) {
 			wp_die( esc_html__( 'You do not have sufficient permissions.', 'github-plugin-installer' ) );
 		}
-
+	
 		$access_token = GPB_Settings::get_access_token();
 		$api = new GPB_GitHub_API( $access_token );
-
+	
 		$query = 'topic:wordpress-plugin';
 		$user_query = '';
 		if ( isset( $_GET['s'] ) && ! empty( $_GET['s'] ) ) {
 			$user_query = sanitize_text_field( $_GET['s'] );
 			$query = $user_query . ' topic:wordpress-plugin';
 		}
-
+	
+		if ( isset( $_GET['tag'] ) && ! empty( $_GET['tag'] ) ) {
+			$tag = sanitize_text_field( $_GET['tag'] );
+			$query .= ' topic:' . $tag;
+		}
+	
 		$page = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1;
 		$results = $api->search_plugins( $query, $page );
-
-		$items = array();
-		$total = 0;
-		if ( ! is_wp_error( $results ) && isset( $results['items'] ) ) {
-			$items = $results['items'];
-			$total = isset( $results['total_count'] ) ? (int) $results['total_count'] : 0;
-		}
-
+	
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'GitHub Plugin Browser', 'github-plugin-installer' ) . '</h1>';
-		
-		echo '<form method="get" class="plugin-search-form">';
+		echo '<h1 class="wp-heading-inline">' . esc_html__( 'GitHub Plugin Browser', 'github-plugin-installer' ) . '</h1>';
+	
+		// Top bar with tags and search
+		echo '<div class="gpb-top-bar">';
+		echo '<div class="gpb-popular-tags">';
+		$popular_tags = array('woocommerce', 'seo', 'security', 'social', 'forms');
+		foreach ($popular_tags as $tag) {
+			echo '<a href="' . esc_url(add_query_arg('tag', $tag)) . '" class="gpb-tag ' . ($tag === $_GET['tag'] ? 'gpb-tag-active' : '') . '">' . esc_html($tag) . '</a>';
+		}
+		echo '</div>';
+	
+		echo '<form method="get" class="gpb-search-form">';
 		echo '<input type="hidden" name="page" value="gpb-plugin-browser" />';
-		echo '<input type="search" name="s" value="' . ( $user_query ? esc_attr( $user_query ) : '' ) . '" placeholder="' . esc_attr__( 'Search GitHub plugins...', 'github-plugin-installer' ) . '" />';
-		submit_button( __( 'Search', 'github-plugin-installer' ), 'primary', false );
+		echo '<input type="search" name="s" value="' . esc_attr($user_query) . '" placeholder="' . esc_attr__('Search plugins...', 'github-plugin-installer') . '" />';
+		submit_button( __( 'Search', 'github-plugin-installer' ), 'primary', 'search', false );
 		echo '</form>';
-
-		if ( ! empty( $items ) ) {
-			echo '<div class="wp-list-table widefat plugin-install">';
-			foreach ( $items as $item ) {
-				$avatar = ! empty( $item['owner']['avatar_url'] ) ? $item['owner']['avatar_url'] : '';
-				$name = $item['name'];
-				$description = isset( $item['description'] ) ? $item['description'] : '';
-				$stars = isset( $item['stargazers_count'] ) ? absint( $item['stargazers_count'] ) : 0;
-				$forks = isset( $item['forks_count'] ) ? absint( $item['forks_count'] ) : 0;
-				$owner = isset( $item['owner']['login'] ) ? $item['owner']['login'] : '';
-				$homepage = isset( $item['homepage'] ) && $item['homepage'] ? $item['homepage'] : $item['html_url'];
-				$updated = isset( $item['updated_at'] ) ? mysql2date( get_option( 'date_format' ), $item['updated_at'] ) : '';
-				$license_name = isset( $item['license']['name'] ) ? $item['license']['name'] : '';
-				$install_url = wp_nonce_url(
-					add_query_arg(
-						array(
-							'page'        => 'gpb-plugin-browser',
-							'gpb_install' => 1,
-							'owner'       => $owner,
-							'repo'        => $name,
-						),
-						admin_url( 'plugins.php' )
-					),
-					'gpb_install_plugin'
-				);
-
-				echo '<div class="gpb-plugin-card">';
-				echo '<div class="gpb-plugin-card-top">';
-				
-				// Plugin Icon
-				echo '<div class="gpb-plugin-icon">';
-				if ( $avatar ) {
-					echo '<img src="' . esc_url( $avatar ) . '" alt="' . esc_attr( $name ) . ' logo" />';
-				} else {
-					echo '<div class="default-icon">' . esc_html( substr( $name, 0, 2 ) ) . '</div>';
-				}
-				echo '</div>';
-
-				// Plugin Name and Owner
-				echo '<div class="name column-name">';
-				echo '<h3>' . esc_html( $name ) . '</h3>';
-				echo '<span class="plugin-owner">' . esc_html( $owner ) . '</span>';
-				echo '</div>';
-
-				// Action Links
-				echo '<div class="action-links">';
-				echo '<a href="' . esc_url( $homepage ) . '" class="plugin-info-link" target="_blank" rel="noopener noreferrer">' . esc_html__( 'View Details', 'github-plugin-installer' ) . '</a>';
-				if ( self::is_plugin_installed( $owner, $name ) ) {
-					echo '<span class="button disabled already-installed">' . esc_html__( 'Installed', 'github-plugin-installer' ) . '</span>';
-				} else {
-					echo '<a class="install-now" href="' . esc_url( $install_url ) . '">' . esc_html__( 'Install Now', 'github-plugin-installer' ) . '</a>';
-				}
-				echo '</div>';
-				echo '</div>';
-
-				// Description
-				echo '<div class="desc column-description">';
-				echo '<p>' . esc_html( $description ) . '</p>';
-				echo '</div>';
-
-				// Plugin Meta
-				echo '<div class="plugin-meta">';
-				echo '<div class="plugin-stats">';
-				echo '<span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>' . esc_html( $stars ) . '</span>';
-				echo '<span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M14 4H2v16h20V8h-8V4zM4 6h8v2H4V6zm16 12H4v-8h16v8zm-8-6h6v4h-6v-4z"/></svg>' . esc_html( $forks ) . '</span>';
-				echo '</div>';
-				
-				if ( $updated || $license_name ) {
-					echo '<div class="plugin-details">';
-					if ( $updated ) {
-						echo '<span class="plugin-updated">' . esc_html__( 'Updated:', 'github-plugin-installer' ) . ' ' . esc_html( $updated ) . '</span>';
-					}
-					if ( $license_name ) {
-						echo '<span class="plugin-license">' . esc_html__( 'License:', 'github-plugin-installer' ) . ' ' . esc_html( $license_name ) . '</span>';
-					}
-					echo '</div>';
-				}
-				echo '</div>';
-
-				echo '</div>';
+		echo '</div>';
+	
+		if ( ! empty( $results['items'] ) ) {
+			echo '<div class="gpb-plugins-grid">';
+			foreach ( $results['items'] as $item ) {
+				self::render_plugin_card($item);
 			}
 			echo '</div>';
-
-			// Pagination (similar to previous implementation)
-			if ( $total > 10 ) {
-				$total_pages = ceil( $total / 10 );
-				$current_url = add_query_arg(
-					array(
-						'page' => 'gpb-plugin-browser',
-						's'    => $user_query ? $user_query : '',
-					),
-					admin_url( 'plugins.php' )
-				);
-				if ( $total_pages > 1 ) {
-					$links = paginate_links(
-						array(
-							'base'      => add_query_arg( 'paged', '%#%', $current_url ),
-							'format'    => '',
-							'current'   => $page,
-							'total'     => $total_pages,
-							'type'      => 'plain',
-						)
-					);
-					echo '<div class="tablenav"><div class="tablenav-pages">' . $links . '</div></div>';
-				}
+	
+			// Pagination
+			if ( $results['total_count'] > 10 ) {
+				$total_pages = ceil( $results['total_count'] / 10 );
+				echo '<div class="tablenav bottom">';
+				echo '<div class="tablenav-pages gpb-pagination">';
+				echo paginate_links( array(
+					'base' => add_query_arg( 'paged', '%#%' ),
+					'format' => '',
+					'prev_text' => __('&laquo;'),
+					'next_text' => __('&raquo;'),
+					'total' => $total_pages,
+					'current' => $page
+				) );
+				echo '</div>';
+				echo '</div>';
 			}
 		} else {
-			echo '<p>' . esc_html__( 'No plugins found.', 'github-plugin-installer' ) . '</p>';
+			echo '<div class="no-plugin-results">';
+			echo '<p>' . esc_html__( 'No plugins found. Try a different search.', 'github-plugin-installer' ) . '</p>';
+			echo '</div>';
 		}
+		echo '</div>';
+	}
+	
+	private static function render_plugin_card( $item ) {
+		$name = $item['name'];
+		$description = isset( $item['description'] ) ? $item['description'] : '';
+		$owner = isset($item['owner']['login']) ? $item['owner']['login'] : '';
+		$avatar = isset($item['owner']['avatar_url']) ? $item['owner']['avatar_url'] : '';
+		$stars = isset($item['stargazers_count']) ? number_format($item['stargazers_count']) : 0;
+		$forks = isset($item['forks_count']) ? number_format($item['forks_count']) : 0;
+		$updated = isset($item['updated_at']) ? human_time_diff(strtotime($item['updated_at'])) . ' ago' : '';
+	
+		$install_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page' => 'gpb-plugin-browser',
+					'gpb_install' => 1,
+					'owner' => $owner,
+					'repo' => $name,
+				),
+				admin_url('plugins.php')
+			),
+			'gpb_install_plugin'
+		);
+	
+		echo '<div class="gpb-plugin-card">';
+		echo '<div class="gpb-plugin-header">';
+		echo '<div class="gpb-plugin-icon">';
+		if ($avatar) {
+			echo '<img src="' . esc_url($avatar) . '" alt="" />';
+		} else {
+			echo '<div class="gpb-plugin-icon-placeholder"></div>';
+		}
+		echo '</div>';
+		
+		echo '<div class="gpb-plugin-info">';
+		echo '<h3 class="gpb-plugin-name">' . esc_html($name) . '</h3>';
+		echo '<div class="gpb-plugin-author">By <a href="https://github.com/' . esc_attr($owner) . '">' . esc_html($owner) . '</a></div>';
+		echo '</div>';
+		echo '</div>';
+	
+		echo '<div class="gpb-plugin-description">' . esc_html(wp_trim_words($description, 20)) . '</div>';
+	
+		echo '<div class="gpb-plugin-actions">';
+		if (self::is_plugin_installed($owner, $name)) {
+			echo '<span class="gpb-button gpb-button-disabled">' . esc_html__('Installed', 'github-plugin-installer') . '</span>';
+		} else {
+			echo '<a href="' . esc_url($install_url) . '" class="gpb-button gpb-button-primary">' . esc_html__( 'Install Now', 'github-plugin-installer' ) . '</a>';
+		}
+		echo '<a href="' . esc_url($item['html_url']) . '" class="gpb-more-details-link" target="_blank">' . esc_html__( 'More Details', 'github-plugin-installer' ) . '</a>';
+		echo '</div>';
+	
+		echo '<div class="gpb-plugin-meta">';
+		echo '<div class="gpb-meta-stats">';
+		echo '<span class="gpb-meta-stat"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"></path></svg>' . esc_html( $stars ) . '</span>';
+		echo '<span class="gpb-meta-stat"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"></path></svg>' . esc_html( $forks ) . '</span>';
+		echo '</div>';
+		echo '<span class="gpb-meta-stat gpb-meta-updated"><svg viewBox="0 0 16 16" title="' . esc_attr( $updated ) . '">';
+		echo '<path fill-rule="evenodd" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm8.5-4a.5.5 0 00-1 0v4a.5.5 0 00.146.354l2.5 2.5a.5.5 0 00.708-.708L8.5 7.793V4z"></path></svg>' . esc_html( $updated ) . '</span>';
+		echo '</div>';
 		echo '</div>';
 	}
 }

@@ -23,6 +23,7 @@ require_once GPB_PLUGIN_DIR . 'includes/class-gpb-settings.php';
 require_once GPB_PLUGIN_DIR . 'includes/class-gpb-admin-page.php';
 require_once GPB_PLUGIN_DIR . 'includes/class-gpb-plugin-installer.php';
 require_once GPB_PLUGIN_DIR . 'includes/class-gpb-plugin-updater.php';
+require_once GPB_PLUGIN_DIR . 'includes/class-gpb-admin-ajax.php'; // New AJAX handler.
 
 // Load text domain.
 function gpb_load_textdomain() {
@@ -39,6 +40,9 @@ GPB_Admin_Page::init();
 // Handle plugin updates.
 GPB_Plugin_Updater::init();
 
+// Initialize AJAX handler.
+new GPB_Admin_Ajax();
+
 // Add action to display rate limit notices if needed.
 add_action( 'admin_notices', 'gpb_display_rate_limit_notice' );
 function gpb_display_rate_limit_notice() {
@@ -53,6 +57,12 @@ function gpb_enqueue_admin_assets( $hook ) {
 	if ( 'plugins_page_gpb-plugin-browser' === $hook ) {
 		wp_enqueue_style( 'gpb-admin-styles', GPB_PLUGIN_URL . 'assets/css/admin-styles.css', array(), GPB_VERSION );
 		wp_enqueue_script( 'gpb-admin-scripts', GPB_PLUGIN_URL . 'assets/js/admin-scripts.js', array( 'jquery' ), GPB_VERSION, true );
+
+		// Localize script with AJAX URL and nonce.
+		wp_localize_script( 'gpb-admin-scripts', 'gpb_ajax_object', array(
+			'ajax_url' => admin_url( 'admin-ajax.php' ),
+			'nonce'    => wp_create_nonce( 'gpb_plugin_details_nonce' ),
+		) );
 	}
 }
 add_action( 'admin_enqueue_scripts', 'gpb_enqueue_admin_assets' );

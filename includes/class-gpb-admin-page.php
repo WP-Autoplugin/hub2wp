@@ -136,7 +136,7 @@ class GPB_Admin_Page {
 		echo '<div class="gpb-popular-tags">';
 		$popular_tags = array('woocommerce', 'seo', 'security', 'social', 'forms');
 		foreach ($popular_tags as $tag) {
-			echo '<a href="' . esc_url(add_query_arg('tag', $tag)) . '" class="gpb-tag ' . ($tag === $_GET['tag'] ? 'gpb-tag-active' : '') . '">' . esc_html($tag) . '</a>';
+			echo '<a href="' . esc_url(add_query_arg('tag', $tag)) . '" class="gpb-tag ' . ( ( isset($_GET['tag']) && $tag === $_GET['tag'] ) ? 'gpb-tag-active' : '' ) . '">' . esc_html($tag) . '</a>';
 		}
 		echo '</div>';
 	
@@ -160,11 +160,11 @@ class GPB_Admin_Page {
 				echo '<div class="tablenav bottom">';
 				echo '<div class="tablenav-pages gpb-pagination">';
 				echo paginate_links( array(
-					'base' => add_query_arg( 'paged', '%#%' ),
-					'format' => '',
+					'base'    => add_query_arg( 'paged', '%#%' ),
+					'format'  => '',
 					'prev_text' => __('&laquo;'),
 					'next_text' => __('&raquo;'),
-					'total' => $total_pages,
+					'total'   => $total_pages,
 					'current' => $page
 				) );
 				echo '</div>';
@@ -176,8 +176,16 @@ class GPB_Admin_Page {
 			echo '</div>';
 		}
 		echo '</div>';
+
+		// Modal HTML
+		self::render_modal();
 	}
-	
+
+	/**
+	 * Render a single plugin card.
+	 *
+	 * @param array $item Plugin data.
+	 */
 	private static function render_plugin_card( $item ) {
 		$name = $item['name'];
 		$description = isset( $item['description'] ) ? $item['description'] : '';
@@ -186,7 +194,7 @@ class GPB_Admin_Page {
 		$stars = isset($item['stargazers_count']) ? number_format($item['stargazers_count']) : 0;
 		$forks = isset($item['forks_count']) ? number_format($item['forks_count']) : 0;
 		$updated = isset($item['updated_at']) ? human_time_diff(strtotime($item['updated_at'])) . ' ago' : '';
-	
+
 		$install_url = wp_nonce_url(
 			add_query_arg(
 				array(
@@ -199,34 +207,37 @@ class GPB_Admin_Page {
 			),
 			'gpb_install_plugin'
 		);
-	
+
 		echo '<div class="gpb-plugin-card">';
 		echo '<div class="gpb-plugin-header">';
 		echo '<div class="gpb-plugin-icon">';
 		if ($avatar) {
-			echo '<img src="' . esc_url($avatar) . '" alt="" />';
+			// Add data attributes for AJAX.
+			echo '<img src="' . esc_url($avatar) . '" alt="" class="gpb-plugin-thumbnail" data-owner="' . esc_attr($owner) . '" data-repo="' . esc_attr($name) . '" style="cursor:pointer;" />';
 		} else {
 			echo '<div class="gpb-plugin-icon-placeholder"></div>';
 		}
 		echo '</div>';
 		
 		echo '<div class="gpb-plugin-info">';
-		echo '<h3 class="gpb-plugin-name">' . esc_html($name) . '</h3>';
+		// Make plugin name clickable for modal.
+		echo '<h3 class="gpb-plugin-name" data-owner="' . esc_attr($owner) . '" data-repo="' . esc_attr($name) . '" style="cursor:pointer;">' . esc_html($name) . '</h3>';
 		echo '<div class="gpb-plugin-author">By <a href="https://github.com/' . esc_attr($owner) . '">' . esc_html($owner) . '</a></div>';
 		echo '</div>';
 		echo '</div>';
-	
+
 		echo '<div class="gpb-plugin-description">' . esc_html(wp_trim_words($description, 20)) . '</div>';
-	
+
 		echo '<div class="gpb-plugin-actions">';
 		if (self::is_plugin_installed($owner, $name)) {
 			echo '<span class="gpb-button gpb-button-disabled">' . esc_html__('Installed', 'github-plugin-browser') . '</span>';
 		} else {
 			echo '<a href="' . esc_url($install_url) . '" class="gpb-button gpb-button-primary">' . esc_html__( 'Install Now', 'github-plugin-browser' ) . '</a>';
 		}
-		echo '<a href="' . esc_url($item['html_url']) . '" class="gpb-more-details-link" target="_blank">' . esc_html__( 'More Details', 'github-plugin-browser' ) . '</a>';
+		// Add data attributes for "More Details" link.
+		echo '<a href="javascript:void(0);" class="gpb-more-details-link" data-owner="' . esc_attr($owner) . '" data-repo="' . esc_attr($name) . '">' . esc_html__( 'More Details', 'github-plugin-browser' ) . '</a>';
 		echo '</div>';
-	
+
 		echo '<div class="gpb-plugin-meta">';
 		echo '<div class="gpb-meta-stats">';
 		echo '<span class="gpb-meta-stat"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"></path></svg>' . esc_html( $stars ) . '</span>';
@@ -236,5 +247,49 @@ class GPB_Admin_Page {
 		echo '<path fill-rule="evenodd" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm8.5-4a.5.5 0 00-1 0v4a.5.5 0 00.146.354l2.5 2.5a.5.5 0 00.708-.708L8.5 7.793V4z"></path></svg>' . esc_html( $updated ) . '</span>';
 		echo '</div>';
 		echo '</div>';
+	}
+
+	/**
+	 * Render the modal structure.
+	 */
+	private static function render_modal() {
+		echo '
+		<div id="gpb-plugin-modal" class="gpb-modal">
+			<div class="gpb-modal-content">
+				<span class="gpb-modal-close">&times;</span>
+				<div class="gpb-modal-header">
+					<img src="" alt="" class="gpb-modal-image" />
+					<h2 class="gpb-modal-title"></h2>
+					<div class="gpb-modal-author"></div>
+				</div>
+				<div class="gpb-modal-body">
+					<ul class="gpb-modal-tabs">
+						<li class="gpb-modal-tab active" data-tab="description">' . esc_html__( 'Description', 'github-plugin-browser' ) . '</li>
+						<li class="gpb-modal-tab" data-tab="readme">' . esc_html__( 'README', 'github-plugin-browser' ) . '</li>
+					</ul>
+					<div class="gpb-modal-content-area">
+						<div class="gpb-modal-tab-content active" id="description">
+							<p class="gpb-modal-description"></p>
+							<ul class="gpb-modal-stats">
+								<li>' . esc_html__( 'Stars:', 'github-plugin-browser' ) . ' <span class="gpb-modal-stars"></span></li>
+								<li>' . esc_html__( 'Forks:', 'github-plugin-browser' ) . ' <span class="gpb-modal-forks"></span></li>
+								<li>' . esc_html__( 'Watchers:', 'github-plugin-browser' ) . ' <span class="gpb-modal-watchers"></span></li>
+								<li>' . esc_html__( 'Open Issues:', 'github-plugin-browser' ) . ' <span class="gpb-modal-issues"></span></li>
+								<li>' . esc_html__( 'Version:', 'github-plugin-browser' ) . ' <span class="gpb-modal-version"></span></li>
+								<li>' . esc_html__( 'Last Updated:', 'github-plugin-browser' ) . ' <span class="gpb-modal-updated"></span></li>
+							</ul>
+							<div class="gpb-modal-links">
+								<a href="#" target="_blank" class="gpb-modal-github-link">' . esc_html__( 'View on GitHub', 'github-plugin-browser' ) . '</a>
+								<a href="#" target="_blank" class="gpb-modal-homepage-link">' . esc_html__( 'Visit Homepage', 'github-plugin-browser' ) . '</a>
+							</div>
+						</div>
+						<div class="gpb-modal-tab-content" id="readme">
+							<div class="gpb-modal-readme"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		';
 	}
 }

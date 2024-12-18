@@ -4,7 +4,7 @@
  * Description: Browse, install, and update WordPress plugins directly from GitHub repositories.
  * Version: 1.0.0
  * Author: Balázs Piller
- * Text Domain: github-plugin-installer
+ * Text Domain: github-plugin-browser
  * Domain Path: /languages
  */
 
@@ -26,7 +26,7 @@ require_once GPB_PLUGIN_DIR . 'includes/class-gpb-plugin-updater.php';
 
 // Load text domain.
 function gpb_load_textdomain() {
-	load_plugin_textdomain( 'github-plugin-installer', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+	load_plugin_textdomain( 'github-plugin-browser', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
 }
 add_action( 'plugins_loaded', 'gpb_load_textdomain' );
 
@@ -44,7 +44,7 @@ add_action( 'admin_notices', 'gpb_display_rate_limit_notice' );
 function gpb_display_rate_limit_notice() {
 	$rate_limited = get_transient( 'gpb_rate_limit_reached' );
 	if ( $rate_limited ) {
-		echo '<div class="notice notice-error"><p>' . esc_html__( 'GitHub API rate limit reached. Please add a personal access token in the settings to continue.', 'github-plugin-installer' ) . '</p></div>';
+		echo '<div class="notice notice-error"><p>' . esc_html__( 'GitHub API rate limit reached. Please add a personal access token in the settings to continue.', 'github-plugin-browser' ) . '</p></div>';
 	}
 }
 

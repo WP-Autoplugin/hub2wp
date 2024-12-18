@@ -22,7 +22,7 @@ Features:
 
 == Installation ==
 
-1. Upload the `github-plugin-installer` folder to the `/wp-content/plugins/` directory.
+1. Upload the `wp-github-plugin-browser` folder to the `/wp-content/plugins/` directory.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
 3. Navigate to "Plugins > GitHub Browser" to browse plugins.
 4. Go to "Settings > GitHub Plugin Browser" to add an optional personal access token and configure caching.
@@ -36,8 +36,3 @@ No, but you have a higher request limit if you use one.
 
 = 1.0.0 =
 * Initial release.
-
-== Upgrade Notice ==
-
-= 1.0.0 =
-Initial release.

@@ -22,8 +22,8 @@ class GPB_Admin_Page {
 	public static function add_menu_page() {
 		add_submenu_page(
 			'plugins.php',
-			__( 'GitHub Plugin Browser', 'github-plugin-installer' ),
-			__( 'GitHub Browser', 'github-plugin-installer' ),
+			__( 'GitHub Plugin Browser', 'github-plugin-browser' ),
+			__( 'GitHub Browser', 'github-plugin-browser' ),
 			'install_plugins',
 			'gpb-plugin-browser',
 			array( __CLASS__, 'render_page' )
@@ -41,7 +41,7 @@ class GPB_Admin_Page {
 			if ( ! empty( $owner ) && ! empty( $repo ) ) {
 				if ( self::is_plugin_installed( $owner, $repo ) ) {
 					add_action( 'admin_notices', function() {
-						echo '<div class="notice notice-error"><p>' . esc_html__( 'Plugin is already installed.', 'github-plugin-installer' ) . '</p></div>';
+						echo '<div class="notice notice-error"><p>' . esc_html__( 'Plugin is already installed.', 'github-plugin-browser' ) . '</p></div>';
 					} );
 				} else {
 					self::install_plugin_from_github( $owner, $repo );
@@ -92,13 +92,13 @@ class GPB_Admin_Page {
 
 		if ( is_wp_error( $result ) || ! $result ) {
 			add_action( 'admin_notices', function() {
-				echo '<div class="notice notice-error"><p>' . esc_html__( 'Failed to install the plugin.', 'github-plugin-installer' ) . '</p></div>';
+				echo '<div class="notice notice-error"><p>' . esc_html__( 'Failed to install the plugin.', 'github-plugin-browser' ) . '</p></div>';
 			} );
 			return;
 		}
 
 		add_action( 'admin_notices', function() {
-			echo '<div class="notice notice-success"><p>' . esc_html__( 'Plugin installed successfully.', 'github-plugin-installer' ) . '</p></div>';
+			echo '<div class="notice notice-success"><p>' . esc_html__( 'Plugin installed successfully.', 'github-plugin-browser' ) . '</p></div>';
 		} );
 	}
 
@@ -107,7 +107,7 @@ class GPB_Admin_Page {
 	 */
 	public static function render_page() {
 		if ( ! current_user_can( 'install_plugins' ) ) {
-			wp_die( esc_html__( 'You do not have sufficient permissions.', 'github-plugin-installer' ) );
+			wp_die( esc_html__( 'You do not have sufficient permissions.', 'github-plugin-browser' ) );
 		}
 	
 		$access_token = GPB_Settings::get_access_token();
@@ -129,7 +129,7 @@ class GPB_Admin_Page {
 		$results = $api->search_plugins( $query, $page );
 	
 		echo '<div class="wrap">';
-		echo '<h1 class="wp-heading-inline">' . esc_html__( 'GitHub Plugin Browser', 'github-plugin-installer' ) . '</h1>';
+		echo '<h1 class="wp-heading-inline">' . esc_html__( 'GitHub Plugin Browser', 'github-plugin-browser' ) . '</h1>';
 	
 		// Top bar with tags and search
 		echo '<div class="gpb-top-bar">';
@@ -142,8 +142,8 @@ class GPB_Admin_Page {
 	
 		echo '<form method="get" class="gpb-search-form">';
 		echo '<input type="hidden" name="page" value="gpb-plugin-browser" />';
-		echo '<input type="search" name="s" value="' . esc_attr($user_query) . '" placeholder="' . esc_attr__('Search plugins...', 'github-plugin-installer') . '" />';
-		submit_button( __( 'Search', 'github-plugin-installer' ), 'primary', 'search', false );
+		echo '<input type="search" name="s" value="' . esc_attr($user_query) . '" placeholder="' . esc_attr__('Search plugins...', 'github-plugin-browser') . '" />';
+		submit_button( __( 'Search', 'github-plugin-browser' ), 'primary', 'search', false );
 		echo '</form>';
 		echo '</div>';
 	
@@ -172,7 +172,7 @@ class GPB_Admin_Page {
 			}
 		} else {
 			echo '<div class="no-plugin-results">';
-			echo '<p>' . esc_html__( 'No plugins found. Try a different search.', 'github-plugin-installer' ) . '</p>';
+			echo '<p>' . esc_html__( 'No plugins found. Try a different search.', 'github-plugin-browser' ) . '</p>';
 			echo '</div>';
 		}
 		echo '</div>';
@@ -220,11 +220,11 @@ class GPB_Admin_Page {
 	
 		echo '<div class="gpb-plugin-actions">';
 		if (self::is_plugin_installed($owner, $name)) {
-			echo '<span class="gpb-button gpb-button-disabled">' . esc_html__('Installed', 'github-plugin-installer') . '</span>';
+			echo '<span class="gpb-button gpb-button-disabled">' . esc_html__('Installed', 'github-plugin-browser') . '</span>';
 		} else {
-			echo '<a href="' . esc_url($install_url) . '" class="gpb-button gpb-button-primary">' . esc_html__( 'Install Now', 'github-plugin-installer' ) . '</a>';
+			echo '<a href="' . esc_url($install_url) . '" class="gpb-button gpb-button-primary">' . esc_html__( 'Install Now', 'github-plugin-browser' ) . '</a>';
 		}
-		echo '<a href="' . esc_url($item['html_url']) . '" class="gpb-more-details-link" target="_blank">' . esc_html__( 'More Details', 'github-plugin-installer' ) . '</a>';
+		echo '<a href="' . esc_url($item['html_url']) . '" class="gpb-more-details-link" target="_blank">' . esc_html__( 'More Details', 'github-plugin-browser' ) . '</a>';
 		echo '</div>';
 	
 		echo '<div class="gpb-plugin-meta">';

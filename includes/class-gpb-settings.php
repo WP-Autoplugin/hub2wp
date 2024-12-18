@@ -29,14 +29,14 @@ class GPB_Settings {
 
 		add_settings_section(
 			'gpb_settings_section',
-			__( 'GitHub Plugin Browser Settings', 'github-plugin-installer' ),
+			__( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ),
 			'__return_false',
 			'gpb_settings_page'
 		);
 
 		add_settings_field(
 			'gpb_access_token',
-			__( 'Personal Access Token', 'github-plugin-installer' ),
+			__( 'Personal Access Token', 'github-plugin-browser' ),
 			array( __CLASS__, 'access_token_field' ),
 			'gpb_settings_page',
 			'gpb_settings_section'
@@ -44,7 +44,7 @@ class GPB_Settings {
 
 		add_settings_field(
 			'gpb_cache_duration',
-			__( 'Cache Duration (Hours)', 'github-plugin-installer' ),
+			__( 'Cache Duration (Hours)', 'github-plugin-browser' ),
 			array( __CLASS__, 'cache_duration_field' ),
 			'gpb_settings_page',
 			'gpb_settings_section'
@@ -56,8 +56,8 @@ class GPB_Settings {
 	 */
 	public static function add_settings_page() {
 		add_options_page(
-			__( 'GitHub Plugin Browser Settings', 'github-plugin-installer' ),
-			__( 'GitHub Installer', 'github-plugin-installer' ),
+			__( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ),
+			__( 'GitHub Installer', 'github-plugin-browser' ),
 			'manage_options',
 			'gpb_settings_page',
 			array( __CLASS__, 'render_settings_page' )
@@ -71,7 +71,7 @@ class GPB_Settings {
 		$options = get_option( self::OPTION_NAME, array() );
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'GitHub Plugin Browser Settings', 'github-plugin-installer' ); ?></h1>
+			<h1><?php esc_html_e( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ); ?></h1>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'gpb_settings_group' ); ?>
 				<?php do_settings_sections( 'gpb_settings_page' ); ?>
@@ -90,10 +90,10 @@ class GPB_Settings {
 		?>
 		<input type="text" name="gpb_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
 		<p class="description">
-			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'github-plugin-installer' ); ?>
+			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'github-plugin-browser' ); ?>
 			<?php printf(
 				/* translators: %s: URL to create a personal access token */
-				__( 'Get a free token from %s.', 'github-plugin-installer' ),
+				__( 'Get a free token from %s.', 'github-plugin-browser' ),
 				'<a href="https://github.com/settings/tokens" target="_blank">GitHub</a>'
 			); ?>
 		</p>
@@ -108,7 +108,7 @@ class GPB_Settings {
 		$cache_duration  = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
 		?>
 		<input type="number" name="gpb_settings[cache_duration]" value="<?php echo esc_attr( $cache_duration ); ?>" min="1" />
-		<p class="description"><?php esc_html_e( 'How long to cache search results and plugin data in hours.', 'github-plugin-installer' ); ?></p>
+		<p class="description"><?php esc_html_e( 'How long to cache search results and plugin data in hours.', 'github-plugin-browser' ); ?></p>
 		<?php
 	}
 

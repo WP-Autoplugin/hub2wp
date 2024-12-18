@@ -63,7 +63,7 @@ class GPB_GitHub_API {
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $data ) || ! isset( $data['items'] ) ) {
-			return new WP_Error( 'gpb_api_error', __( 'Invalid response from GitHub API.', 'github-plugin-installer' ) );
+			return new WP_Error( 'gpb_api_error', __( 'Invalid response from GitHub API.', 'github-plugin-browser' ) );
 		}
 
 		GPB_Cache::set( $cache_key, $data );
@@ -110,7 +110,7 @@ class GPB_GitHub_API {
 			return $branch_url;
 		}
 
-		return new WP_Error( 'gpb_no_release', __( 'No release or default branch found.', 'github-plugin-installer' ) );
+		return new WP_Error( 'gpb_no_release', __( 'No release or default branch found.', 'github-plugin-browser' ) );
 	}
 
 	/**
@@ -148,7 +148,7 @@ class GPB_GitHub_API {
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
-			return new WP_Error( 'gpb_api_error', __( 'GitHub API returned an error.', 'github-plugin-installer' ) );
+			return new WP_Error( 'gpb_api_error', __( 'GitHub API returned an error.', 'github-plugin-browser' ) );
 		}
 
 		$headers = wp_remote_retrieve_headers( $response );

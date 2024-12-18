@@ -22,7 +22,7 @@ class GPB_Plugin_Installer {
 		$result   = $upgrader->install( $download_url );
 
 		if ( is_wp_error( $result ) || ! $result ) {
-			return new WP_Error( 'gpb_install_error', __( 'Failed to install the plugin.', 'github-plugin-installer' ) );
+			return new WP_Error( 'gpb_install_error', __( 'Failed to install the plugin.', 'github-plugin-browser' ) );
 		}
 		return true;
 	}

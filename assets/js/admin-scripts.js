@@ -77,17 +77,4 @@ jQuery(document).ready(function($) {
             closeGpbModal();
         }
     });
-
-    // Tab switching within the modal.
-    $('.gpb-modal-tabs .gpb-modal-tab').on('click', function() {
-        var tab = $(this).data('tab');
-
-        // Remove active class from all tabs and contents.
-        $('.gpb-modal-tabs .gpb-modal-tab').removeClass('active');
-        $('.gpb-modal-tab-content').removeClass('active');
-
-        // Add active class to the clicked tab and corresponding content.
-        $(this).addClass('active');
-        $('#' + tab).addClass('active');
-    });
 });

@@ -258,38 +258,36 @@ class GPB_Admin_Page {
 			<div class="gpb-modal-content">
 				<span class="gpb-modal-close">&times;</span>
 				<div class="gpb-modal-header">
-					<img src="" alt="" class="gpb-modal-image" />
-					<h2 class="gpb-modal-title"></h2>
-					<div class="gpb-modal-author"></div>
+					<div class="gpb-modal-header-image">
+						<img src="" alt="" class="gpb-modal-image" />
+					</div>
+					<div class="gpb-modal-header-text">
+						<h2 class="gpb-modal-title"></h2>
+						<div class="gpb-modal-author"></div>
+					</div>
 				</div>
 				<div class="gpb-modal-body">
-					<ul class="gpb-modal-tabs">
-						<li class="gpb-modal-tab active" data-tab="description">' . esc_html__( 'Description', 'github-plugin-browser' ) . '</li>
-						<li class="gpb-modal-tab" data-tab="readme">' . esc_html__( 'README', 'github-plugin-browser' ) . '</li>
-					</ul>
-					<div class="gpb-modal-content-area">
-						<div class="gpb-modal-tab-content active" id="description">
-							<p class="gpb-modal-description"></p>
+					<div class="gpb-modal-main">
+						<div class="gpb-modal-readme"></div>
+					</div>
+					<div class="gpb-modal-sidebar">
+						<div class="gpb-modal-meta">
 							<ul class="gpb-modal-stats">
-								<li>' . esc_html__( 'Stars:', 'github-plugin-browser' ) . ' <span class="gpb-modal-stars"></span></li>
-								<li>' . esc_html__( 'Forks:', 'github-plugin-browser' ) . ' <span class="gpb-modal-forks"></span></li>
-								<li>' . esc_html__( 'Watchers:', 'github-plugin-browser' ) . ' <span class="gpb-modal-watchers"></span></li>
-								<li>' . esc_html__( 'Open Issues:', 'github-plugin-browser' ) . ' <span class="gpb-modal-issues"></span></li>
-								<li>' . esc_html__( 'Version:', 'github-plugin-browser' ) . ' <span class="gpb-modal-version"></span></li>
-								<li>' . esc_html__( 'Last Updated:', 'github-plugin-browser' ) . ' <span class="gpb-modal-updated"></span></li>
+								<li><strong>' . esc_html__('Stars:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-stars"></span></li>
+								<li><strong>' . esc_html__('Forks:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-forks"></span></li>
+								<li><strong>' . esc_html__('Watchers:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-watchers"></span></li>
+								<li><strong>' . esc_html__('Open Issues:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-issues"></span></li>
+								<li><strong>' . esc_html__('Version:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-version"></span></li>
+								<li><strong>' . esc_html__('Last Updated:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-updated"></span></li>
 							</ul>
 							<div class="gpb-modal-links">
-								<a href="#" target="_blank" class="gpb-modal-github-link">' . esc_html__( 'View on GitHub', 'github-plugin-browser' ) . '</a>
-								<a href="#" target="_blank" class="gpb-modal-homepage-link">' . esc_html__( 'Visit Homepage', 'github-plugin-browser' ) . '</a>
+								<a href="#" target="_blank" class="gpb-button gpb-button-secondary gpb-modal-github-link">' . esc_html__('View on GitHub', 'github-plugin-browser') . '</a>
+								<a href="#" target="_blank" class="gpb-button gpb-button-secondary gpb-modal-homepage-link">' . esc_html__('Visit Homepage', 'github-plugin-browser') . '</a>
 							</div>
-						</div>
-						<div class="gpb-modal-tab-content" id="readme">
-							<div class="gpb-modal-readme"></div>
 						</div>
 					</div>
 				</div>
 			</div>
-		</div>
-		';
+		</div>';
 	}
 }

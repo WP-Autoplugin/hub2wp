@@ -116,6 +116,36 @@ class GPB_GitHub_API {
 	}
 
 	/**
+	 * Get latest release tag for a repository.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return string|WP_Error Tag or error.
+	 */
+	public function get_latest_release_tag( $owner, $repo ) {
+		$cache_key = 'release_tag_' . $owner . '_' . $repo;
+		$cached    = GPB_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$url      = $this->base_url . '/repos/' . $owner . '/' . $repo . '/releases/latest';
+		$response = $this->request( $url );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( isset( $data['tag_name'] ) ) {
+			GPB_Cache::set( $cache_key, $data['tag_name'], HOUR_IN_SECONDS );
+			return $data['tag_name'];
+		}
+
+		return new WP_Error( 'gpb_no_release', __( 'No release found.', 'github-plugin-browser' ) );
+	}
+
+	/**
 	 * Get repository details.
 	 *
 	 * @param string $owner Owner of the repo.
@@ -224,6 +254,38 @@ class GPB_GitHub_API {
 		}
 
 		return new WP_Error( 'gpb_image_error', __( 'No image available.', 'github-plugin-browser' ) );
+	}
+
+	/**
+	 * Get watchers count. This is not available in the repository details, so we need to fetch it separately.
+	 * It's included in the repository HTML page:
+	 * <a href="/WordPress/gutenberg/watchers" data-view-component="true" class="Link Link--muted"><svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-eye mr-2"><strong>348</strong> watching</a>
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return int|WP_Error Watchers count or error.
+	 */
+	public function get_watchers_count( $owner, $repo ) {
+		$cache_key = 'watchers_count_' . $owner . '_' . $repo;
+		$cached    = GPB_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		// Fetch and cache repository HTML
+		$repo_html = $this->get_repo_html( $owner, $repo );
+		if ( is_wp_error( $repo_html ) ) {
+			return $repo_html;
+		}
+
+		// Attempt to extract watchers count using regex or DOM parsing.
+		if ( preg_match( '/<strong>(\d+)<\/strong>\s+watching/', $repo_html, $matches ) ) {
+			$count = absint( $matches[1] );
+			GPB_Cache::set( $cache_key, $count, DAY_IN_SECONDS );
+			return $count;
+		}
+
+		return new WP_Error( 'gpb_watchers_error', __( 'Unable to determine watchers count.', 'github-plugin-browser' ) );
 	}
 
 	/**

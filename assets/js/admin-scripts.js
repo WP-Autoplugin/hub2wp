@@ -2,10 +2,9 @@ jQuery(document).ready(function($) {
     // Function to open modal with plugin details.
     function openGpbModal(data) {
         var modal = $('#gpb-plugin-modal');
-        modal.find('.gpb-modal-image').attr('src', data.og_image);
         modal.find('.gpb-modal-title').text(data.name);
-        modal.find('.gpb-modal-author').html('By <a href="' + data.author_url + '" target="_blank">' + data.author + '</a>');
-        modal.find('.gpb-modal-description').text(data.description);
+        modal.find('.gpb-modal-author').html('<a href="' + data.author_url + '" target="_blank">' + data.author + '</a>');
+        modal.find('.gpb-modal-description').html(data.description);
         modal.find('.gpb-modal-stars').text(data.stargazers);
         modal.find('.gpb-modal-forks').text(data.forks);
         modal.find('.gpb-modal-watchers').text(data.watchers);
@@ -13,12 +12,14 @@ jQuery(document).ready(function($) {
         modal.find('.gpb-modal-version').text(data.version);
         modal.find('.gpb-modal-updated').text(data.updated_at);
         modal.find('.gpb-modal-github-link').attr('href', data.html_url);
+        modal.find('.gpb-modal-header').css('background-image', 'url(' + data.og_image + ')');
+
         if (data.homepage) {
             modal.find('.gpb-modal-homepage-link').attr('href', data.homepage).show();
         } else {
             modal.find('.gpb-modal-homepage-link').hide();
         }
-        modal.find('.gpb-modal-readme').html(data.readme);
+        modal.find('.gpb-modal-readme-content').html(data.readme);
 
         // Show the modal
         modal.fadeIn();

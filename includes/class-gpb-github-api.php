@@ -349,6 +349,49 @@ class GPB_GitHub_API {
 	}
 
 	/**
+     * Get contributors for a repository.
+     *
+     * @param string $owner Owner of the repo.
+     * @param string $repo  Repo name.
+     * @return array|WP_Error Contributors or error.
+     */
+    public function get_contributors($owner, $repo) {
+        $cache_key = 'contributors_' . $owner . '_' . $repo;
+        $cached = GPB_Cache::get($cache_key);
+        if (false !== $cached) {
+            return $cached;
+        }
+
+        $url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/contributors';
+        $response = $this->request($url);
+
+        if (is_wp_error($response)) {
+            return $response;
+        }
+
+        $contributors = json_decode(wp_remote_retrieve_body($response), true);
+        if (!is_array($contributors)) {
+            return new WP_Error('gpb_api_error', __('Invalid contributors data from GitHub API.', 'github-plugin-browser'));
+        }
+
+        // Limit to 5 contributors
+        $contributors = array_slice($contributors, 0, 5);
+
+        // Prepare data for each contributor
+        $data = array();
+        foreach ($contributors as $contributor) {
+            $data[] = array(
+                'login' => isset($contributor['login']) ? sanitize_text_field($contributor['login']) : '',
+                'html_url' => isset($contributor['html_url']) ? esc_url_raw($contributor['html_url']) : '',
+                'avatar_url' => isset($contributor['avatar_url']) ? esc_url_raw($contributor['avatar_url']) : '',
+            );
+        }
+
+        GPB_Cache::set($cache_key, $data, HOUR_IN_SECONDS);
+        return $data;
+    }
+
+	/**
 	 * Check rate limits and handle them.
 	 *
 	 * @param array $headers Response headers.
@@ -380,6 +423,7 @@ class GPB_GitHub_API {
 		$args = wp_parse_args( $args, $default_args );
 
 		$response = wp_remote_get( $url, $args );
+
 		if ( is_wp_error( $response ) ) {
 			return $response;
 		}

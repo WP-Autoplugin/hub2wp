@@ -22,8 +22,8 @@ class GPB_Admin_Page {
 	public static function add_menu_page() {
 		add_submenu_page(
 			'plugins.php',
-			__( 'GitHub Plugin Browser', 'github-plugin-browser' ),
-			__( 'GitHub Browser', 'github-plugin-browser' ),
+			__( 'Add Plugins', 'github-plugin-browser' ),
+			__( 'Add GitHub Plugin', 'github-plugin-browser' ),
 			'install_plugins',
 			'gpb-plugin-browser',
 			array( __CLASS__, 'render_page' )
@@ -136,7 +136,7 @@ class GPB_Admin_Page {
 		echo '<div class="gpb-popular-tags">';
 		$popular_tags = array('woocommerce', 'seo', 'security', 'social', 'forms');
 		foreach ($popular_tags as $tag) {
-			echo '<a href="' . esc_url(add_query_arg('tag', $tag)) . '" class="gpb-tag ' . ( ( isset($_GET['tag']) && $tag === $_GET['tag'] ) ? 'gpb-tag-active' : '' ) . '">' . esc_html($tag) . '</a>';
+			echo '<a href="' . esc_url( add_query_arg( 'tag', $tag, remove_query_arg( 'paged' ) ) ) . '" class="gpb-tag ' . ( ( isset($_GET['tag']) && $tag === $_GET['tag'] ) ? 'gpb-tag-active' : '' ) . '">' . esc_html($tag) . '</a>';
 		}
 		echo '</div>';
 	
@@ -162,8 +162,8 @@ class GPB_Admin_Page {
 				echo paginate_links( array(
 					'base'    => add_query_arg( 'paged', '%#%' ),
 					'format'  => '',
-					'prev_text' => __('&laquo;'),
-					'next_text' => __('&raquo;'),
+					'prev_text' => __('«'),
+					'next_text' => __('»'),
 					'total'   => $total_pages,
 					'current' => $page
 				) );
@@ -256,36 +256,40 @@ class GPB_Admin_Page {
 		echo '
 		<div id="gpb-plugin-modal" class="gpb-modal">
 			<div class="gpb-modal-content">
-				<span class="gpb-modal-close">&times;</span>
+				<span class="gpb-modal-close">×</span>
 				<div class="gpb-modal-header">
-					<div class="gpb-modal-header-image">
-						<img src="" alt="" class="gpb-modal-image" />
-					</div>
 					<div class="gpb-modal-header-text">
 						<h2 class="gpb-modal-title"></h2>
-						<div class="gpb-modal-author"></div>
 					</div>
 				</div>
 				<div class="gpb-modal-body">
 					<div class="gpb-modal-main">
-						<div class="gpb-modal-readme"></div>
+						<div class="gpb-modal-readme-content"></div>
 					</div>
 					<div class="gpb-modal-sidebar">
 						<div class="gpb-modal-meta">
-							<ul class="gpb-modal-stats">
-								<li><strong>' . esc_html__('Stars:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-stars"></span></li>
-								<li><strong>' . esc_html__('Forks:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-forks"></span></li>
-								<li><strong>' . esc_html__('Watchers:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-watchers"></span></li>
-								<li><strong>' . esc_html__('Open Issues:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-issues"></span></li>
-								<li><strong>' . esc_html__('Version:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-version"></span></li>
-								<li><strong>' . esc_html__('Last Updated:', 'github-plugin-browser') . '</strong> <span class="gpb-modal-updated"></span></li>
-							</ul>
-							<div class="gpb-modal-links">
-								<a href="#" target="_blank" class="gpb-button gpb-button-secondary gpb-modal-github-link">' . esc_html__('View on GitHub', 'github-plugin-browser') . '</a>
-								<a href="#" target="_blank" class="gpb-button gpb-button-secondary gpb-modal-homepage-link">' . esc_html__('Visit Homepage', 'github-plugin-browser') . '</a>
+							<div class="gpb-modal-rating">
+								<div class="gpb-modal-rating-stars"></div>
+								<span class="gpb-modal-rating-count"></span>
 							</div>
+							<ul class="gpb-modal-stats">
+								<li><span class="dashicons dashicons-admin-users"></span>' . esc_html__('Author:', 'github-plugin-browser') . ' <span class="gpb-modal-author"></span></li>
+								<li><span class="dashicons dashicons-star-filled"></span>' . esc_html__('Stars:', 'github-plugin-browser') . ' <span class="gpb-modal-stars"></span></li>
+								<li><span class="dashicons dashicons-networking"></span>' . esc_html__('Forks:', 'github-plugin-browser') . ' <span class="gpb-modal-forks"></span></li>
+								<li><span class="dashicons dashicons-visibility"></span>' . esc_html__('Watchers:', 'github-plugin-browser') . ' <span class="gpb-modal-watchers"></span></li>
+								<li><span class="dashicons dashicons-warning"></span>' . esc_html__('Open Issues:', 'github-plugin-browser') . ' <span class="gpb-modal-issues"></span></li>
+								<li><span class="dashicons dashicons-tag"></span>' . esc_html__('Version:', 'github-plugin-browser') . ' <span class="gpb-modal-version"></span></li>
+								<li><span class="dashicons dashicons-clock"></span>' . esc_html__('Last Updated:', 'github-plugin-browser') . ' <span class="gpb-modal-updated"></span></li>
+							</ul>
 						</div>
 					</div>
+				</div>
+				<div class="gpb-modal-footer">
+					<div class="gpb-modal-links">
+						<a href="#" target="_blank" class="gpb-button gpb-button-secondary gpb-modal-github-link">' . esc_html__('View on GitHub', 'github-plugin-browser') . '</a>
+						<a href="#" target="_blank" class="gpb-button gpb-button-secondary gpb-modal-homepage-link">' . esc_html__('Visit Homepage', 'github-plugin-browser') . '</a>
+					</div>
+					<a href="#" class="gpb-button gpb-button-primary gpb-modal-install-button">' . esc_html__('Install Now', 'github-plugin-browser') . '</a>
 				</div>
 			</div>
 		</div>';

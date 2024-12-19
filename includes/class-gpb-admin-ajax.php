@@ -68,9 +68,10 @@ class GPB_Admin_Ajax {
 			'homepage'       => isset( $repo_details['homepage'] ) ? esc_url_raw( $repo_details['homepage'] ) : '',
 			'version'        => $api->get_latest_release_tag( $owner, $repo ),
 			'og_image'       => esc_url_raw( $og_image ),
+			'owner_avatar_url' => isset($repo_details['owner']['avatar_url']) ? esc_url_raw($repo_details['owner']['avatar_url']) : '',
 			'author'         => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'author_url'     => isset( $repo_details['owner']['html_url'] ) ? esc_url_raw( $repo_details['owner']['html_url'] ) : '',
-			'updated_at'     => isset( $repo_details['updated_at'] ) ? human_time_diff( strtotime( $repo_details['updated_at'] ), current_time( 'timestamp' ) ) . ' ' . __( 'ago', 'github-plugin-browser' ) : '',
+			'updated_at'     => isset($repo_details['updated_at']) ? human_time_diff(strtotime($repo_details['updated_at'])) . ' ago' : '',
 		);
 
 		wp_send_json_success( $data );

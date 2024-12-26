@@ -29,7 +29,7 @@ class GPB_Settings {
 
 		add_settings_section(
 			'gpb_settings_section',
-			__( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ),
+			'', // no title
 			'__return_false',
 			'gpb_settings_page'
 		);
@@ -46,6 +46,14 @@ class GPB_Settings {
 			'gpb_cache_duration',
 			__( 'Cache Duration (Hours)', 'github-plugin-browser' ),
 			array( __CLASS__, 'cache_duration_field' ),
+			'gpb_settings_page',
+			'gpb_settings_section'
+		);
+
+		add_settings_field(
+			'gpb_monitored_plugins',
+			__( 'Monitored Plugins', 'github-plugin-browser' ),
+			array( __CLASS__, 'monitored_plugins_field' ),
 			'gpb_settings_page',
 			'gpb_settings_section'
 		);
@@ -68,16 +76,37 @@ class GPB_Settings {
 	 * Render settings page.
 	 */
 	public static function render_settings_page() {
-		$options = get_option( self::OPTION_NAME, array() );
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ); ?></h1>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'gpb_settings_group' ); ?>
 				<?php do_settings_sections( 'gpb_settings_page' ); ?>
+
 				<?php submit_button(); ?>
 			</form>
 		</div>
+		<?php
+	}
+
+	public static function next_run_schedule() {
+		?>
+		<p>
+			<?php
+			$next_check = wp_next_scheduled( 'gpb_daily_update_check' );
+			// translators: %s: human-readable time difference (e.g. "1 hour"), %s: link to run the update check, %d: number of API calls
+			printf(
+				esc_html__( 'The daily update check is scheduled to run in %s. %s (note: the GitHub API will be called %d times).', 'github-plugin-browser' ),
+				'<span>' . $next_check ? human_time_diff( time(), $next_check ) : __( 'less than 1 minute', 'github-plugin-browser' ) . '</span>',
+				sprintf(
+					'<a href="%s">%s</a>',
+					wp_nonce_url( admin_url( 'options-general.php?page=gpb_settings_page&action=gpb_run_update_check' ), 'gpb_run_update_check' ),
+					esc_html__( 'Run now', 'github-plugin-browser' )
+				),
+				count( get_option( 'gpb_plugins', array() ) )
+			);
+			?>
+		</p>
 		<?php
 	}
 
@@ -150,5 +179,31 @@ class GPB_Settings {
 		$options = get_option( self::OPTION_NAME, array() );
 		$hours   = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
 		return $hours * HOUR_IN_SECONDS;
+	}
+
+	/**
+	 * Monitored plugins field callback.
+	 * Shows a list of plugins that are being monitored, with checkboxes to disable monitoring.
+	 * Once disabled, the plugin must be re-installed through the GitHub Plugin Browser to re-enable monitoring.
+	 */
+	public static function monitored_plugins_field() {
+		$monitored_plugins = get_option( 'gpb_plugins', array() );
+
+		if ( empty( $monitored_plugins ) ) {
+			echo '<p class="description">' . esc_html__( 'No plugins are currently being monitored for updates. Install a plugin through the GitHub Plugin Browser to enable update monitoring.', 'github-plugin-browser' ) . '</p>';
+			return;
+		}
+
+		foreach ( $monitored_plugins as $key => $plugin ) {
+			?>
+			<label>
+				<input type="checkbox" name="gpb_settings[monitored_plugins][]" value="<?php echo esc_attr( $key ); ?>" checked="checked" />
+				<?php echo esc_html( $plugin['name'] ); ?>
+				(<a href="<?php echo esc_url( 'https://github.com/' . $key ); ?>" target="_blank"><?php echo esc_html( $key ); ?></a>)
+			</label><br />
+			<?php
+		}
+		?>
+		<?php
 	}
 }

@@ -16,14 +16,8 @@ define( 'GPB_VERSION', '1.0.0' );
 define( 'GPB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GPB_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-// Include required files.
-require_once GPB_PLUGIN_DIR . 'includes/class-gpb-cache.php';
-require_once GPB_PLUGIN_DIR . 'includes/class-gpb-github-api.php';
-require_once GPB_PLUGIN_DIR . 'includes/class-gpb-settings.php';
-require_once GPB_PLUGIN_DIR . 'includes/class-gpb-admin-page.php';
-require_once GPB_PLUGIN_DIR . 'includes/class-gpb-plugin-installer.php';
-require_once GPB_PLUGIN_DIR . 'includes/class-gpb-plugin-updater.php';
-require_once GPB_PLUGIN_DIR . 'includes/class-gpb-admin-ajax.php'; // New AJAX handler.
+// Include autoload.
+require_once GPB_PLUGIN_DIR . 'vendor/autoload.php';
 
 // Load text domain.
 function gpb_load_textdomain() {

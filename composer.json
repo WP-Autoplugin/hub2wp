@@ -1,0 +1,17 @@
+{
+    "name": "wp-autoplugin/wp-github-plugin-browser",
+    "description": "Browse, install, and update WordPress plugins from GitHub, as if they were in the .org repo.",
+    "type": "wordpress-plugin",
+    "autoload": {
+        "classmap": [
+            "includes/"
+        ]
+    },
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "WP-Autoplugin",
+            "email": "connect@webwizwork.com"
+        }
+    ]
+}

@@ -1,4 +1,8 @@
 <?php
+/**
+ * Handles interaction with the GitHub API.
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -38,7 +42,8 @@ class GPB_GitHub_API {
 	 * @param int    $page  Page number.
 	 * @param string $sort  Sort parameter.
 	 * @param string $order Order parameter.
-	 * @return array Results or WP_Error.
+	 *
+	 * @return array|WP_Error Search results or error.
 	 */
 	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
 		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
@@ -51,8 +56,8 @@ class GPB_GitHub_API {
 			array(
 				'q'        => $query,
 				'page'     => $page,
-				'per_page' => 10,
-				'sort'     => $sort,
+				'per_page' => 12,
+				'sort'     => $sort, // Can be one of: stars, forks, help-wanted-issues, updated.
 				'order'    => $order,
 			),
 			$this->base_url . '/search/repositories'
@@ -73,76 +78,15 @@ class GPB_GitHub_API {
 	}
 
 	/**
-	 * Get latest release download URL for a repository.
-	 *
+	 * Get zipball URL for the main branch of a repository.
+	 * 
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
-	 * @return string|WP_Error URL or error.
+	 * @return string Zipball URL.
 	 */
-	public function get_latest_release_zip( $owner, $repo ) {
-		$cache_key = 'release_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
-		if ( false !== $cached ) {
-			return $cached;
-		}
-
-		$url      = $this->base_url . '/repos/' . $owner . '/' . $repo . '/releases/latest';
-		$response = $this->request( $url );
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( isset( $data['zipball_url'] ) ) {
-			GPB_Cache::set( $cache_key, $data['zipball_url'], HOUR_IN_SECONDS );
-			return $data['zipball_url'];
-		}
-
-		// If no release found, try default branch archive.
-		$url      = $this->base_url . '/repos/' . $owner . '/' . $repo;
-		$response = $this->request( $url );
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( isset( $data['default_branch'] ) ) {
-			$branch_url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/zipball/' . $data['default_branch'];
-			GPB_Cache::set( $cache_key, $branch_url, HOUR_IN_SECONDS );
-			return $branch_url;
-		}
-
-		return new WP_Error( 'gpb_no_release', __( 'No release or default branch found.', 'github-plugin-browser' ) );
-	}
-
-	/**
-	 * Get latest release tag for a repository.
-	 *
-	 * @param string $owner Owner of the repo.
-	 * @param string $repo  Repo name.
-	 * @return string|WP_Error Tag or error.
-	 */
-	public function get_latest_release_tag( $owner, $repo ) {
-		$cache_key = 'release_tag_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
-		if ( false !== $cached ) {
-			return $cached;
-		}
-
-		$url      = $this->base_url . '/repos/' . $owner . '/' . $repo . '/releases/latest';
-		$response = $this->request( $url );
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( isset( $data['tag_name'] ) ) {
-			GPB_Cache::set( $cache_key, $data['tag_name'], HOUR_IN_SECONDS );
-			return $data['tag_name'];
-		}
-
-		return new WP_Error( 'gpb_no_release', __( 'No release found.', 'github-plugin-browser' ) );
+	public function get_download_url( $owner, $repo ) {
+		$branch_url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/zipball';
+		return $branch_url;
 	}
 
 	/**
@@ -405,6 +349,93 @@ class GPB_GitHub_API {
 	}
 
 	/**
+	 * Check if plugin is compatible with the current WordPress environment.
+	 * 
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return array|WP_Error Compatibility data (is_compatible, reason) or error.
+	 */
+	public function check_compatibility( $owner, $repo ) {
+		$url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/contents/readme.txt';
+		$response = $this->request( $url );
+
+		if ( is_wp_error( $response ) ) {
+			if ( 'gpb_api_error_404' === $response->get_error_code() ) {
+				return array(
+					'is_compatible' => false,
+					'reason'        => __( 'No valid readme.txt file found.', 'github-plugin-browser' ),
+				);
+			}
+
+			return $response;
+		}
+
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! isset( $data['content'] ) || empty( $data['content'] ) ) {
+			return array(
+				'is_compatible' => false,
+				'reason'        => __( 'No valid readme.txt file found.', 'github-plugin-browser' ),
+			);
+		}
+
+		// Decode the base64-encoded readme.txt file.
+		$readme = base64_decode( $data['content'] );
+		if ( ! $readme ) {
+			return array(
+				'is_compatible' => false,
+				'reason'        => __( 'No valid readme.txt file found.', 'github-plugin-browser' ),
+			);
+		}
+
+		// Parse required headers.
+		$headers = array(
+			'Requires at least' => '',
+			'Tested up to'      => '',
+			'Requires PHP'      => '',
+		);
+
+		foreach ( $headers as $header => &$value ) {
+			if ( preg_match( '/^' . preg_quote( $header, '/' ) . ':\s*(.+)$/mi', $readme, $matches ) ) {
+				$value = trim( $matches[1] );
+			}
+		}
+
+		// Check WordPress compatibility.
+		if ( ! empty( $headers['Requires at least'] ) && version_compare( get_bloginfo( 'version' ), $headers['Requires at least'], '<' ) ) {
+			return array(
+				'is_compatible' => false,
+				'reason'        => sprintf(
+					__( 'This plugin requires WordPress version %s or higher.', 'github-plugin-browser' ),
+					$headers['Requires at least']
+				),
+			);
+		}
+
+		// Check PHP compatibility.
+		if ( ! empty( $headers['Requires PHP'] ) && version_compare( PHP_VERSION, $headers['Requires PHP'], '<' ) ) {
+			return array(
+				'is_compatible' => false,
+				'reason'        => sprintf(
+					__( 'This plugin requires PHP version %s or higher.', 'github-plugin-browser' ),
+					$headers['Requires PHP']
+				),
+			);
+		}
+
+		if ( ! empty( $headers['Tested up to'] ) && version_compare( get_bloginfo( 'version' ), $headers['Tested up to'], '>' ) ) {
+			return array(
+				'is_compatible' => true,
+				'reason'        => __( 'This plugin has not been tested with your WordPress version.', 'github-plugin-browser' ),
+			);
+		}
+
+		return array(
+			'is_compatible' => true,
+			'reason'        => '',
+		);
+	}
+
+	/**
 	 * Make a request to the GitHub API.
 	 *
 	 * @param string $url  Request URL.
@@ -421,7 +452,6 @@ class GPB_GitHub_API {
 		}
 
 		$args = wp_parse_args( $args, $default_args );
-
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
@@ -430,7 +460,7 @@ class GPB_GitHub_API {
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
-			return new WP_Error( 'gpb_api_error', __( 'GitHub API returned an error.', 'github-plugin-browser' ) );
+			return new WP_Error( "gpb_api_error_$code", sprintf( __( 'GitHub API HTTP error: %s', 'github-plugin-browser' ), $code ) );
 		}
 
 		$headers = wp_remote_retrieve_headers( $response );

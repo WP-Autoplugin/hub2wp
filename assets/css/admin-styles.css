@@ -12,6 +12,7 @@
 .gpb-popular-tags {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
 }
 
@@ -23,7 +24,6 @@
 .gpb-popular-tags a {
     text-decoration: none;
     padding: 4px 8px;
-    border-radius: 2px;
     color: #2271b1;
     background: #f0f0f1;
     font-size: 13px;
@@ -49,7 +49,6 @@
 
 .gpb-search-form input[type="search"] {
     width: 280px;
-    padding: 6px 12px;
 }
 
 /* Plugin Cards Grid */
@@ -188,16 +187,30 @@
     pointer-events: none;
 }
 
-.gpb-button:hover {
+.gpb-button-primary:hover {
     background: #2271b1;
     color: #fff;
 }
 
-.gpb-button:active {
+.gpb-button-primary:focus {
     background: #1e5b90;
+    color: #fff;
+    outline: 1px solid #2271b1;
+}
+
+.gpb-button-secondary:hover {
+    background: #f0f0f1;
+    color: #2271b1;
+}
+
+.gpb-button-secondary:focus {
+    background: #e6e7e8;
+    color: #2271b1;
+    outline: 1px solid #2271b1;
 }
 
 /* Pagination */
+
 .gpb-pagination {
     display: flex;
     justify-content: center;
@@ -238,6 +251,10 @@
     color: #fff;
 }
 
+.gpb-hidden {
+    display: none;
+}
+
 /* Modal Styles */
 .gpb-modal {
     display: none;
@@ -265,6 +282,25 @@
     transform: translate(-50%, -50%);
     max-height: 80vh;
     overflow-y: auto;
+}
+
+#gpb-plugin-modal.gpb-modal-loading .gpb-modal-content > * {
+    visibility: hidden;
+}
+
+#gpb-plugin-modal.gpb-modal-loading .gpb-modal-content:after {
+    content: '';
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50px;
+    height: 50px;
+    margin: -25px 0 0 -25px;
+    border: 5px solid #f3f3f3;
+    border-top-color: #23282d;
+    border-radius: 50%;
+    animation: gpb-spin 1s linear infinite;
 }
 
 .gpb-modal-close {
@@ -329,16 +365,20 @@
     gap: 30px;
     border-top: 1px solid #dcdcde;
     position: relative;
-    height: calc(100% - 60px); /* Full height minus header/footer */
+    height: calc(100% - 60px);
     min-height: 300px;
     overflow: hidden;
-    align-items: stretch; /* Stretch children to full height */
+    align-items: stretch;
 }
 
 .gpb-modal-body > .gpb-modal-main {
     flex: 1;
     padding: 10px 30px;
     overflow-y: auto;
+}
+
+.gpb-modal-readme-content h1, .gpb-modal-readme-content h2, .gpb-modal-readme-content h3, .gpb-modal-readme-content h4, .gpb-modal-readme-content h5, .gpb-modal-readme-content h6 {
+    line-height: 1.2;
 }
 
 .gpb-modal-body > .gpb-modal-sidebar {
@@ -348,7 +388,6 @@
     border-left: 1px solid #dcdcde;
     color: #646970;
     flex-shrink: 0;
-    /* Remove fixed height to allow stretching */
 }
 
 .gpb-modal-stats {
@@ -376,6 +415,60 @@
     color: #646970;
 }
 
+.gpb-modal-stats li.gpb-loading span.dashicons {
+    display: inline-block;
+    transform: scaleX(-1);
+}
+
+.gpb-modal-stats li.gpb-loading span.dashicons::before {
+    content: '\f531';
+    animation: gpb-spin-invert 1s linear infinite;
+    display: inline-block;
+    font-size: 16px;
+    margin-right: 5px;
+}
+
+.gpb-modal-stats li span.gpb-modal-compatibility {
+    font-weight: 600;
+    color: #3c434a;
+}
+
+.gpb-loading span.gpb-modal-compatibility {
+    vertical-align: bottom;
+}
+
+.gpb-modal-incompatibility-reason {
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #dcdcde;
+}
+
+/* Topics look like tags */
+.gpb-modal-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.gpb-modal-topics span a {
+    text-decoration: none;
+    padding: 4px 8px;
+    color: #2271b1;
+    background: #f0f0f1;
+    font-size: 13px;
+}
+.gpb-modal-topics span a:hover {
+    background: #2271b1;
+    color: #fff;
+}
+
+.gpb-modal-plugin-compatility:before {
+    content: '';
+    display: block;
+    height: 1px;
+    background: #dcdcde;
+    margin: 20px 0;
+}
+
 .gpb-modal-footer {
     background: #f6f7f7;
     border-top: 1px solid #dcdcde;
@@ -393,6 +486,11 @@
 }
 
 @media (max-width: 782px) {
+    .gpb-top-bar {
+        flex-direction: column;
+        gap: 20px;
+    }
+
     .gpb-modal-content {
         margin: 0 15px;
         width: calc(100% - 30px);
@@ -404,5 +502,23 @@
     
     .gpb-modal-title {
         font-size: 24px;
+    }
+}
+
+@keyframes gpb-spin {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes gpb-spin-invert {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(-360deg);
     }
 }

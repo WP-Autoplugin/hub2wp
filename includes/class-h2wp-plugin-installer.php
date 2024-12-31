@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * For now, plugin installation is handled directly in the admin page class.
  * This class is provided as a placeholder for organizational purposes.
  */
-class GPB_Plugin_Installer {
+class H2WP_Plugin_Installer {
 
 	public $plugin_data = array();
 
@@ -25,14 +25,14 @@ class GPB_Plugin_Installer {
 	public function install_plugin( $download_url ) {
 		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
 		
-		$upgrader = new Plugin_Upgrader( new GPB_Silent_Installer_Skin() );
+		$upgrader = new Plugin_Upgrader( new H2WP_Silent_Installer_Skin() );
 
 		ob_start();
 		$result   = $upgrader->install( $download_url );
 		ob_end_clean();
 
 		if ( is_wp_error( $result ) || ! $result ) {
-			return new WP_Error( 'gpb_install_error', __( 'Failed to install the plugin.', 'github-plugin-browser' ) );
+			return new WP_Error( 'h2wp_install_error', __( 'Failed to install the plugin.', 'hub2wp' ) );
 		}
 
 		$this->plugin_data = array(

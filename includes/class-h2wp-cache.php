@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Handles caching logic.
  */
-class GPB_Cache {
+class H2WP_Cache {
 
 	/**
 	 * Get cached data.
@@ -15,7 +15,7 @@ class GPB_Cache {
 	 * @return mixed Cached data or false if not found.
 	 */
 	public static function get( $key ) {
-		return get_transient( 'gpb_' . $key );
+		return get_transient( 'h2wp_' . $key );
 	}
 
 	/**
@@ -27,9 +27,9 @@ class GPB_Cache {
 	 */
 	public static function set( $key, $data, $duration = null ) {
 		if ( ! $duration ) {
-			$duration = GPB_Settings::get_cache_duration();
+			$duration = H2WP_Settings::get_cache_duration();
 		}
-		set_transient( 'gpb_' . $key, $data, $duration );
+		set_transient( 'h2wp_' . $key, $data, $duration );
 	}
 
 	/**
@@ -38,6 +38,6 @@ class GPB_Cache {
 	 * @param string $key Cache key.
 	 */
 	public static function delete( $key ) {
-		delete_transient( 'gpb_' . $key );
+		delete_transient( 'h2wp_' . $key );
 	}
 }

@@ -6,12 +6,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Handles the settings page and options.
  */
-class GPB_Settings {
+class H2WP_Settings {
 
 	/**
 	 * Option name.
 	 */
-	const OPTION_NAME = 'gpb_settings';
+	const OPTION_NAME = 'h2wp_settings';
 
 	/**
 	 * Initialize the settings.
@@ -26,37 +26,37 @@ class GPB_Settings {
 	 * Register settings.
 	 */
 	public static function register_settings() {
-		register_setting( 'gpb_settings_group', self::OPTION_NAME, array( __CLASS__, 'sanitize_settings' ) );
+		register_setting( 'h2wp_settings_group', self::OPTION_NAME, array( __CLASS__, 'sanitize_settings' ) );
 
 		add_settings_section(
-			'gpb_settings_section',
+			'h2wp_settings_section',
 			'', // no title
 			'__return_false',
-			'gpb_settings_page'
+			'h2wp_settings_page'
 		);
 
 		add_settings_field(
-			'gpb_access_token',
-			__( 'Personal Access Token', 'github-plugin-browser' ),
+			'h2wp_access_token',
+			__( 'Personal Access Token', 'hub2wp' ),
 			array( __CLASS__, 'access_token_field' ),
-			'gpb_settings_page',
-			'gpb_settings_section'
+			'h2wp_settings_page',
+			'h2wp_settings_section'
 		);
 
 		add_settings_field(
-			'gpb_cache_duration',
-			__( 'Cache Duration (Hours)', 'github-plugin-browser' ),
+			'h2wp_cache_duration',
+			__( 'Cache Duration (Hours)', 'hub2wp' ),
 			array( __CLASS__, 'cache_duration_field' ),
-			'gpb_settings_page',
-			'gpb_settings_section'
+			'h2wp_settings_page',
+			'h2wp_settings_section'
 		);
 
 		add_settings_field(
-			'gpb_monitored_plugins',
-			__( 'Monitored Plugins', 'github-plugin-browser' ),
+			'h2wp_monitored_plugins',
+			__( 'Monitored Plugins', 'hub2wp' ),
 			array( __CLASS__, 'monitored_plugins_field' ),
-			'gpb_settings_page',
-			'gpb_settings_section'
+			'h2wp_settings_page',
+			'h2wp_settings_section'
 		);
 	}
 
@@ -65,10 +65,10 @@ class GPB_Settings {
 	 */
 	public static function add_settings_page() {
 		add_options_page(
-			__( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ),
-			__( 'GitHub Plugins', 'github-plugin-browser' ),
+			__( 'hub2wp Settings', 'hub2wp' ),
+			__( 'GitHub Plugins', 'hub2wp' ),
 			'manage_options',
-			'gpb_settings_page',
+			'h2wp_settings_page',
 			array( __CLASS__, 'render_settings_page' )
 		);
 	}
@@ -79,10 +79,10 @@ class GPB_Settings {
 	public static function render_settings_page() {
 		?>
 		<div class="wrap">
-			<h1><?php esc_html_e( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ); ?></h1>
+			<h1><?php esc_html_e( 'hub2wp Settings', 'hub2wp' ); ?></h1>
 			<form method="post" action="options.php">
-				<?php settings_fields( 'gpb_settings_group' ); ?>
-				<?php do_settings_sections( 'gpb_settings_page' ); ?>
+				<?php settings_fields( 'h2wp_settings_group' ); ?>
+				<?php do_settings_sections( 'h2wp_settings_page' ); ?>
 
 				<?php submit_button(); ?>
 			</form>
@@ -94,17 +94,17 @@ class GPB_Settings {
 		?>
 		<p>
 			<?php
-			$next_check = wp_next_scheduled( 'gpb_daily_update_check' );
+			$next_check = wp_next_scheduled( 'h2wp_daily_update_check' );
 			// translators: %s: human-readable time difference (e.g. "1 hour"), %s: link to run the update check, %d: number of API calls
 			printf(
-				esc_html__( 'The daily update check is scheduled to run in %s. %s (note: the GitHub API will be called %d times).', 'github-plugin-browser' ),
-				'<span>' . $next_check ? human_time_diff( time(), $next_check ) : __( 'less than 1 minute', 'github-plugin-browser' ) . '</span>',
+				esc_html__( 'The daily update check is scheduled to run in %s. %s (note: the GitHub API will be called %d times).', 'hub2wp' ),
+				'<span>' . $next_check ? human_time_diff( time(), $next_check ) : __( 'less than 1 minute', 'hub2wp' ) . '</span>',
 				sprintf(
 					'<a href="%s">%s</a>',
-					wp_nonce_url( admin_url( 'options-general.php?page=gpb_settings_page&action=gpb_run_update_check' ), 'gpb_run_update_check' ),
-					esc_html__( 'Run now', 'github-plugin-browser' )
+					wp_nonce_url( admin_url( 'options-general.php?page=h2wp_settings_page&action=h2wp_run_update_check' ), 'h2wp_run_update_check' ),
+					esc_html__( 'Run now', 'hub2wp' )
 				),
-				count( get_option( 'gpb_plugins', array() ) )
+				count( get_option( 'h2wp_plugins', array() ) )
 			);
 			?>
 		</p>
@@ -118,12 +118,12 @@ class GPB_Settings {
 		$options      = get_option( self::OPTION_NAME, array() );
 		$access_token = isset( $options['access_token'] ) ? $options['access_token'] : '';
 		?>
-		<input type="text" name="gpb_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
+		<input type="text" name="h2wp_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
 		<p class="description">
-			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'github-plugin-browser' ); ?>
+			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'hub2wp' ); ?>
 			<?php printf(
 				/* translators: %s: URL to create a personal access token */
-				__( 'Get a free token from %s.', 'github-plugin-browser' ),
+				__( 'Get a free token from %s.', 'hub2wp' ),
 				'<a href="https://github.com/settings/tokens" target="_blank">GitHub</a>'
 			); ?>
 		</p>
@@ -137,8 +137,8 @@ class GPB_Settings {
 		$options         = get_option( self::OPTION_NAME, array() );
 		$cache_duration  = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
 		?>
-		<input type="number" name="gpb_settings[cache_duration]" value="<?php echo esc_attr( $cache_duration ); ?>" min="1" />
-		<p class="description"><?php esc_html_e( 'How long to cache search results and plugin data in hours.', 'github-plugin-browser' ); ?></p>
+		<input type="number" name="h2wp_settings[cache_duration]" value="<?php echo esc_attr( $cache_duration ); ?>" min="1" />
+		<p class="description"><?php esc_html_e( 'How long to cache search results and plugin data in hours.', 'hub2wp' ); ?></p>
 		<?php
 	}
 
@@ -179,7 +179,7 @@ class GPB_Settings {
 			return;
 		}
 
-		$monitored_plugins = get_option( 'gpb_plugins', array() );
+		$monitored_plugins = get_option( 'h2wp_plugins', array() );
 		$new_plugins = array();
 
 		foreach ( $monitored_plugins as $plugin_id => $plugin_data ) {
@@ -188,7 +188,7 @@ class GPB_Settings {
 			}
 		}
 
-		update_option( 'gpb_plugins', $new_plugins );
+		update_option( 'h2wp_plugins', $new_plugins );
 	}
 
 	/**
@@ -215,22 +215,22 @@ class GPB_Settings {
 	/**
 	 * Monitored plugins field callback.
 	 * Shows a list of plugins that are being monitored, with checkboxes to disable monitoring.
-	 * Once disabled, the plugin must be re-installed through the GitHub Plugin Browser to re-enable monitoring.
+	 * Once disabled, the plugin must be re-installed through hub2wp to re-enable monitoring.
 	 */
 	public static function monitored_plugins_field() {
-		$monitored_plugins = get_option( 'gpb_plugins', array() );
+		$monitored_plugins = get_option( 'h2wp_plugins', array() );
 
 		if ( empty( $monitored_plugins ) ) {
-			echo '<p class="description">' . esc_html__( 'No plugins are currently being monitored for updates. Install a plugin through the GitHub Plugin Browser to enable update monitoring.', 'github-plugin-browser' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'No plugins are currently being monitored for updates. Install a plugin through hub2wp to enable update monitoring.', 'hub2wp' ) . '</p>';
 			return;
 		}
 
 		foreach ( $monitored_plugins as $key => $plugin ) {
 			?>
 			<label>
-				<input type="checkbox" name="gpb_settings[monitored_plugins][]" value="<?php echo esc_attr( $key ); ?>" checked="checked" />
+				<input type="checkbox" name="h2wp_settings[monitored_plugins][]" value="<?php echo esc_attr( $key ); ?>" checked="checked" />
 				<strong><?php echo esc_html( $plugin['name'] ); ?></strong> by <?php echo esc_html( $plugin['author'] ); ?>
-				(<a href="<?php echo esc_url( 'https://github.com/' . $key ); ?>" target="_blank"><?php echo esc_html( $key ); ?></a>)
+				(<a href="<?php echo esc_url( 'https://github.com/' . $plugin['owner'] . '/' . $plugin['repo'] ); ?>" target="_blank"><?php echo esc_html( $plugin['owner'] . '/' . $plugin['repo'] ); ?></a>)
 			</label><br />
 			<?php
 		}

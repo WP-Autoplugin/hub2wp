@@ -6,19 +6,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Checks for plugin updates and integrates with the WordPress update system.
  */
-class GPB_Plugin_Updater {
+class H2WP_Plugin_Updater {
 
 	/**
 	 * Initialize the updater.
 	 */
 	public static function init() {
 		// Schedule the daily update check if not already scheduled
-		if ( ! wp_next_scheduled( 'gpb_daily_update_check' ) ) {
-			wp_schedule_event( time(), 'daily', 'gpb_daily_update_check' );
+		if ( ! wp_next_scheduled( 'h2wp_daily_update_check' ) ) {
+			wp_schedule_event( time(), 'daily', 'h2wp_daily_update_check' );
 		}
 
 		// Hook into the update check
-		add_action( 'gpb_daily_update_check', array( __CLASS__, 'check_for_updates' ) );
+		add_action( 'h2wp_daily_update_check', array( __CLASS__, 'check_for_updates' ) );
 
 		// Filter the update_plugins transient
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject_plugin_updates' ) );
@@ -31,11 +31,11 @@ class GPB_Plugin_Updater {
 	 * Check for updates for all installed GitHub plugins.
 	 */
 	public static function check_for_updates() {
-		$gpb_plugins = get_option( 'gpb_plugins', array() );
-		$api = new GPB_GitHub_API( GPB_Settings::get_access_token() );
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
 		$updated = false;
 
-		foreach ( $gpb_plugins as $plugin_id => &$plugin ) {
+		foreach ( $h2wp_plugins as $plugin_id => &$plugin ) {
 			list( $owner, $repo ) = explode( '/', $plugin_id );
 
 			// Get readme headers
@@ -56,7 +56,7 @@ class GPB_Plugin_Updater {
 		}
 
 		if ( $updated ) {
-			update_option( 'gpb_plugins', $gpb_plugins );
+			update_option( 'h2wp_plugins', $h2wp_plugins );
 		}
 	}
 
@@ -71,9 +71,9 @@ class GPB_Plugin_Updater {
 			return $transient;
 		}
 
-		$gpb_plugins = get_option( 'gpb_plugins', array() );
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
 
-		foreach ( $gpb_plugins as $plugin_id => $plugin ) {
+		foreach ( $h2wp_plugins as $plugin_id => $plugin ) {
 			if ( empty( $plugin['plugin_file'] ) || empty( $plugin['version'] ) ) {
 				continue;
 			}
@@ -116,16 +116,16 @@ class GPB_Plugin_Updater {
 			return $result;
 		}
 
-		$gpb_plugins = get_option( 'gpb_plugins', array() );
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
 
 		// Find the plugin by slug.
-		foreach ( $gpb_plugins as $plugin_id => $plugin ) {
+		foreach ( $h2wp_plugins as $plugin_id => $plugin ) {
 			$plugin_slug = dirname( $plugin['plugin_file'] );
 
 			if ( $plugin_slug === $args->slug ) {
 				list( $owner, $repo ) = explode( '/', $plugin_id );
 
-				$api          = new GPB_GitHub_API( GPB_Settings::get_access_token() );
+				$api          = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
 				$repo_details = $api->get_repo_details( $owner, $repo );
 				$readme_html  = $api->get_readme_html( $owner, $repo );
 				$watchers     = $api->get_watchers_count( $owner, $repo );
@@ -189,7 +189,7 @@ class GPB_Plugin_Updater {
 					'language'     => esc_html( $primary_language ),
 					'last_commit'  => isset( $repo_details['updated_at'] ) ? esc_html( $repo_details['updated_at'] ) : '',
 					'created_at'   => isset( $repo_details['created_at'] ) ? esc_html( $repo_details['created_at'] ) : '',
-					'license'      => esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'github-plugin-browser' ) ),
+					'license'      => esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'hub2wp' ) ),
 				);
 
 				// Short description from GitHub.
@@ -209,31 +209,31 @@ class GPB_Plugin_Updater {
 	 * @return string Formatted installation instructions.
 	 */
 	public static function get_installation_instructions( $plugin_id = '' ) {
-		$instructions  = '<h4>' . esc_html__( 'Installation via GitHub Plugin Browser', 'github-plugin-browser' ) . '</h4>';
+		$instructions  = '<h4>' . esc_html__( 'Installation via hub2wp', 'hub2wp' ) . '</h4>';
 		$instructions .= '<ol>';
 		$instructions .= '<li>' . sprintf(
 			/* translators: %s: Plugin navigation path */
-			__( 'Navigate to <strong>%s</strong> in your WordPress admin panel', 'github-plugin-browser' ),
-			'<strong>' . esc_html__( 'Plugins &rarr; Add GitHub Plugin', 'github-plugin-browser' ) . '</strong>'
+			__( 'Navigate to <strong>%s</strong> in your WordPress admin panel', 'hub2wp' ),
+			'<strong>' . esc_html__( 'Plugins &rarr; Add GitHub Plugin', 'hub2wp' ) . '</strong>'
 		) . '</li>';
 		$instructions .= '<li>' . sprintf(
 			/* translators: %s: Plugin identifier */
-			__( 'Search for <strong class="gpb-modal-title">%s</strong>', 'github-plugin-browser' ),
+			__( 'Search for <strong class="h2wp-modal-title">%s</strong>', 'hub2wp' ),
 			esc_html( $plugin_id )
 		) . '</li>';
-		$instructions .= '<li>' . esc_html__( 'Click the "Install" button', 'github-plugin-browser' ) . '</li>';
-		$instructions .= '<li>' . esc_html__( 'Activate the plugin through the WordPress Plugins menu', 'github-plugin-browser' ) . '</li>';
+		$instructions .= '<li>' . esc_html__( 'Click the "Install" button', 'hub2wp' ) . '</li>';
+		$instructions .= '<li>' . esc_html__( 'Activate the plugin through the WordPress Plugins menu', 'hub2wp' ) . '</li>';
 		$instructions .= '</ol>';
 
-		$instructions .= '<h4>' . esc_html__( 'Manual Installation', 'github-plugin-browser' ) . '</h4>';
+		$instructions .= '<h4>' . esc_html__( 'Manual Installation', 'hub2wp' ) . '</h4>';
 		$instructions .= '<ol>';
-		$instructions .= '<li>' . esc_html__( 'Download the latest release from the GitHub repository', 'github-plugin-browser' ) . '</li>';
+		$instructions .= '<li>' . esc_html__( 'Download the latest release from the GitHub repository', 'hub2wp' ) . '</li>';
 		$instructions .= '<li>' . sprintf(
 			/* translators: %s: Directory path */
-			__( 'Upload the plugin files to your <code>%s</code> directory', 'github-plugin-browser' ),
+			__( 'Upload the plugin files to your <code>%s</code> directory', 'hub2wp' ),
 			'/wp-content/plugins/'
 		) . '</li>';
-		$instructions .= '<li>' . esc_html__( 'Activate the plugin through the WordPress Plugins menu', 'github-plugin-browser' ) . '</li>';
+		$instructions .= '<li>' . esc_html__( 'Activate the plugin through the WordPress Plugins menu', 'hub2wp' ) . '</li>';
 		$instructions .= '</ol>';
 
 		return $instructions;
@@ -250,30 +250,30 @@ class GPB_Plugin_Updater {
 		$content  = '<div class="github-info">';
 
 		// Repository Statistics.
-		$content .= '<h3>' . esc_html__( 'Repository Statistics', 'github-plugin-browser' ) . '</h3>';
+		$content .= '<h3>' . esc_html__( 'Repository Statistics', 'hub2wp' ) . '</h3>';
 		$content .= '<ul class="github-stats">';
-		$content .= '<li>⭐ ' . esc_html__( 'Stars:', 'github-plugin-browser' ) . ' ' . number_format_i18n( $repo_details['stargazers_count'] ) . '</li>';
-		$content .= '<li>🔀 ' . esc_html__( 'Forks:', 'github-plugin-browser' ) . ' ' . number_format_i18n( $repo_details['forks_count'] ) . '</li>';
-		$content .= '<li>👀 ' . esc_html__( 'Watchers:', 'github-plugin-browser' ) . ' ' . number_format_i18n( $watchers ) . '</li>';
-		$content .= '<li>❗ ' . esc_html__( 'Open Issues:', 'github-plugin-browser' ) . ' ' . number_format_i18n( $repo_details['open_issues_count'] ) . '</li>';
+		$content .= '<li>⭐ ' . esc_html__( 'Stars:', 'hub2wp' ) . ' ' . number_format_i18n( $repo_details['stargazers_count'] ) . '</li>';
+		$content .= '<li>🔀 ' . esc_html__( 'Forks:', 'hub2wp' ) . ' ' . number_format_i18n( $repo_details['forks_count'] ) . '</li>';
+		$content .= '<li>👀 ' . esc_html__( 'Watchers:', 'hub2wp' ) . ' ' . number_format_i18n( $watchers ) . '</li>';
+		$content .= '<li>❗ ' . esc_html__( 'Open Issues:', 'hub2wp' ) . ' ' . number_format_i18n( $repo_details['open_issues_count'] ) . '</li>';
 		$content .= '</ul>';
 
 		// Technical Details.
-		$content .= '<h3>' . esc_html__( 'Technical Details', 'github-plugin-browser' ) . '</h3>';
+		$content .= '<h3>' . esc_html__( 'Technical Details', 'hub2wp' ) . '</h3>';
 		$content .= '<ul class="github-technical">';
-		$content .= '<li>' . esc_html__( 'License:', 'github-plugin-browser' ) . ' ' . esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'github-plugin-browser' ) ) . '</li>';
-		$content .= '<li>' . esc_html__( 'Created:', 'github-plugin-browser' ) . ' ' . human_time_diff( strtotime( $repo_details['created_at'] ) ) . ' ' . esc_html__( 'ago', 'github-plugin-browser' ) . '</li>';
-		$content .= '<li>' . esc_html__( 'Last Updated:', 'github-plugin-browser' ) . ' ' . human_time_diff( strtotime( $repo_details['updated_at'] ) ) . ' ' . esc_html__( 'ago', 'github-plugin-browser' ) . '</li>';
+		$content .= '<li>' . esc_html__( 'License:', 'hub2wp' ) . ' ' . esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'hub2wp' ) ) . '</li>';
+		$content .= '<li>' . esc_html__( 'Created:', 'hub2wp' ) . ' ' . human_time_diff( strtotime( $repo_details['created_at'] ) ) . ' ' . esc_html__( 'ago', 'hub2wp' ) . '</li>';
+		$content .= '<li>' . esc_html__( 'Last Updated:', 'hub2wp' ) . ' ' . human_time_diff( strtotime( $repo_details['updated_at'] ) ) . ' ' . esc_html__( 'ago', 'hub2wp' ) . '</li>';
 		$content .= '</ul>';
 
 		// Quick Links.
-		$content .= '<h3>' . esc_html__( 'Quick Links', 'github-plugin-browser' ) . '</h3>';
+		$content .= '<h3>' . esc_html__( 'Quick Links', 'hub2wp' ) . '</h3>';
 		$content .= '<ul class="github-links">';
-		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] ) . '" target="_blank">' . esc_html__( 'View on GitHub', 'github-plugin-browser' ) . '</a></li>';
-		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/issues' ) . '" target="_blank">' . esc_html__( 'Issue Tracker', 'github-plugin-browser' ) . '</a></li>';
-		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/releases' ) . '" target="_blank">' . esc_html__( 'Releases', 'github-plugin-browser' ) . '</a></li>';
+		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] ) . '" target="_blank">' . esc_html__( 'View on GitHub', 'hub2wp' ) . '</a></li>';
+		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/issues' ) . '" target="_blank">' . esc_html__( 'Issue Tracker', 'hub2wp' ) . '</a></li>';
+		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/releases' ) . '" target="_blank">' . esc_html__( 'Releases', 'hub2wp' ) . '</a></li>';
 		if ( ! empty( $repo_details['wiki'] ) ) {
-			$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/wiki' ) . '" target="_blank">' . esc_html__( 'Documentation Wiki', 'github-plugin-browser' ) . '</a></li>';
+			$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/wiki' ) . '" target="_blank">' . esc_html__( 'Documentation Wiki', 'hub2wp' ) . '</a></li>';
 		}
 		$content .= '</ul>';
 
@@ -287,7 +287,7 @@ class GPB_Plugin_Updater {
 	 *
 	 * @param string         $owner Repository owner.
 	 * @param string         $repo  Repository name.
-	 * @param GPB_GitHub_API $api   GitHub API instance.
+	 * @param H2WP_GitHub_API $api   GitHub API instance.
 	 * @return string Formatted changelog content.
 	 */
 	private static function get_changelog_content( $owner, $repo, $api ) {
@@ -297,18 +297,18 @@ class GPB_Plugin_Updater {
 			array(
 				'headers' => array(
 					'Accept'        => 'application/vnd.github.v3+json',
-					'Authorization' => 'token ' . GPB_Settings::get_access_token(),
+					'Authorization' => 'token ' . H2WP_Settings::get_access_token(),
 				),
 			)
 		);
 
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			return '<p>' . esc_html__( 'No changelog information available.', 'github-plugin-browser' ) . '</p>';
+			return '<p>' . esc_html__( 'No changelog information available.', 'hub2wp' ) . '</p>';
 		}
 
 		$releases = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( empty( $releases ) ) {
-			return '<p>' . esc_html__( 'No release information available.', 'github-plugin-browser' ) . '</p>';
+			return '<p>' . esc_html__( 'No release information available.', 'hub2wp' ) . '</p>';
 		}
 
 		$changelog = '';
@@ -345,27 +345,27 @@ class GPB_Plugin_Updater {
 	}
 
 	/**
-	 * Add "wp-github-plugin-browser" to the list of update sources on activation.
+	 * Add "hub2wp" to the list of update sources on activation.
 	 */
 	public static function activate() {
-		$gpb_sources = get_option( 'gpb_plugins', array() );
-		if ( ! isset( $gpb_sources['wp-github-plugin-browser'] ) ) {
-			$gpb_sources['wp-github-plugin-browser'] = array(
-				'directory'    => GPB_PLUGIN_BASENAME,
-				'name'         => 'GitHub Plugin Browser',
+		$h2wp_sources = get_option( 'h2wp_plugins', array() );
+		if ( ! isset( $h2wp_sources['hub2wp'] ) ) {
+			$h2wp_sources['hub2wp'] = array(
+				'directory'    => H2WP_PLUGIN_BASENAME,
+				'name'         => 'hub2wp',
 				'author'       => 'Balázs Piller',
-				'version'      => GPB_VERSION,
+				'version'      => H2WP_VERSION,
 				'owner'        => 'wp-autoplugin',
-				'repo'         => 'github-plugin-browser',
-				'plugin_file'  => GPB_PLUGIN_FILE,
+				'repo'         => 'hub2wp',
+				'plugin_file'  => H2WP_PLUGIN_FILE,
 				'requires'     => '5.5',
 				'tested'       => '6.7.1',
 				'requires_php' => '7.0',
 				'last_checked' => time(),
 				'last_updated' => '',
-				'download_url' => 'https://api.github.com/repos/wp-autoplugin/github-plugin-browser/zipball',
+				'download_url' => 'https://api.github.com/repos/wp-autoplugin/hub2wp/zipball',
 			);
-			update_option( 'gpb_plugins', $gpb_sources );
+			update_option( 'h2wp_plugins', $h2wp_sources );
 		}
 	}
 
@@ -373,6 +373,6 @@ class GPB_Plugin_Updater {
 	 * Clean up scheduled events on plugin deactivation.
 	 */
 	public static function deactivate() {
-		wp_clear_scheduled_hook( 'gpb_daily_update_check' );
+		wp_clear_scheduled_hook( 'h2wp_daily_update_check' );
 	}
 }

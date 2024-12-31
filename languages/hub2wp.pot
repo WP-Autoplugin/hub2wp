@@ -1,0 +1,460 @@
+# Copyright (C) 2024 Balázs Piller
+# This file is distributed under the same license as the hub2wp plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: hub2wp 1.0.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/wp-github-plugin-browser\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2024-12-31T03:15:16+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.11.0\n"
+"X-Domain: hub2wp\n"
+
+#. Plugin Name of the plugin
+#: hub2wp.php
+msgid "hub2wp"
+msgstr ""
+
+#. Description of the plugin
+#: hub2wp.php
+msgid "Browse, install, and update WordPress plugins directly from GitHub repositories."
+msgstr ""
+
+#. Author of the plugin
+#: hub2wp.php
+msgid "Balázs Piller"
+msgstr ""
+
+#: includes/class-h2wp-admin-ajax.php:31
+#: includes/class-h2wp-admin-ajax.php:147
+#: includes/class-h2wp-admin-ajax.php:206
+#: includes/class-h2wp-admin-ajax.php:236
+#: includes/class-h2wp-admin-ajax.php:301
+msgid "Insufficient permissions."
+msgstr ""
+
+#: includes/class-h2wp-admin-ajax.php:39
+#: includes/class-h2wp-admin-ajax.php:155
+#: includes/class-h2wp-admin-ajax.php:214
+#: includes/class-h2wp-admin-ajax.php:243
+#: includes/class-h2wp-admin-ajax.php:309
+msgid "Invalid parameters."
+msgstr ""
+
+#: includes/class-h2wp-admin-ajax.php:54
+msgid "No README available."
+msgstr ""
+
+#: includes/class-h2wp-admin-ajax.php:323
+msgid "No changelog available."
+msgstr ""
+
+#: includes/class-h2wp-admin-ajax.php:330
+msgid "Released:"
+msgstr ""
+
+#: includes/class-h2wp-admin-ajax.php:332
+#: includes/class-h2wp-plugin-updater.php:272
+msgid "View on GitHub"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:26
+msgid "Add Plugins"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:27
+msgid "Add GitHub Plugin"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:60
+msgid "You do not have sufficient permissions."
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:87
+msgid "Add GitHub Plugins"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:92
+msgid "All"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:94
+msgid "WooCommerce"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:95
+msgid "SEO"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:96
+msgid "AI"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:97
+msgid "Security"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:98
+msgid "Social"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:99
+msgid "Forms"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:100
+msgid "Gallery"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:101
+msgid "Caching"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:115
+msgid "Search plugins..."
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:116
+msgid "Search"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:145
+msgid "No plugins found. Try a different search."
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:191
+msgid "Installed"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:193
+#: includes/class-h2wp-admin-page.php:333
+msgid "Install Now"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:194
+#: includes/class-h2wp-admin-page.php:334
+msgid "Activate"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:198
+msgid "More Details"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:228
+msgid "Readme"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:229
+msgid "Meta"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:230
+msgid "Changelog"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:231
+msgid "Installation"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:238
+msgid "GitHub Meta"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:243
+#: includes/class-h2wp-admin-page.php:310
+msgid "Author:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:251
+#: includes/class-h2wp-plugin-updater.php:255
+msgid "Stars:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:259
+#: includes/class-h2wp-plugin-updater.php:256
+msgid "Forks:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:267
+#: includes/class-h2wp-plugin-updater.php:257
+msgid "Watchers:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:275
+#: includes/class-h2wp-plugin-updater.php:258
+msgid "Open Issues:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:283
+#: includes/class-h2wp-admin-page.php:311
+#: includes/class-h2wp-plugin-updater.php:266
+msgid "Last Updated:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:290
+msgid "Topics:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:295
+msgid "View plugin on GitHub"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:307
+msgid "Checking compatibility..."
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:309
+msgid "Version:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:309
+#: includes/class-h2wp-admin-page.php:310
+#: includes/class-h2wp-admin-page.php:311
+#: includes/class-h2wp-admin-page.php:312
+#: includes/class-h2wp-admin-page.php:313
+#: includes/class-h2wp-admin-page.php:314
+#: includes/class-h2wp-plugin-updater.php:192
+#: includes/class-h2wp-plugin-updater.php:264
+msgid "Unknown"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:312
+msgid "Requires WordPress:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:313
+msgid "Tested up to:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:314
+msgid "Requires PHP:"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:318
+msgid "GitHub Plugin Page &raquo;"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:319
+msgid "Plugin Homepage &raquo;"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:322
+msgid "Stars"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:324
+msgid "stars on GitHub"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:327
+msgid "Topics"
+msgstr ""
+
+#: includes/class-h2wp-admin-page.php:363
+msgid "GitHub API rate limit reached. Please add a personal access token in the settings to continue."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:73
+msgid "Invalid response from GitHub API."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:115
+msgid "Invalid repository data from GitHub API."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:150
+msgid "Unable to retrieve README."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:200
+msgid "No image available."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:232
+msgid "Unable to determine watchers count."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:262
+msgid "Unable to determine primary language."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:283
+msgid "Unable to fetch repository page."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:288
+msgid "Empty repository page."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:318
+msgid "Invalid contributors data from GitHub API."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:369
+#: includes/class-h2wp-github-api.php:379
+#: includes/class-h2wp-github-api.php:428
+msgid "No valid readme file found."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:465
+msgid "This plugin requires WordPress version %s or higher."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:475
+msgid "This plugin requires PHP version %s or higher."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:484
+msgid "This plugin has not been tested with your WordPress version."
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:543
+msgid "GitHub API HTTP error: %s"
+msgstr ""
+
+#: includes/class-h2wp-github-api.php:586
+msgid "Invalid response from GitHub API"
+msgstr ""
+
+#: includes/class-h2wp-plugin-installer.php:35
+msgid "Failed to install the plugin."
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:212
+msgid "Installation via hub2wp"
+msgstr ""
+
+#. translators: %s: Plugin navigation path
+#: includes/class-h2wp-plugin-updater.php:216
+msgid "Navigate to <strong>%s</strong> in your WordPress admin panel"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:217
+msgid "Plugins &rarr; Add GitHub Plugin"
+msgstr ""
+
+#. translators: %s: Plugin identifier
+#: includes/class-h2wp-plugin-updater.php:221
+msgid "Search for <strong class=\"h2wp-modal-title\">%s</strong>"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:224
+msgid "Click the \"Install\" button"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:225
+#: includes/class-h2wp-plugin-updater.php:236
+msgid "Activate the plugin through the WordPress Plugins menu"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:228
+msgid "Manual Installation"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:230
+msgid "Download the latest release from the GitHub repository"
+msgstr ""
+
+#. translators: %s: Directory path
+#: includes/class-h2wp-plugin-updater.php:233
+msgid "Upload the plugin files to your <code>%s</code> directory"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:253
+msgid "Repository Statistics"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:262
+msgid "Technical Details"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:264
+msgid "License:"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:265
+msgid "Created:"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:265
+#: includes/class-h2wp-plugin-updater.php:266
+msgid "ago"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:270
+msgid "Quick Links"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:273
+msgid "Issue Tracker"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:274
+msgid "Releases"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:276
+msgid "Documentation Wiki"
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:306
+msgid "No changelog information available."
+msgstr ""
+
+#: includes/class-h2wp-plugin-updater.php:311
+msgid "No release information available."
+msgstr ""
+
+#: includes/class-h2wp-settings.php:40
+msgid "Personal Access Token"
+msgstr ""
+
+#: includes/class-h2wp-settings.php:48
+msgid "Cache Duration (Hours)"
+msgstr ""
+
+#: includes/class-h2wp-settings.php:56
+msgid "Monitored Plugins"
+msgstr ""
+
+#: includes/class-h2wp-settings.php:68
+#: includes/class-h2wp-settings.php:82
+msgid "hub2wp Settings"
+msgstr ""
+
+#: includes/class-h2wp-settings.php:69
+msgid "GitHub Plugins"
+msgstr ""
+
+#: includes/class-h2wp-settings.php:100
+msgid "The daily update check is scheduled to run in %s. %s (note: the GitHub API will be called %d times)."
+msgstr ""
+
+#: includes/class-h2wp-settings.php:101
+msgid "less than 1 minute"
+msgstr ""
+
+#: includes/class-h2wp-settings.php:105
+msgid "Run now"
+msgstr ""
+
+#: includes/class-h2wp-settings.php:123
+msgid "Enter your GitHub personal access token to increase your rate limit."
+msgstr ""
+
+#. translators: %s: URL to create a personal access token
+#: includes/class-h2wp-settings.php:126
+msgid "Get a free token from %s."
+msgstr ""
+
+#: includes/class-h2wp-settings.php:141
+msgid "How long to cache search results and plugin data in hours."
+msgstr ""
+
+#: includes/class-h2wp-settings.php:224
+msgid "No plugins are currently being monitored for updates. Install a plugin through hub2wp to enable update monitoring."
+msgstr ""

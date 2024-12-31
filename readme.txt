@@ -1,4 +1,4 @@
-=== GitHub Plugin Browser ===
+=== hub2wp ===
 Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.0
@@ -14,7 +14,7 @@ Browse, install, and update WordPress plugins directly from GitHub repositories.
 This plugin allows you to discover WordPress plugins hosted on GitHub by searching repositories with the "wordpress-plugin" topic. You can install and update these plugins directly from your WordPress dashboard, just like plugins from the official WordPress plugin repository.
 
 Features:
-* Search GitHub repositories tagged as "wordpress-plugin".
+* Search WordPress plugins in GitHub repositories.
 * Install plugins with one click.
 * Receive update notifications and update with one click.
 * Optionally add a personal GitHub access token to increase API rate limits.
@@ -22,10 +22,10 @@ Features:
 
 == Installation ==
 
-1. Upload the `wp-github-plugin-browser` folder to the `/wp-content/plugins/` directory.
+1. Upload the `hub2wp` folder to the `/wp-content/plugins/` directory.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
-3. Navigate to "Plugins > GitHub Browser" to browse plugins.
-4. Go to "Settings > GitHub Plugin Browser" to add an optional personal access token and configure caching.
+3. Navigate to "Plugins > Add GitHub Plugin" to browse plugins.
+4. Go to "Settings > GitHub Plugins" to add an optional personal access token and configure caching.
 
 == Frequently Asked Questions ==
 

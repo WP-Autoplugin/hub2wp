@@ -1,5 +1,5 @@
 {
-    "name": "wp-autoplugin/wp-github-plugin-browser",
+    "name": "wp-autoplugin/hub2wp",
     "description": "Browse, install, and update WordPress plugins from GitHub, as if they were in the .org repo.",
     "type": "wordpress-plugin",
     "autoload": {

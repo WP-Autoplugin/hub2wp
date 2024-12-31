@@ -4,19 +4,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * Handles AJAX requests for the GitHub Plugin Browser.
+ * Handles AJAX requests for the hub2wp plugin.
  */
-class GPB_Admin_Ajax {
+class H2WP_Admin_Ajax {
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
-		add_action( 'wp_ajax_gpb_get_plugin_details', array( $this, 'get_plugin_details' ) );
-		add_action( 'wp_ajax_gpb_check_compatibility', array( $this, 'check_compatibility' ) );
-		add_action( 'wp_ajax_gpb_get_changelog', array( $this, 'get_changelog' ) );
-		add_action( 'wp_ajax_gpb_install_plugin', array( $this, 'install_plugin' ) );
-		add_action( 'wp_ajax_gpb_activate_plugin', array( $this, 'activate_plugin' ) );
+		add_action( 'wp_ajax_h2wp_get_plugin_details', array( $this, 'get_plugin_details' ) );
+		add_action( 'wp_ajax_h2wp_check_compatibility', array( $this, 'check_compatibility' ) );
+		add_action( 'wp_ajax_h2wp_get_changelog', array( $this, 'get_changelog' ) );
+		add_action( 'wp_ajax_h2wp_install_plugin', array( $this, 'install_plugin' ) );
+		add_action( 'wp_ajax_h2wp_activate_plugin', array( $this, 'activate_plugin' ) );
 	}
 
 	/**
@@ -24,11 +24,11 @@ class GPB_Admin_Ajax {
 	 */
 	public function get_plugin_details() {
 		// Check nonce.
-		check_ajax_referer( 'gpb_plugin_details_nonce', 'nonce' );
+		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
 		// Check user capabilities.
 		if ( ! current_user_can( 'install_plugins' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
 		// Get and sanitize parameters.
@@ -36,12 +36,12 @@ class GPB_Admin_Ajax {
 		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
 
 		if ( empty( $owner ) || empty( $repo ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		// Get access token from settings.
-		$access_token = GPB_Settings::get_access_token();
-		$api          = new GPB_GitHub_API( $access_token );
+		$access_token = H2WP_Settings::get_access_token();
+		$api          = new H2WP_GitHub_API( $access_token );
 
 		// Fetch data.
 		$repo_details = $api->get_repo_details( $owner, $repo );
@@ -51,7 +51,7 @@ class GPB_Admin_Ajax {
 
 		$readme_html = $api->get_readme_html( $owner, $repo );
 		if ( is_wp_error( $readme_html ) ) {
-			$readme_html = __( 'No README available.', 'github-plugin-browser' );
+			$readme_html = __( 'No README available.', 'hub2wp' );
 		}
 
 		$readme_html = $this->strip_plugin_headers( $readme_html );
@@ -64,7 +64,7 @@ class GPB_Admin_Ajax {
 		// Prepare data.
 		$data = array(
 			'name'             => isset( $repo_details['name'] ) ? $repo_details['name'] : '',
-			'display_name'     => isset( $repo_details['name'] ) ? ucwords( str_replace( array( '-', 'wp', 'wordpress' ), array( ' ', 'WP', 'WordPress' ), $repo_details['name'] ) ) : '',
+			'display_name'     => isset( $repo_details['name'] ) ? ucwords( str_replace( array( '-', 'wp', 'wordpress', 'seo' ), array( ' ', 'WP', 'WordPress', 'SEO' ), $repo_details['name'] ) ) : '',
 			'owner'            => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'repo'             => isset( $repo_details['name'] ) ? sanitize_text_field( $repo_details['name'] ) : '',
 			'description'      => isset( $repo_details['description'] ) ? $repo_details['description'] : '',
@@ -81,7 +81,7 @@ class GPB_Admin_Ajax {
 			'author_url'       => isset( $repo_details['owner']['html_url'] ) ? esc_url_raw( $repo_details['owner']['html_url'] ) : '',
 			'updated_at'       => isset( $repo_details['updated_at'] ) ? human_time_diff( strtotime( $repo_details['updated_at'] ) ) . ' ago' : '',
 			'topics'           => isset( $repo_details['topics'] ) ? $this->extract_topics( $repo_details['topics'] ) : array(),
-			'is_installed'     => GPB_Admin_Page::is_plugin_installed( $owner, $repo ),
+			'is_installed'     => H2WP_Admin_Page::is_plugin_installed( $owner, $repo ),
 		);
 
 		wp_send_json_success( $data );
@@ -140,11 +140,11 @@ class GPB_Admin_Ajax {
 	 */
 	public function install_plugin() {
 		// Check nonce.
-		check_ajax_referer( 'gpb_plugin_details_nonce', 'nonce' );
+		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
 		// Check user capabilities.
 		if ( ! current_user_can( 'install_plugins' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
 		// Get and sanitize parameters.
@@ -152,11 +152,11 @@ class GPB_Admin_Ajax {
 		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
 
 		if ( empty( $owner ) || empty( $repo ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		// Check if plugin is compatible.
-		$api = new GPB_GitHub_API( GPB_Settings::get_access_token() );
+		$api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
 		$compatibility = $api->check_compatibility( $owner, $repo );
 		if ( ! $compatibility['is_compatible'] ) {
 			wp_send_json_error( array( 'message' => $compatibility['reason'] ) );
@@ -165,7 +165,7 @@ class GPB_Admin_Ajax {
 		$download_url = $api->get_download_url( $owner, $repo );
 
 		// Install the plugin.
-		$installer = new GPB_Plugin_Installer();
+		$installer = new H2WP_Plugin_Installer();
 		$result = $installer->install_plugin( $download_url );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
@@ -177,12 +177,12 @@ class GPB_Admin_Ajax {
 
 		$plugin_data['plugin_file'] = $this->find_plugin_file( $plugin_data );
 
-		// Store plugin data in the gpb_plugins option.
-		$gpb_plugins = get_option( 'gpb_plugins', array() );
-		$gpb_plugins[ $owner . '/' . $repo ] = $plugin_data;
-		$gpb_plugins[ $owner . '/' . $repo ]['last_checked'] = time();
-		$gpb_plugins[ $owner . '/' . $repo ]['last_updated'] = time();
-		update_option( 'gpb_plugins', $gpb_plugins, false );
+		// Store plugin data in the h2wp_plugins option.
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$h2wp_plugins[ $owner . '/' . $repo ] = $plugin_data;
+		$h2wp_plugins[ $owner . '/' . $repo ]['last_checked'] = time();
+		$h2wp_plugins[ $owner . '/' . $repo ]['last_updated'] = time();
+		update_option( 'h2wp_plugins', $h2wp_plugins, false );
 
 		$plugin_data['activate_url'] = add_query_arg( array(
 			'action' => 'activate',
@@ -199,11 +199,11 @@ class GPB_Admin_Ajax {
 	public function check_compatibility() {
 
 		// Check nonce.
-		check_ajax_referer( 'gpb_plugin_details_nonce', 'nonce' );
+		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
 		// Check user capabilities.
 		if ( ! current_user_can( 'install_plugins' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
 		// Get and sanitize parameters.
@@ -211,12 +211,12 @@ class GPB_Admin_Ajax {
 		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
 
 		if ( empty( $owner ) || empty( $repo ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		// Get access token from settings.
-		$access_token = GPB_Settings::get_access_token();
-		$api          = new GPB_GitHub_API( $access_token );
+		$access_token = H2WP_Settings::get_access_token();
+		$api          = new H2WP_GitHub_API( $access_token );
 
 		// Check compatibility.
 		$compatibility = $api->check_compatibility( $owner, $repo );
@@ -229,18 +229,18 @@ class GPB_Admin_Ajax {
 	 */
 	public function activate_plugin() {
 		// Check nonce.
-		check_ajax_referer( 'gpb_plugin_details_nonce', 'nonce' );
+		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
 		// Check user capabilities.
 		if ( ! current_user_can( 'activate_plugins' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
 		// Get and sanitize parameters.
 		$plugin_file = isset( $_POST['plugin_file'] ) ? sanitize_text_field( wp_unslash( $_POST['plugin_file'] ) ) : '';
 
 		if ( empty( $plugin_file ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		// Activate the plugin.
@@ -264,7 +264,7 @@ class GPB_Admin_Ajax {
 
 			return array(
 				'name' => $topic,
-				'url' => add_query_arg( 'page', 'gpb-plugin-browser', admin_url( 'plugins.php' ) ) . '&tag=' . urlencode( $topic ),
+				'url' => add_query_arg( 'page', 'h2wp-plugin-browser', admin_url( 'plugins.php' ) ) . '&tag=' . urlencode( $topic ),
 			);
 		}, $topics)));
 	}
@@ -294,11 +294,11 @@ class GPB_Admin_Ajax {
 	 */
 	public function get_changelog() {
 		// Check nonce
-		check_ajax_referer( 'gpb_plugin_details_nonce', 'nonce' );
+		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
 		// Check user capabilities
 		if ( ! current_user_can( 'install_plugins' ) ) {
-			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
 		// Get and sanitize parameters
@@ -306,12 +306,12 @@ class GPB_Admin_Ajax {
 		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
 
 		if ( empty( $owner ) || empty( $repo ) ) {
-			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		// Get access token from settings
-		$access_token = GPB_Settings::get_access_token();
-		$api = new GPB_GitHub_API( $access_token );
+		$access_token = H2WP_Settings::get_access_token();
+		$api = new H2WP_GitHub_API( $access_token );
 
 		// Fetch changelog
 		$changelog = $api->get_changelog( $owner, $repo );
@@ -320,16 +320,16 @@ class GPB_Admin_Ajax {
 		}
 
 		if ( empty( $changelog ) ) {
-			wp_send_json_error( array( 'message' => __( 'No changelog available.', 'github-plugin-browser' ) ) );
+			wp_send_json_error( array( 'message' => __( 'No changelog available.', 'hub2wp' ) ) );
 		}
 
-		$changelog_html = '<ul class="gpb-changelog">';
+		$changelog_html = '<ul class="h2wp-changelog">';
 		foreach ( $changelog as $release ) {
 			$changelog_html .= '<li>';
 			$changelog_html .= '<h4>' . esc_html( $release['version'] ) . ( $release['title'] ? ' (' . esc_html( $release['title'] ) . ')' : '' ) . '</h4>';
-			$changelog_html .= '<p><strong>' . __( 'Released:', 'github-plugin-browser' ) . '</strong> ' . date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $release['date'] ) ) . '</p>';
+			$changelog_html .= '<p><strong>' . __( 'Released:', 'hub2wp' ) . '</strong> ' . date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $release['date'] ) ) . '</p>';
 			$changelog_html .= '<p>' . nl2br( $release['description'] ) . '</p>';
-			$changelog_html .= '<p><a href="' . $release['url'] . '" target="_blank">' . __( 'View on GitHub', 'github-plugin-browser' ) . '</a></p>';
+			$changelog_html .= '<p><a href="' . $release['url'] . '" target="_blank">' . __( 'View on GitHub', 'hub2wp' ) . '</a></p>';
 			$changelog_html .= '</li>';
 		}
 		$changelog_html .= '</ul>';

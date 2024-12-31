@@ -7,12 +7,12 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'Composer\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',
-    'GPB_Admin_Ajax' => $baseDir . '/includes/class-gpb-admin-ajax.php',
-    'GPB_Admin_Page' => $baseDir . '/includes/class-gpb-admin-page.php',
-    'GPB_Cache' => $baseDir . '/includes/class-gpb-cache.php',
-    'GPB_GitHub_API' => $baseDir . '/includes/class-gpb-github-api.php',
-    'GPB_Plugin_Installer' => $baseDir . '/includes/class-gpb-plugin-installer.php',
-    'GPB_Plugin_Updater' => $baseDir . '/includes/class-gpb-plugin-updater.php',
-    'GPB_Settings' => $baseDir . '/includes/class-gpb-settings.php',
-    'GPB_Silent_Installer_Skin' => $baseDir . '/includes/class-gpb-silent-installer-skin.php',
+    'H2WP_Admin_Ajax' => $baseDir . '/includes/class-h2wp-admin-ajax.php',
+    'H2WP_Admin_Page' => $baseDir . '/includes/class-h2wp-admin-page.php',
+    'H2WP_Cache' => $baseDir . '/includes/class-h2wp-cache.php',
+    'H2WP_GitHub_API' => $baseDir . '/includes/class-h2wp-github-api.php',
+    'H2WP_Plugin_Installer' => $baseDir . '/includes/class-h2wp-plugin-installer.php',
+    'H2WP_Plugin_Updater' => $baseDir . '/includes/class-h2wp-plugin-updater.php',
+    'H2WP_Settings' => $baseDir . '/includes/class-h2wp-settings.php',
+    'H2WP_Silent_Installer_Skin' => $baseDir . '/includes/class-h2wp-silent-installer-skin.php',
 );

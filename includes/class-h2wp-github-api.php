@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Handles interaction with the GitHub API.
  */
-class GPB_GitHub_API {
+class H2WP_GitHub_API {
 
 	/**
 	 * The personal access token.
@@ -47,7 +47,7 @@ class GPB_GitHub_API {
 	 */
 	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
 		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -70,10 +70,10 @@ class GPB_GitHub_API {
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $data ) || ! isset( $data['items'] ) ) {
-			return new WP_Error( 'gpb_api_error', __( 'Invalid response from GitHub API.', 'github-plugin-browser' ) );
+			return new WP_Error( 'h2wp_api_error', __( 'Invalid response from GitHub API.', 'hub2wp' ) );
 		}
 
-		GPB_Cache::set( $cache_key, $data );
+		H2WP_Cache::set( $cache_key, $data );
 		return $data;
 	}
 
@@ -98,7 +98,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_repo_details( $owner, $repo ) {
 		$cache_key = 'repo_details_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -112,10 +112,10 @@ class GPB_GitHub_API {
 
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $data ) ) {
-			return new WP_Error( 'gpb_api_error', __( 'Invalid repository data from GitHub API.', 'github-plugin-browser' ) );
+			return new WP_Error( 'h2wp_api_error', __( 'Invalid repository data from GitHub API.', 'hub2wp' ) );
 		}
 
-		GPB_Cache::set( $cache_key, $data );
+		H2WP_Cache::set( $cache_key, $data );
 		return $data;
 	}
 
@@ -128,7 +128,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_readme_html( $owner, $repo ) {
 		$cache_key = 'readme_html_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -147,14 +147,14 @@ class GPB_GitHub_API {
 
 		$html = wp_remote_retrieve_body( $response );
 		if ( empty( $html ) ) {
-			return new WP_Error( 'gpb_readme_error', __( 'Unable to retrieve README.', 'github-plugin-browser' ) );
+			return new WP_Error( 'h2wp_readme_error', __( 'Unable to retrieve README.', 'hub2wp' ) );
 		}
 
 		// Sanitize HTML for safe output.
 		$allowed_html    = wp_kses_allowed_html( 'post' );
 		$sanitized_html  = wp_kses( $html, $allowed_html );
 
-		GPB_Cache::set( $cache_key, $sanitized_html );
+		H2WP_Cache::set( $cache_key, $sanitized_html );
 		return $sanitized_html;
 	}
 
@@ -167,7 +167,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_og_image( $owner, $repo ) {
 		$cache_key = 'og_image_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -181,7 +181,7 @@ class GPB_GitHub_API {
 		// Attempt to extract og:image using regex.
 		if ( preg_match( '/<meta property="og:image" content="([^"]+)"/i', $repo_html, $matches ) ) {
 			$og_image = esc_url_raw( $matches[1] );
-			GPB_Cache::set( $cache_key, $og_image );
+			H2WP_Cache::set( $cache_key, $og_image );
 			return $og_image;
 		}
 
@@ -193,11 +193,11 @@ class GPB_GitHub_API {
 
 		if ( isset( $repo_details['owner']['avatar_url'] ) ) {
 			$avatar_url = esc_url_raw( $repo_details['owner']['avatar_url'] );
-			GPB_Cache::set( $cache_key, $avatar_url );
+			H2WP_Cache::set( $cache_key, $avatar_url );
 			return $avatar_url;
 		}
 
-		return new WP_Error( 'gpb_image_error', __( 'No image available.', 'github-plugin-browser' ) );
+		return new WP_Error( 'h2wp_image_error', __( 'No image available.', 'hub2wp' ) );
 	}
 
 	/**
@@ -211,7 +211,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_watchers_count( $owner, $repo ) {
 		$cache_key = 'watchers_count_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -225,11 +225,11 @@ class GPB_GitHub_API {
 		// Attempt to extract watchers count using regex or DOM parsing.
 		if ( preg_match( '/<strong>(\d+)<\/strong>\s+watching/', $repo_html, $matches ) ) {
 			$count = absint( $matches[1] );
-			GPB_Cache::set( $cache_key, $count );
+			H2WP_Cache::set( $cache_key, $count );
 			return $count;
 		}
 
-		return new WP_Error( 'gpb_watchers_error', __( 'Unable to determine watchers count.', 'github-plugin-browser' ) );
+		return new WP_Error( 'h2wp_watchers_error', __( 'Unable to determine watchers count.', 'hub2wp' ) );
 	}
 
 	/**
@@ -241,7 +241,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_primary_language( $owner, $repo ) {
 		$cache_key = 'primary_language_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -255,11 +255,11 @@ class GPB_GitHub_API {
 		// Attempt to extract primary language using regex or DOM parsing.
 		if ( preg_match( '/<span class="color-fg-default text-bold mr-1">([A-Za-z]+)<\/span>/', $repo_html, $matches ) ) {
 			$language = sanitize_text_field( $matches[1] );
-			GPB_Cache::set( $cache_key, $language );
+			H2WP_Cache::set( $cache_key, $language );
 			return $language;
 		}
 
-		return new WP_Error( 'gpb_language_error', __( 'Unable to determine primary language.', 'github-plugin-browser' ) );
+		return new WP_Error( 'h2wp_language_error', __( 'Unable to determine primary language.', 'hub2wp' ) );
 	}
 
 	/**
@@ -271,7 +271,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_repo_html( $owner, $repo ) {
 		$cache_key = 'repo_html_' . $owner . '_' . $repo;
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -280,15 +280,15 @@ class GPB_GitHub_API {
 		$response = wp_remote_get( $url, array( 'timeout' => 10 ) );
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'gpb_scrape_error', __( 'Unable to fetch repository page.', 'github-plugin-browser' ) );
+			return new WP_Error( 'h2wp_scrape_error', __( 'Unable to fetch repository page.', 'hub2wp' ) );
 		}
 
 		$body = wp_remote_retrieve_body( $response );
 		if ( empty( $body ) ) {
-			return new WP_Error( 'gpb_scrape_error', __( 'Empty repository page.', 'github-plugin-browser' ) );
+			return new WP_Error( 'h2wp_scrape_error', __( 'Empty repository page.', 'hub2wp' ) );
 		}
 
-		GPB_Cache::set( $cache_key, $body );
+		H2WP_Cache::set( $cache_key, $body );
 		return $body;
 	}
 
@@ -301,7 +301,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_contributors( $owner, $repo ) {
 		$cache_key = 'contributors_' . $owner . '_' . $repo;
-		$cached = GPB_Cache::get( $cache_key );
+		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -315,7 +315,7 @@ class GPB_GitHub_API {
 
 		$contributors = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $contributors ) ) {
-			return new WP_Error( 'gpb_api_error', __( 'Invalid contributors data from GitHub API.', 'github-plugin-browser' ) );
+			return new WP_Error( 'h2wp_api_error', __( 'Invalid contributors data from GitHub API.', 'hub2wp' ) );
 		}
 
 		// Limit to 5 contributors
@@ -331,7 +331,7 @@ class GPB_GitHub_API {
 			);
 		}
 
-		GPB_Cache::set( $cache_key, $data );
+		H2WP_Cache::set( $cache_key, $data );
 		return $data;
 	}
 
@@ -342,9 +342,9 @@ class GPB_GitHub_API {
 	 */
 	private function handle_rate_limits( $headers ) {
 		if ( isset( $headers['x-ratelimit-remaining'] ) && (int) $headers['x-ratelimit-remaining'] === 0 ) {
-			set_transient( 'gpb_rate_limit_reached', 1, HOUR_IN_SECONDS );
+			set_transient( 'h2wp_rate_limit_reached', 1, HOUR_IN_SECONDS );
 		} else {
-			delete_transient( 'gpb_rate_limit_reached' );
+			delete_transient( 'h2wp_rate_limit_reached' );
 		}
 	}
 
@@ -357,7 +357,7 @@ class GPB_GitHub_API {
 	 */
 	public function check_compatibility( $owner, $repo ) {
 		$cache_key = 'compatibility_' . $owner . '_' . $repo;
-		$cached = GPB_Cache::get( $cache_key );
+		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -366,9 +366,9 @@ class GPB_GitHub_API {
 		if ( is_wp_error( $readme_content ) ) {
 			$error_data = array(
 				'is_compatible' => false,
-				'reason'        => __( 'No valid readme file found.', 'github-plugin-browser' ),
+				'reason'        => __( 'No valid readme file found.', 'hub2wp' ),
 			);
-			GPB_Cache::set( $cache_key, $error_data );
+			H2WP_Cache::set( $cache_key, $error_data );
 			return $error_data;
 		}
 
@@ -376,13 +376,13 @@ class GPB_GitHub_API {
 		if ( empty( $headers['stable tag'] ) ) {
 			return array(
 				'is_compatible' => false,
-				'reason'        => __( 'No valid readme file found.', 'github-plugin-browser' ),
+				'reason'        => __( 'No valid readme file found.', 'hub2wp' ),
 			);
 		}
 
 		$compatibility = $this->evaluate_compatibility( $headers );
 		$compatibility['headers'] = $headers;
-		GPB_Cache::set( $cache_key, $compatibility );
+		H2WP_Cache::set( $cache_key, $compatibility );
 		return $compatibility;
 	}
 
@@ -408,7 +408,7 @@ class GPB_GitHub_API {
 				}
 			}
 
-			if ( $response->get_error_code() !== 'gpb_api_error_404' ) {
+			if ( $response->get_error_code() !== 'h2wp_api_error_404' ) {
 				return $response;
 			}
 		}
@@ -425,7 +425,7 @@ class GPB_GitHub_API {
 			}
 		}
 
-		return new WP_Error( 'gpb_readme_not_found', __( 'No valid readme file found.', 'github-plugin-browser' ) );
+		return new WP_Error( 'h2wp_readme_not_found', __( 'No valid readme file found.', 'hub2wp' ) );
 	}
 
 	/**
@@ -462,7 +462,7 @@ class GPB_GitHub_API {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
-					__( 'This plugin requires WordPress version %s or higher.', 'github-plugin-browser' ),
+					__( 'This plugin requires WordPress version %s or higher.', 'hub2wp' ),
 					$headers['requires at least']
 				),
 			);
@@ -472,7 +472,7 @@ class GPB_GitHub_API {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
-					__( 'This plugin requires PHP version %s or higher.', 'github-plugin-browser' ),
+					__( 'This plugin requires PHP version %s or higher.', 'hub2wp' ),
 					$headers['requires php']
 				),
 			);
@@ -481,7 +481,7 @@ class GPB_GitHub_API {
 		if ( ! empty( $headers['tested up to'] ) && version_compare( get_bloginfo( 'version' ), $headers['tested up to'], '>' ) ) {
 			return array(
 				'is_compatible' => true,
-				'reason'        => __( 'This plugin has not been tested with your WordPress version.', 'github-plugin-browser' ),
+				'reason'        => __( 'This plugin has not been tested with your WordPress version.', 'hub2wp' ),
 			);
 		}
 
@@ -500,7 +500,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_readme_headers( $owner, $repo ) {
 		$cache_key = 'readme_headers_' . $owner . '_' . $repo;
-		$cached = GPB_Cache::get( $cache_key );
+		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -511,7 +511,7 @@ class GPB_GitHub_API {
 		}
 
 		$headers = $this->extract_headers_from_readme( $readme_content );
-		GPB_Cache::set( $cache_key, $headers );
+		H2WP_Cache::set( $cache_key, $headers );
 		return $headers;
 	}
 
@@ -524,7 +524,7 @@ class GPB_GitHub_API {
 	 */
 	private function request( $url, $args = array() ) {
 		$default_args = array(
-			'user-agent' => 'WordPress/GPB',
+			'user-agent' => 'WordPress/hub2wp',
 		);
 
 		if ( ! empty( $this->access_token ) ) {
@@ -540,7 +540,7 @@ class GPB_GitHub_API {
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
-			return new WP_Error( "gpb_api_error_$code", sprintf( __( 'GitHub API HTTP error: %s', 'github-plugin-browser' ), $code ) );
+			return new WP_Error( "h2wp_api_error_$code", sprintf( __( 'GitHub API HTTP error: %s', 'hub2wp' ), $code ) );
 		}
 
 		$headers = wp_remote_retrieve_headers( $response );
@@ -560,7 +560,7 @@ class GPB_GitHub_API {
 	 */
 	public function get_changelog( $owner, $repo ) {
 		$cache_key = 'changelog_' . sanitize_key( $owner . '_' . $repo );
-		$cached    = GPB_Cache::get( $cache_key );
+		$cached    = H2WP_Cache::get( $cache_key );
 
 		if ( false !== $cached ) {
 			return $cached;
@@ -582,8 +582,8 @@ class GPB_GitHub_API {
 
 		if ( ! is_array( $releases ) ) {
 			return new WP_Error(
-				'gpb_invalid_response',
-				__( 'Invalid response from GitHub API', 'github-plugin-browser' )
+				'h2wp_invalid_response',
+				__( 'Invalid response from GitHub API', 'hub2wp' )
 			);
 		}
 
@@ -600,7 +600,7 @@ class GPB_GitHub_API {
 			$releases
 		);
 
-		GPB_Cache::set( $cache_key, $changelog, HOUR_IN_SECONDS );
+		H2WP_Cache::set( $cache_key, $changelog, HOUR_IN_SECONDS );
 
 		return $changelog;
 	}

@@ -73,7 +73,7 @@ class GPB_GitHub_API {
 			return new WP_Error( 'gpb_api_error', __( 'Invalid response from GitHub API.', 'github-plugin-browser' ) );
 		}
 
-		GPB_Cache::set( $cache_key, $data, HOUR_IN_SECONDS );
+		GPB_Cache::set( $cache_key, $data );
 		return $data;
 	}
 
@@ -115,7 +115,7 @@ class GPB_GitHub_API {
 			return new WP_Error( 'gpb_api_error', __( 'Invalid repository data from GitHub API.', 'github-plugin-browser' ) );
 		}
 
-		GPB_Cache::set( $cache_key, $data, HOUR_IN_SECONDS );
+		GPB_Cache::set( $cache_key, $data );
 		return $data;
 	}
 
@@ -154,7 +154,7 @@ class GPB_GitHub_API {
 		$allowed_html    = wp_kses_allowed_html( 'post' );
 		$sanitized_html  = wp_kses( $html, $allowed_html );
 
-		GPB_Cache::set( $cache_key, $sanitized_html, HOUR_IN_SECONDS );
+		GPB_Cache::set( $cache_key, $sanitized_html );
 		return $sanitized_html;
 	}
 
@@ -181,7 +181,7 @@ class GPB_GitHub_API {
 		// Attempt to extract og:image using regex.
 		if ( preg_match( '/<meta property="og:image" content="([^"]+)"/i', $repo_html, $matches ) ) {
 			$og_image = esc_url_raw( $matches[1] );
-			GPB_Cache::set( $cache_key, $og_image, DAY_IN_SECONDS );
+			GPB_Cache::set( $cache_key, $og_image );
 			return $og_image;
 		}
 
@@ -193,7 +193,7 @@ class GPB_GitHub_API {
 
 		if ( isset( $repo_details['owner']['avatar_url'] ) ) {
 			$avatar_url = esc_url_raw( $repo_details['owner']['avatar_url'] );
-			GPB_Cache::set( $cache_key, $avatar_url, DAY_IN_SECONDS );
+			GPB_Cache::set( $cache_key, $avatar_url );
 			return $avatar_url;
 		}
 
@@ -225,7 +225,7 @@ class GPB_GitHub_API {
 		// Attempt to extract watchers count using regex or DOM parsing.
 		if ( preg_match( '/<strong>(\d+)<\/strong>\s+watching/', $repo_html, $matches ) ) {
 			$count = absint( $matches[1] );
-			GPB_Cache::set( $cache_key, $count, DAY_IN_SECONDS );
+			GPB_Cache::set( $cache_key, $count );
 			return $count;
 		}
 
@@ -255,7 +255,7 @@ class GPB_GitHub_API {
 		// Attempt to extract primary language using regex or DOM parsing.
 		if ( preg_match( '/<span class="color-fg-default text-bold mr-1">([A-Za-z]+)<\/span>/', $repo_html, $matches ) ) {
 			$language = sanitize_text_field( $matches[1] );
-			GPB_Cache::set( $cache_key, $language, DAY_IN_SECONDS );
+			GPB_Cache::set( $cache_key, $language );
 			return $language;
 		}
 
@@ -288,52 +288,52 @@ class GPB_GitHub_API {
 			return new WP_Error( 'gpb_scrape_error', __( 'Empty repository page.', 'github-plugin-browser' ) );
 		}
 
-		GPB_Cache::set( $cache_key, $body, HOUR_IN_SECONDS );
+		GPB_Cache::set( $cache_key, $body );
 		return $body;
 	}
 
 	/**
-     * Get contributors for a repository.
-     *
-     * @param string $owner Owner of the repo.
-     * @param string $repo  Repo name.
-     * @return array|WP_Error Contributors or error.
-     */
-    public function get_contributors($owner, $repo) {
-        $cache_key = 'contributors_' . $owner . '_' . $repo;
-        $cached = GPB_Cache::get($cache_key);
-        if (false !== $cached) {
-            return $cached;
-        }
+	 * Get contributors for a repository.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return array|WP_Error Contributors or error.
+	 */
+	public function get_contributors( $owner, $repo ) {
+		$cache_key = 'contributors_' . $owner . '_' . $repo;
+		$cached = GPB_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
 
-        $url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/contributors';
-        $response = $this->request($url);
+		$url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/contributors';
+		$response = $this->request( $url );
 
-        if (is_wp_error($response)) {
-            return $response;
-        }
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
 
-        $contributors = json_decode(wp_remote_retrieve_body($response), true);
-        if (!is_array($contributors)) {
-            return new WP_Error('gpb_api_error', __('Invalid contributors data from GitHub API.', 'github-plugin-browser'));
-        }
+		$contributors = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $contributors ) ) {
+			return new WP_Error( 'gpb_api_error', __( 'Invalid contributors data from GitHub API.', 'github-plugin-browser' ) );
+		}
 
-        // Limit to 5 contributors
-        $contributors = array_slice($contributors, 0, 5);
+		// Limit to 5 contributors
+		$contributors = array_slice( $contributors, 0, 5 );
 
-        // Prepare data for each contributor
-        $data = array();
-        foreach ($contributors as $contributor) {
-            $data[] = array(
-                'login' => isset($contributor['login']) ? sanitize_text_field($contributor['login']) : '',
-                'html_url' => isset($contributor['html_url']) ? esc_url_raw($contributor['html_url']) : '',
-                'avatar_url' => isset($contributor['avatar_url']) ? esc_url_raw($contributor['avatar_url']) : '',
-            );
-        }
+		// Prepare data for each contributor
+		$data = array();
+		foreach ( $contributors as $contributor ) {
+			$data[] = array(
+				'login'      => isset( $contributor['login'] ) ? sanitize_text_field( $contributor['login'] ) : '',
+				'html_url'   => isset( $contributor['html_url'] ) ? esc_url_raw( $contributor['html_url'] ) : '',
+				'avatar_url' => isset( $contributor['avatar_url'] ) ? esc_url_raw( $contributor['avatar_url'] ) : '',
+			);
+		}
 
-        GPB_Cache::set($cache_key, $data, HOUR_IN_SECONDS);
-        return $data;
-    }
+		GPB_Cache::set( $cache_key, $data );
+		return $data;
+	}
 
 	/**
 	 * Check rate limits and handle them.
@@ -350,79 +350,135 @@ class GPB_GitHub_API {
 
 	/**
 	 * Check if plugin is compatible with the current WordPress environment.
-	 * 
+	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
-	 * @return array|WP_Error Compatibility data (is_compatible, reason) or error.
+	 * @return array Compatibility data (is_compatible, reason) or error.
 	 */
 	public function check_compatibility( $owner, $repo ) {
-		$url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/contents/readme.txt';
-		$response = $this->request( $url );
+		$cache_key = 'compatibility_' . $owner . '_' . $repo;
+		$cached = GPB_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
 
-		if ( is_wp_error( $response ) ) {
-			if ( 'gpb_api_error_404' === $response->get_error_code() ) {
-				return array(
-					'is_compatible' => false,
-					'reason'        => __( 'No valid readme.txt file found.', 'github-plugin-browser' ),
-				);
+		$readme_content = $this->fetch_readme_content( $owner, $repo );
+		if ( is_wp_error( $readme_content ) ) {
+			$error_data = array(
+				'is_compatible' => false,
+				'reason'        => __( 'No valid readme file found.', 'github-plugin-browser' ),
+			);
+			GPB_Cache::set( $cache_key, $error_data );
+			return $error_data;
+		}
+
+		$headers = $this->extract_headers_from_readme( $readme_content );
+		if ( empty( $headers['stable tag'] ) ) {
+			return array(
+				'is_compatible' => false,
+				'reason'        => __( 'No valid readme file found.', 'github-plugin-browser' ),
+			);
+		}
+
+		$compatibility = $this->evaluate_compatibility( $headers );
+		$compatibility['headers'] = $headers;
+		GPB_Cache::set( $cache_key, $compatibility );
+		return $compatibility;
+	}
+
+	/**
+	 * Fetch the content of the readme file from the repository.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return string|WP_Error Readme content or error.
+	 */
+	private function fetch_readme_content( $owner, $repo ) {
+		$filenames = array( 'readme.txt', 'README.txt' );
+
+		foreach ( $filenames as $filename ) {
+			$url = $this->base_url . "/repos/{$owner}/{$repo}/contents/{$filename}";
+			$response = $this->request( $url );
+
+			if ( ! is_wp_error( $response ) ) {
+				$data = json_decode( wp_remote_retrieve_body( $response ), true );
+				if ( isset( $data['content'] ) ) {
+					// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- We need to decode that base64.
+					return base64_decode( $data['content'] );
+				}
 			}
 
-			return $response;
+			if ( $response->get_error_code() !== 'gpb_api_error_404' ) {
+				return $response;
+			}
 		}
 
-		$data = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( ! isset( $data['content'] ) || empty( $data['content'] ) ) {
-			return array(
-				'is_compatible' => false,
-				'reason'        => __( 'No valid readme.txt file found.', 'github-plugin-browser' ),
-			);
+		// Fall back to the readme endpoint which will find README.md/readme.md/README etc.
+		$url = $this->base_url . "/repos/{$owner}/{$repo}/readme";
+		$response = $this->request( $url );
+
+		if ( ! is_wp_error( $response ) ) {
+			$data = json_decode( wp_remote_retrieve_body( $response ), true );
+			if ( isset( $data['content'] ) ) {
+				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- We need to decode that base64.
+				return base64_decode( $data['content'] );
+			}
 		}
 
-		// Decode the base64-encoded readme.txt file.
-		$readme = base64_decode( $data['content'] );
-		if ( ! $readme ) {
-			return array(
-				'is_compatible' => false,
-				'reason'        => __( 'No valid readme.txt file found.', 'github-plugin-browser' ),
-			);
-		}
+		return new WP_Error( 'gpb_readme_not_found', __( 'No valid readme file found.', 'github-plugin-browser' ) );
+	}
 
-		// Parse required headers.
-		$headers = array(
-			'Requires at least' => '',
-			'Tested up to'      => '',
-			'Requires PHP'      => '',
+	/**
+	 * Extract headers from readme content using regex.
+	 *
+	 * @param string $readme_content Readme file content.
+	 * @return array Extracted headers.
+	 */
+	private function extract_headers_from_readme( $readme_content ) {
+		$fields = array(
+			'requires at least' => '',
+			'tested up to'      => '',
+			'requires php'      => '',
+			'stable tag'        => '',
 		);
 
-		foreach ( $headers as $header => &$value ) {
-			if ( preg_match( '/^' . preg_quote( $header, '/' ) . ':\s*(.+)$/mi', $readme, $matches ) ) {
+		foreach ( $fields as $field => &$value ) {
+			if ( preg_match( '/^' . preg_quote( $field, '/' ) . ':\s*(.+)$/mi', $readme_content, $matches ) ) {
 				$value = trim( $matches[1] );
 			}
 		}
 
-		// Check WordPress compatibility.
-		if ( ! empty( $headers['Requires at least'] ) && version_compare( get_bloginfo( 'version' ), $headers['Requires at least'], '<' ) ) {
+		return $fields;
+	}
+
+	/**
+	 * Evaluate compatibility based on parsed headers.
+	 *
+	 * @param array $headers Parsed readme headers.
+	 * @return array Compatibility data.
+	 */
+	private function evaluate_compatibility( $headers ) {
+		if ( ! empty( $headers['requires at least'] ) && version_compare( get_bloginfo( 'version' ), $headers['requires at least'], '<' ) ) {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
 					__( 'This plugin requires WordPress version %s or higher.', 'github-plugin-browser' ),
-					$headers['Requires at least']
+					$headers['requires at least']
 				),
 			);
 		}
 
-		// Check PHP compatibility.
-		if ( ! empty( $headers['Requires PHP'] ) && version_compare( PHP_VERSION, $headers['Requires PHP'], '<' ) ) {
+		if ( ! empty( $headers['requires php'] ) && version_compare( PHP_VERSION, $headers['requires php'], '<' ) ) {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
 					__( 'This plugin requires PHP version %s or higher.', 'github-plugin-browser' ),
-					$headers['Requires PHP']
+					$headers['requires php']
 				),
 			);
 		}
 
-		if ( ! empty( $headers['Tested up to'] ) && version_compare( get_bloginfo( 'version' ), $headers['Tested up to'], '>' ) ) {
+		if ( ! empty( $headers['tested up to'] ) && version_compare( get_bloginfo( 'version' ), $headers['tested up to'], '>' ) ) {
 			return array(
 				'is_compatible' => true,
 				'reason'        => __( 'This plugin has not been tested with your WordPress version.', 'github-plugin-browser' ),
@@ -433,6 +489,30 @@ class GPB_GitHub_API {
 			'is_compatible' => true,
 			'reason'        => '',
 		);
+	}
+
+	/**
+	 * Get parsed headers from the readme.txt file.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return array|WP_Error Parsed headers or error.
+	 */
+	public function get_readme_headers( $owner, $repo ) {
+		$cache_key = 'readme_headers_' . $owner . '_' . $repo;
+		$cached = GPB_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$readme_content = $this->fetch_readme_content( $owner, $repo );
+		if ( is_wp_error( $readme_content ) ) {
+			return $readme_content;
+		}
+
+		$headers = $this->extract_headers_from_readme( $readme_content );
+		GPB_Cache::set( $cache_key, $headers );
+		return $headers;
 	}
 
 	/**
@@ -467,5 +547,61 @@ class GPB_GitHub_API {
 		$this->handle_rate_limits( $headers );
 
 		return $response;
+	}
+
+	/**
+	 * Get changelog from GitHub releases.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $owner Repository owner.
+	 * @param string $repo  Repository name.
+	 * @return array|WP_Error Array of releases or error object.
+	 */
+	public function get_changelog( $owner, $repo ) {
+		$cache_key = 'changelog_' . sanitize_key( $owner . '_' . $repo );
+		$cached    = GPB_Cache::get( $cache_key );
+
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$url = sprintf(
+			'https://api.github.com/repos/%s/%s/releases',
+			urlencode( $owner ),
+			urlencode( $repo )
+		);
+
+		$response = $this->request( $url );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$releases = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( ! is_array( $releases ) ) {
+			return new WP_Error(
+				'gpb_invalid_response',
+				__( 'Invalid response from GitHub API', 'github-plugin-browser' )
+			);
+		}
+
+		$changelog = array_map(
+			function( $release ) {
+				return array(
+					'version'     => ltrim( $release['tag_name'], 'v' ),
+					'title'       => sanitize_text_field( $release['name'] ),
+					'description' => wp_kses_post( $release['body'] ),
+					'date'        => sanitize_text_field( $release['published_at'] ),
+					'url'         => esc_url_raw( $release['html_url'] ),
+				);
+			},
+			$releases
+		);
+
+		GPB_Cache::set( $cache_key, $changelog, HOUR_IN_SECONDS );
+
+		return $changelog;
 	}
 }

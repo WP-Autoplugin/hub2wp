@@ -14,6 +14,7 @@ class GPB_Admin_Ajax {
 	public function __construct() {
 		add_action( 'wp_ajax_gpb_get_plugin_details', array( $this, 'get_plugin_details' ) );
 		add_action( 'wp_ajax_gpb_check_compatibility', array( $this, 'check_compatibility' ) );
+		add_action( 'wp_ajax_gpb_get_changelog', array( $this, 'get_changelog' ) );
 		add_action( 'wp_ajax_gpb_install_plugin', array( $this, 'install_plugin' ) );
 		add_action( 'wp_ajax_gpb_activate_plugin', array( $this, 'activate_plugin' ) );
 	}
@@ -53,6 +54,8 @@ class GPB_Admin_Ajax {
 			$readme_html = __( 'No README available.', 'github-plugin-browser' );
 		}
 
+		$readme_html = $this->strip_plugin_headers( $readme_html );
+
 		$og_image = $api->get_og_image( $owner, $repo );
 		if ( is_wp_error( $og_image ) ) {
 			$og_image = $repo_details['owner']['avatar_url'];
@@ -61,6 +64,7 @@ class GPB_Admin_Ajax {
 		// Prepare data.
 		$data = array(
 			'name'             => isset( $repo_details['name'] ) ? $repo_details['name'] : '',
+			'display_name'     => isset( $repo_details['name'] ) ? ucwords( str_replace( array( '-', 'wp', 'wordpress' ), array( ' ', 'WP', 'WordPress' ), $repo_details['name'] ) ) : '',
 			'owner'            => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'repo'             => isset( $repo_details['name'] ) ? sanitize_text_field( $repo_details['name'] ) : '',
 			'description'      => isset( $repo_details['description'] ) ? $repo_details['description'] : '',
@@ -81,6 +85,54 @@ class GPB_Admin_Ajax {
 		);
 
 		wp_send_json_success( $data );
+	}
+
+	/**
+	 * Try to strip plugin headers like "Contributors: x", "Donate link: Y", "Tags: Z", etc. from the readme because they already appear in the sidebar.
+	 *
+	 * @param string $readme Readme HTML.
+	 * @return string Filtered readme HTML.
+	 */
+	private function strip_plugin_headers( $readme ) {
+		$skip = array(
+			'contributors',
+			'donate link',
+			'tags',
+			'requires at least',
+			'tested up to',
+			'stable tag',
+			'requires php',
+			'license',
+			'license uri',
+		);
+
+		$lines = explode( "\n", $readme );
+		$filtered_lines = array();
+		$header_section = true;
+
+		foreach ( $lines as $index => $line ) {
+			// Only check first x lines for headers.
+			if ( $index >= 40 ) {
+				$header_section = false;
+			}
+
+			if ( $header_section ) {
+				$skip_line = false;
+				foreach ( $skip as $header ) {
+					if ( stripos( $line, $header . ':' ) === 0 ) {
+						$skip_line = true;
+						break;
+					}
+				}
+				if ( $skip_line ) {
+					continue;
+				}
+			}
+
+			$filtered_lines[] = $line;
+		}
+
+		return implode( "\n", $filtered_lines );
 	}
 
 	/**
@@ -106,9 +158,6 @@ class GPB_Admin_Ajax {
 		// Check if plugin is compatible.
 		$api = new GPB_GitHub_API( GPB_Settings::get_access_token() );
 		$compatibility = $api->check_compatibility( $owner, $repo );
-		if ( is_wp_error( $compatibility ) ) {
-			wp_send_json_error( array( 'message' => $compatibility->get_error_message() ) );
-		}
 		if ( ! $compatibility['is_compatible'] ) {
 			wp_send_json_error( array( 'message' => $compatibility['reason'] ) );
 		}
@@ -171,11 +220,8 @@ class GPB_Admin_Ajax {
 
 		// Check compatibility.
 		$compatibility = $api->check_compatibility( $owner, $repo );
-		if ( is_wp_error( $compatibility ) ) {
-			wp_send_json_error( array( 'message' => $compatibility->get_error_message() ) );
-		}
 
-		wp_send_json_success( array( 'is_compatible' => $compatibility['is_compatible'], 'reason' => $compatibility['reason'] ) );
+		wp_send_json_success( array( 'is_compatible' => $compatibility['is_compatible'], 'reason' => $compatibility['reason'], 'headers' => ! empty( $compatibility['headers'] ) ? $compatibility['headers'] : array() ) );
 	}
 
 	/**
@@ -225,7 +271,7 @@ class GPB_Admin_Ajax {
 
 	/**
 	 * Find the plugin file in the plugin directory.
-	 * 
+	 *
 	 * @param array $plugin_data Plugin data.
 	 * @return string|bool Plugin file path or false if not found.
 	 */
@@ -243,4 +289,51 @@ class GPB_Admin_Ajax {
 		return $plugin_file;
 	}
 
+	/**
+	 * Handle AJAX request to get changelog.
+	 */
+	public function get_changelog() {
+		// Check nonce
+		check_ajax_referer( 'gpb_plugin_details_nonce', 'nonce' );
+
+		// Check user capabilities
+		if ( ! current_user_can( 'install_plugins' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'github-plugin-browser' ) ) );
+		}
+
+		// Get and sanitize parameters
+		$owner = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
+		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+
+		if ( empty( $owner ) || empty( $repo ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'github-plugin-browser' ) ) );
+		}
+
+		// Get access token from settings
+		$access_token = GPB_Settings::get_access_token();
+		$api = new GPB_GitHub_API( $access_token );
+
+		// Fetch changelog
+		$changelog = $api->get_changelog( $owner, $repo );
+		if ( is_wp_error( $changelog ) ) {
+			wp_send_json_error( array( 'message' => $changelog->get_error_message() ) );
+		}
+
+		if ( empty( $changelog ) ) {
+			wp_send_json_error( array( 'message' => __( 'No changelog available.', 'github-plugin-browser' ) ) );
+		}
+
+		$changelog_html = '<ul class="gpb-changelog">';
+		foreach ( $changelog as $release ) {
+			$changelog_html .= '<li>';
+			$changelog_html .= '<h4>' . esc_html( $release['version'] ) . ( $release['title'] ? ' (' . esc_html( $release['title'] ) . ')' : '' ) . '</h4>';
+			$changelog_html .= '<p><strong>' . __( 'Released:', 'github-plugin-browser' ) . '</strong> ' . date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $release['date'] ) ) . '</p>';
+			$changelog_html .= '<p>' . nl2br( $release['description'] ) . '</p>';
+			$changelog_html .= '<p><a href="' . $release['url'] . '" target="_blank">' . __( 'View on GitHub', 'github-plugin-browser' ) . '</a></p>';
+			$changelog_html .= '</li>';
+		}
+		$changelog_html .= '</ul>';
+
+		wp_send_json_success( array( 'changelog_html' => $changelog_html ) );
+	}
 }

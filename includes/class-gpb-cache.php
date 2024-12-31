@@ -25,7 +25,10 @@ class GPB_Cache {
 	 * @param mixed  $data     Data to store.
 	 * @param int    $duration Duration in seconds.
 	 */
-	public static function set( $key, $data, $duration = 43200 ) {
+	public static function set( $key, $data, $duration = null ) {
+		if ( ! $duration ) {
+			$duration = GPB_Settings::get_cache_duration();
+		}
 		set_transient( 'gpb_' . $key, $data, $duration );
 	}
 

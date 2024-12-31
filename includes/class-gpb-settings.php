@@ -19,6 +19,7 @@ class GPB_Settings {
 	public static function init() {
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 		add_action( 'admin_menu', array( __CLASS__, 'add_settings_page' ) );
+		add_action( 'update_option_' . self::OPTION_NAME, array( __CLASS__, 'handle_monitored_plugins_update' ), 10, 3 );
 	}
 
 	/**
@@ -65,7 +66,7 @@ class GPB_Settings {
 	public static function add_settings_page() {
 		add_options_page(
 			__( 'GitHub Plugin Browser Settings', 'github-plugin-browser' ),
-			__( 'GitHub Installer', 'github-plugin-browser' ),
+			__( 'GitHub Plugins', 'github-plugin-browser' ),
 			'manage_options',
 			'gpb_settings_page',
 			array( __CLASS__, 'render_settings_page' )
@@ -149,15 +150,45 @@ class GPB_Settings {
 	 */
 	public static function sanitize_settings( $input ) {
 		$output = array();
+
 		if ( isset( $input['access_token'] ) ) {
 			$output['access_token'] = sanitize_text_field( $input['access_token'] );
 		}
+
 		if ( isset( $input['cache_duration'] ) ) {
 			$output['cache_duration'] = absint( $input['cache_duration'] );
-		} else {
-			$output['cache_duration'] = 12; // default
 		}
+
+		// Store monitored plugins selection for processing after save
+		$output['monitored_plugins'] = isset( $input['monitored_plugins'] ) ? 
+			array_map( 'sanitize_text_field', $input['monitored_plugins'] ) : 
+			array();
+
 		return $output;
+	}
+
+	/**
+	 * Handle monitored plugins updates after settings are saved.
+	 *
+	 * @param mixed  $old_value The old option value.
+	 * @param mixed  $value     The new option value.
+	 * @param string $option    Option name.
+	 */
+	public static function handle_monitored_plugins_update( $old_value, $value, $option ) {
+		if ( self::OPTION_NAME !== $option || ! isset( $value['monitored_plugins'] ) ) {
+			return;
+		}
+
+		$monitored_plugins = get_option( 'gpb_plugins', array() );
+		$new_plugins = array();
+
+		foreach ( $monitored_plugins as $plugin_id => $plugin_data ) {
+			if ( in_array( $plugin_id, $value['monitored_plugins'], true ) ) {
+				$new_plugins[$plugin_id] = $plugin_data;
+			}
+		}
+
+		update_option( 'gpb_plugins', $new_plugins );
 	}
 
 	/**
@@ -198,7 +229,7 @@ class GPB_Settings {
 			?>
 			<label>
 				<input type="checkbox" name="gpb_settings[monitored_plugins][]" value="<?php echo esc_attr( $key ); ?>" checked="checked" />
-				<?php echo esc_html( $plugin['name'] ); ?>
+				<strong><?php echo esc_html( $plugin['name'] ); ?></strong> by <?php echo esc_html( $plugin['author'] ); ?>
 				(<a href="<?php echo esc_url( 'https://github.com/' . $key ); ?>" target="_blank"><?php echo esc_html( $key ); ?></a>)
 			</label><br />
 			<?php

@@ -268,19 +268,88 @@
     background-color: rgba(0, 0, 0, 0.7);
 }
 
+/* Tab container */
+.gpb-modal-tabs {
+    border-bottom: 1px solid #dcdcde;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: inherit;
+    background: #f6f7f7;
+}
+
+/* Tab list */
+.gpb-modal-tabs ul {
+    list-style: none;
+    margin: 0;
+    padding: 0 20px;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* Individual tab items */
+.gpb-modal-tabs li {
+    margin: 0;
+    padding: 0;
+}
+
+/* Tab links */
+.gpb-modal-tabs .gpb-modal-tab {
+    padding: 5px 10px;
+    margin: 0 3px;
+    font-size: 14px;
+    line-height: 1.71428571;
+    font-weight: 400;
+    text-decoration: none;
+    color: #2271b1;
+    display: inline-block;
+    cursor: pointer;
+    border: 1px solid transparent;
+    border-bottom: none;
+    background: transparent;
+    transition: all 0.2s ease-in-out;
+}
+
+/* First tab spacing */
+.gpb-modal-tabs li:first-child .gpb-modal-tab {
+    margin-left: 0;
+}
+
+/* Hover state */
+.gpb-modal-tabs .gpb-modal-tab:hover {
+    color: #135e96;
+}
+
+/* Active state */
+.gpb-modal-tabs .gpb-modal-tab-active,
+.gpb-modal-tabs .gpb-modal-tab-active:hover {
+    border-color: #dcdcde;
+    border-top-color: #fff;
+    background: #fff;
+    color: #2c3338;
+    margin-bottom: -1px;
+    padding-bottom: 6px;
+}
+
+/* Focus state */
+.gpb-modal-tabs .gpb-modal-tab:focus {
+    box-shadow: 0 0 0 1px #2271b1;
+    outline: 1px solid transparent;
+}
+
 .gpb-modal-content {
     position: relative;
     background-color: #fff;
     margin: 0;
     width: 100%;
-    max-width: 900px;
+    max-width: 800px;
     border-radius: 0;
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    max-height: 80vh;
+    max-height: 90vh;
     overflow-y: auto;
 }
 
@@ -288,8 +357,11 @@
     visibility: hidden;
 }
 
-#gpb-plugin-modal.gpb-modal-loading .gpb-modal-content:after {
-    content: '';
+#gpb-plugin-modal .gpb-modal-spinner {
+    display: none;
+}
+
+#gpb-plugin-modal.gpb-modal-loading .gpb-modal-spinner {
     display: block;
     position: absolute;
     top: 50%;
@@ -297,10 +369,6 @@
     width: 50px;
     height: 50px;
     margin: -25px 0 0 -25px;
-    border: 5px solid #f3f3f3;
-    border-top-color: #23282d;
-    border-radius: 50%;
-    animation: gpb-spin 1s linear infinite;
 }
 
 .gpb-modal-close {
@@ -332,7 +400,7 @@
     left: 0;
     right: 0;
     height: 100%;
-    background: linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.8) 100%);
+    background: linear-gradient(to bottom, transparent 70%, rgba(0,0,0,0.15) 100%);
 }
 
 .gpb-modal-header-text {
@@ -344,7 +412,7 @@
     z-index: 1;
 }
 
-.gpb-modal-title {
+.gpb-modal-header-text > .gpb-modal-title {
     font-family: "Helvetica Neue", sans-serif;
     display: inline-block;
     font-size: 30px;
@@ -362,8 +430,7 @@
 
 .gpb-modal-body {
     display: flex;
-    gap: 30px;
-    border-top: 1px solid #dcdcde;
+    gap: 0;
     position: relative;
     height: calc(100% - 60px);
     min-height: 300px;
@@ -383,11 +450,31 @@
 
 .gpb-modal-body > .gpb-modal-sidebar {
     background: #f6f7f7;
-    padding: 20px;
+    padding: 16px;
     width: 200px;
     border-left: 1px solid #dcdcde;
     color: #646970;
     flex-shrink: 0;
+}
+
+.gpb-modal-compatibility-details p, .gpb-modal-links p {
+    margin: 0.8em 0;
+}
+
+.gpb-modal-sidebar h3 {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 12px;
+    color: #646970;
+    margin: 24px 0 8px;
+}
+
+.gpb-meta-stats .gpb-meta-stat:first-child svg {
+    color: #dba617;
+}
+
+.gpb-meta-stats .gpb-meta-stat:nth-child(2) svg {
+    color: #0073aa;
 }
 
 .gpb-modal-stats {
@@ -399,6 +486,14 @@
 .gpb-modal-body > .gpb-modal-sidebar strong,
 .gpb-modal-stats li {
     color: #3c434a;
+}
+
+.gpb-modal-stars-content .dashicons {
+    color: #dba617;
+}
+
+.gpb-modal-stars {
+    font-weight: bold;
 }
 
 .gpb-modal-stats li {
@@ -415,12 +510,12 @@
     color: #646970;
 }
 
-.gpb-modal-stats li.gpb-loading span.dashicons {
+.gpb-modal-compatibility-details .gpb-loading span.dashicons {
     display: inline-block;
     transform: scaleX(-1);
 }
 
-.gpb-modal-stats li.gpb-loading span.dashicons::before {
+.gpb-modal-compatibility-details .gpb-loading span.dashicons::before {
     content: '\f531';
     animation: gpb-spin-invert 1s linear infinite;
     display: inline-block;
@@ -428,7 +523,7 @@
     margin-right: 5px;
 }
 
-.gpb-modal-stats li span.gpb-modal-compatibility {
+.gpb-modal-compatibility-details span.gpb-modal-compatibility {
     font-weight: 600;
     color: #3c434a;
 }
@@ -443,7 +538,91 @@
     border: 1px solid #dcdcde;
 }
 
-/* Topics look like tags */
+/* Meta tab */
+.gpb-modal-meta-content {
+    padding: 16px;
+    background: white;
+}
+
+.gpb-modal-meta-content h3 {
+    margin: 0 0 16px;
+    color: #1d2327;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.gpb-modal-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.gpb-modal-stat-card {
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    transition: border-color 0.15s ease;
+}
+
+.gpb-modal-stat-card:hover {
+    border-color: #8c8f94;
+}
+
+.gpb-modal-stat-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    color: #646970;
+}
+
+.gpb-modal-stat-label {
+    font-size: 13px;
+}
+
+.gpb-modal-author,
+.gpb-modal-stars,
+.gpb-modal-forks,
+.gpb-modal-watchers,
+.gpb-modal-issues,
+.gpb-modal-updated {
+    font-weight: 500;
+}
+
+.gpb-modal-author a {
+    color: #2271b1;
+    text-decoration: none;
+}
+
+.gpb-modal-author a:hover {
+    color: #135e96;
+    text-decoration: underline;
+}
+
+.gpb-modal-links {
+    margin-top: 16px;
+}
+
+@media (max-width: 600px) {
+    .gpb-modal-stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+ul.gpb-changelog {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+ul.gpb-changelog li {
+    margin: 0 0 15px;
+    border-bottom: 1px solid #dcdcde;
+}
+
+/* Topics */
 .gpb-modal-topics {
     display: flex;
     flex-wrap: wrap;
@@ -478,6 +657,8 @@
     align-items: center;
     position: sticky;
     bottom: -1px;
+    flex-direction: row-reverse;
+    min-height: 36px;
 }
 
 .gpb-modal-footer .gpb-button {

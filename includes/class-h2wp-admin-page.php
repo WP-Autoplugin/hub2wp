@@ -15,6 +15,7 @@ class H2WP_Admin_Page {
 		add_action( 'admin_menu', array( __CLASS__, 'add_menu_page' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'display_rate_limit_notice' ) );
+		add_filter( 'plugin_action_links_' . H2WP_PLUGIN_BASENAME, array( __CLASS__, 'add_action_links' ) );
 	}
 
 	/**
@@ -363,5 +364,18 @@ class H2WP_Admin_Page {
 			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'GitHub API rate limit reached. Please add a personal access token in the settings to continue.', 'hub2wp' ) . '</p></div>';
 			delete_transient( 'h2wp_rate_limit_reached' );
 		}
+	}
+
+	/**
+	 * Add action links to the plugin list: Settings and Add Plugin.
+	 *
+	 * @param array $links Plugin action links.
+	 * @return array
+	 */
+	public static function add_action_links( $links ) {
+		$settings_link = '<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'Settings', 'hub2wp' ) . '</a>';
+		$add_plugin_link = '<a href="' . esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser' ) ) . '">' . esc_html__( 'Add GitHub Plugin', 'hub2wp' ) . '</a>';
+		array_unshift( $links, $settings_link, $add_plugin_link );
+		return $links;
 	}
 }

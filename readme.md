@@ -27,7 +27,7 @@ hub2wp does not require any changes to existing plugins or approvals from a cent
    Currently, hub2wp checks the `Stable tag:` version in the default branch of the repository to manage updates. In the future, support for GitHub releases will be added, prioritizing them for update monitoring if the repository uses the releases feature.
 
 3. **Installation**:  
-   - Download the latest release from the [Releases](https://github.com/YourGithubUsername/hub2wp/releases) page.
+   - Download the latest release from the [Releases](https://github.com/WP-Autoplugin/hub2wp/releases) page.
    - Upload the ZIP file via the 'Plugins' screen in WordPress or extract it to the `/wp-content/plugins/` directory.
    - Activate hub2wp from the 'Plugins' menu.
    - Start exploring GitHub plugins under “Plugins > Add GitHub Plugin.”
@@ -92,7 +92,7 @@ Not yet, but support for private repositories is planned for a future release.
 
 ## Contribution
 
-hub2wp is open source and welcomes contributions. If you encounter issues or have suggestions, please create an issue or pull request in the [GitHub repository](https://github.com/YourGithubUsername/hub2wp).
+hub2wp is open source and welcomes contributions. If you encounter issues or have suggestions, please create an issue or pull request in the [GitHub repository](https://github.com/WP-Autoplugin/hub2wp).
 
 ---
 

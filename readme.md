@@ -47,6 +47,31 @@ hub2wp will continue to evolve with the following planned features:
 
 ---
 
+## Screenshots
+
+<details>
+<summary>GitHub Plugin Browsing</summary>
+
+![GitHub Plugin Browsing](assets/hub2wp-screenshot-1.png)
+
+</details>
+
+<details>
+<summary>Plugin Details Popup</summary>
+
+![Plugin Details Popup](assets/hub2wp-screenshot-2.png)
+
+</details>
+
+<details>
+<summary>Update Processing via GitHub API</summary>
+
+![Update Processing via GitHub API](assets/hub2wp-screenshot-3.png)
+
+</details>
+
+---
+
 ## FAQs
 
 **Do I need a GitHub token?**  

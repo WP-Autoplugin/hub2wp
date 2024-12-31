@@ -2,24 +2,26 @@
 
 hub2wp is a WordPress plugin that lets you discover, install, and update plugins hosted on GitHub directly from your WordPress dashboard. By leveraging GitHub's plugin ecosystem, it provides a straightforward way to extend your WordPress site beyond the plugins available on WordPress.org.
 
+hub2wp does not require any changes to existing plugins or approvals from a central authority to make plugins discoverable or updatable. All it takes is for developers to add the `wordpress-plugin` tag to their public GitHub repository. hub2wp automatically verifies that a repository is a valid WordPress plugin. Thousands of valid plugins are already available on GitHub, ready to be installed right away!
+
+![GitHub Plugin Browsing](assets/hub2wp-screenshot-1.png)
+
 ---
 
 ## Features
 
-- **Search GitHub Plugins**: Browse repositories tagged with the `wordpress-plugin` topic.
+- **Search GitHub Plugins**: Browse and search repositories on GitHub to find plugins that meet your needs.
 - **Install with One Click**: Easily add GitHub-hosted plugins to your site.
-- **Update Management**: Receive notifications and perform updates for GitHub plugins directly from your admin panel.
-- **Optional GitHub Token Support**: Enhance API rate limits by adding a personal access token.
-- **Caching**: Built-in caching minimizes API requests for faster performance.
+- **Update Management**: Receive notifications and perform updates for GitHub plugins directly from your admin panel, like you would for WordPress.org plugins.
+- **Optional GitHub Token Support**: Increase the GitHub API rate limit by adding a personal access token. Normal usage does not require a token, thanks to GitHub's generous API limits for unauthenticated requests.
+- **Caching**: Built-in caching minimizes API requests for faster performance and reduced API quota usage.
 
 ---
 
 ## How It Works
 
 1. **Plugin Eligibility**:  
-   A repository must meet these requirements to appear in hub2wp’s search results:
-   - The repository must include the `wordpress-plugin` topic on GitHub.
-   - A `Stable tag:` header must be present in either `readme.txt` or `readme.md` in the root folder. This is used to determine the plugin's version.
+   To appear in hub2wp’s plugin list and search results, a repository must include the `wordpress-plugin` topic on GitHub. The repository must also include a `Stable tag:` header in either readme.txt or readme.md in the root folder. 
 
 2. **Update Mechanism**:  
    Currently, hub2wp checks the `Stable tag:` version in the default branch of the repository to manage updates. In the future, support for GitHub releases will be added, prioritizing them for update monitoring if the repository uses the releases feature.
@@ -85,14 +87,6 @@ If the plugin has been installed on your site via hub2wp, then you will be notif
 
 **Can I use hub2wp for private repositories?**  
 Not yet, but support for private repositories is planned for a future release.
-
----
-
-## Technical Details
-
-- **Requires WordPress**: 5.0 or higher
-- **Tested Up To**: 6.3
-- **License**: GPLv2 or later
 
 ---
 

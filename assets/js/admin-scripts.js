@@ -20,6 +20,9 @@ jQuery(document).ready(function($) {
         modal.find('.h2wp-install-plugin').data('owner', data.owner).data('repo', data.repo);
         modal.find('.h2wp-activate-plugin').addClass('h2wp-hidden');
 
+        // Also update the updated_at in the plugin card (.h2wp-meta-updated)
+        $('.h2wp-meta-updated[data-owner="' + data.owner + '"][data-repo="' + data.repo + '"] span').text(data.updated_at);
+
         // Set current tab to "readme" and show the content.
         modal.find('.h2wp-modal-tab-active').removeClass('h2wp-modal-tab-active');
         modal.find('.h2wp-modal-tab[data-tab="readme"]').addClass('h2wp-modal-tab-active');

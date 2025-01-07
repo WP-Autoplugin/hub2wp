@@ -61,6 +61,27 @@ class H2WP_Admin_Ajax {
 			$og_image = $repo_details['owner']['avatar_url'];
 		}
 
+		$last_updated = '';
+		if ( isset( $repo_details['pushed_at'] ) ) {
+			$last_updated = sprintf(
+				/* translators: %s: human-readable time difference */
+				__( '%s ago', 'hub2wp' ),
+				human_time_diff( strtotime( $repo_details['pushed_at'] ) )
+			);
+		}
+
+		// Let's try to use the pushed_at date of the default_branch
+		if ( isset( $repo_details['default_branch'] ) ) {
+			$branch_details = $api->get_branch_details( $owner, $repo, $repo_details['default_branch'] );
+			if ( ! is_wp_error( $branch_details ) && isset( $branch_details['commit']['commit']['author']['date'] ) ) {
+				$last_updated = sprintf(
+					/* translators: %s: human-readable time difference */
+					__( '%s ago', 'hub2wp' ),
+					human_time_diff( strtotime( $branch_details['commit']['commit']['author']['date'] ) )
+				);
+			}
+		}
+
 		// Prepare data.
 		$data = array(
 			'name'             => isset( $repo_details['name'] ) ? $repo_details['name'] : '',
@@ -79,7 +100,7 @@ class H2WP_Admin_Ajax {
 			'owner_avatar_url' => isset( $repo_details['owner']['avatar_url'] ) ? esc_url_raw( $repo_details['owner']['avatar_url'] ) : '',
 			'author'           => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'author_url'       => isset( $repo_details['owner']['html_url'] ) ? esc_url_raw( $repo_details['owner']['html_url'] ) : '',
-			'updated_at'       => isset( $repo_details['updated_at'] ) ? human_time_diff( strtotime( $repo_details['updated_at'] ) ) . ' ago' : '',
+			'updated_at'       => $last_updated,
 			'topics'           => isset( $repo_details['topics'] ) ? $this->extract_topics( $repo_details['topics'] ) : array(),
 			'is_installed'     => H2WP_Admin_Page::is_plugin_installed( $owner, $repo ),
 		);

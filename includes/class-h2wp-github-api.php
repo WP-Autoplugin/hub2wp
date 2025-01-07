@@ -79,7 +79,7 @@ class H2WP_GitHub_API {
 
 	/**
 	 * Get zipball URL for the main branch of a repository.
-	 * 
+	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
 	 * @return string Zipball URL.
@@ -113,6 +113,37 @@ class H2WP_GitHub_API {
 		$data = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( ! is_array( $data ) ) {
 			return new WP_Error( 'h2wp_api_error', __( 'Invalid repository data from GitHub API.', 'hub2wp' ) );
+		}
+
+		H2WP_Cache::set( $cache_key, $data );
+		return $data;
+	}
+
+	/**
+	 * Get branch details.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @param string $branch Branch name.
+	 * @return array|WP_Error Branch details or error.
+	 */
+	public function get_branch_details( $owner, $repo, $branch ) {
+		$cache_key = 'branch_details_' . $owner . '_' . $repo . '_' . $branch;
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$url      = $this->base_url . '/repos/' . $owner . '/' . $repo . '/branches/' . $branch;
+		$response = $this->request( $url );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'h2wp_api_error', __( 'Invalid branch data from GitHub API.', 'hub2wp' ) );
 		}
 
 		H2WP_Cache::set( $cache_key, $data );

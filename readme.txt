@@ -3,7 +3,7 @@ Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.0
 Tested up to: 6.3
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -33,6 +33,10 @@ Features:
 No, but you have a higher request limit if you use one.
 
 == Changelog ==
+
+= 1.0.1 =
+* Fix: Update plugin data saved in the activation hook.
+* Fix: Use the last commit date from the default branch as the plugin's last updated date.
 
 = 1.0.0 =
 * Initial release.

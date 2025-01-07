@@ -98,5 +98,9 @@ hub2wp is open source and welcomes contributions. If you encounter issues or hav
 
 ## Changelog
 
+### 1.1.0
+- Fix: Update plugin data saved in the activation hook.
+- Fix: Use the last commit date from the default branch as the plugin's last updated date.
+
 ### 1.0.0
 - Initial release

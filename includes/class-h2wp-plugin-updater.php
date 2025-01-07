@@ -357,7 +357,7 @@ class H2WP_Plugin_Updater {
 				'version'      => H2WP_VERSION,
 				'owner'        => 'wp-autoplugin',
 				'repo'         => 'hub2wp',
-				'plugin_file'  => H2WP_PLUGIN_FILE,
+				'plugin_file'  => H2WP_PLUGIN_BASENAME,
 				'requires'     => '5.5',
 				'tested'       => '6.7.1',
 				'requires_php' => '7.0',
@@ -365,6 +365,12 @@ class H2WP_Plugin_Updater {
 				'last_updated' => '',
 				'download_url' => 'https://api.github.com/repos/wp-autoplugin/hub2wp/zipball',
 			);
+			update_option( 'h2wp_plugins', $h2wp_sources );
+		}
+
+		// Check if the plugin_file contains WP_PLUGIN_DIR and if so, update it to the correct value.
+		if ( isset( $h2wp_sources['hub2wp']['plugin_file'] ) && false !== strpos( $h2wp_sources['hub2wp']['plugin_file'], WP_PLUGIN_DIR ) ) {
+			$h2wp_sources['hub2wp']['plugin_file'] = H2WP_PLUGIN_BASENAME;
 			update_option( 'h2wp_plugins', $h2wp_sources );
 		}
 	}

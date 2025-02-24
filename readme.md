@@ -6,6 +6,8 @@ hub2wp does not require any changes to existing plugins or approvals from a cent
 
 ![GitHub Plugin Browsing](assets/hub2wp-screenshot-1.png)
 
+Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public website to browse, search, and explore WordPress plugins hosted on GitHub.
+
 ---
 
 ## Features

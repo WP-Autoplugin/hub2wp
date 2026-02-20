@@ -200,9 +200,12 @@ class H2WP_Admin_Ajax {
 
 		// Store plugin data in the h2wp_plugins option.
 		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-		$h2wp_plugins[ $owner . '/' . $repo ] = $plugin_data;
-		$h2wp_plugins[ $owner . '/' . $repo ]['last_checked'] = time();
-		$h2wp_plugins[ $owner . '/' . $repo ]['last_updated'] = time();
+		$repo_key = $owner . '/' . $repo;
+		// Preserve existing fields (e.g. 'private' flag set when manually monitoring the repo).
+		$existing = isset( $h2wp_plugins[ $repo_key ] ) ? $h2wp_plugins[ $repo_key ] : array();
+		$h2wp_plugins[ $repo_key ] = array_merge( $existing, $plugin_data );
+		$h2wp_plugins[ $repo_key ]['last_checked'] = time();
+		$h2wp_plugins[ $repo_key ]['last_updated'] = time();
 		update_option( 'h2wp_plugins', $h2wp_plugins, false );
 
 		$plugin_data['activate_url'] = add_query_arg( array(

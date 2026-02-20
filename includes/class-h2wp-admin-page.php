@@ -155,7 +155,14 @@ class H2WP_Admin_Page {
 	 * @return array|WP_Error Array of private repo data or error.
 	 */
 	private static function get_private_repos_data( $api ) {
-		$private_repos = H2WP_Settings::get_private_repos();
+		$monitored_plugins = get_option( 'h2wp_plugins', array() );
+		$private_repos = array();
+
+		foreach ( $monitored_plugins as $repo_key => $repo_data ) {
+			if ( ! empty( $repo_data['private'] ) ) {
+				$private_repos[ $repo_key ] = $repo_data;
+			}
+		}
 
 		if ( empty( $private_repos ) ) {
 			return array(
@@ -230,7 +237,7 @@ class H2WP_Admin_Page {
 			echo '</ul>';
 			echo '<p>' . sprintf(
 				/* translators: %s: settings page URL */
-				__( 'You can manage your private repositories in the %s.', 'hub2wp' ),
+				__( 'You can manage your monitored plugins in the %s.', 'hub2wp' ),
 				'<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'settings', 'hub2wp' ) . '</a>'
 			) . '</p>';
 			echo '</div>';
@@ -242,7 +249,7 @@ class H2WP_Admin_Page {
 			echo '<p>' . esc_html__( 'No private repositories configured.', 'hub2wp' ) . '</p>';
 			echo '<p>' . sprintf(
 				/* translators: %s: settings page URL */
-				__( 'Add private repositories in the %s.', 'hub2wp' ),
+				__( 'Add repositories in the %s.', 'hub2wp' ),
 				'<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'settings page', 'hub2wp' ) . '</a>'
 			) . '</p>';
 			echo '</div>';

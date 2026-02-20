@@ -185,9 +185,11 @@ class H2WP_Admin_Ajax {
 
 		$download_url = $api->get_download_url( $owner, $repo );
 
-		// Install the plugin.
+		// Install the plugin. Pass the access token so private-repo zips can be
+		// downloaded with an Authorization header (the upgrader's built-in
+		// download_url() never sends auth headers).
 		$installer = new H2WP_Plugin_Installer();
-		$result = $installer->install_plugin( $download_url );
+		$result    = $installer->install_plugin( $download_url, H2WP_Settings::get_access_token() );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}

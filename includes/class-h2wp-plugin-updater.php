@@ -78,6 +78,10 @@ class H2WP_Plugin_Updater {
 				continue;
 			}
 
+			if ( ! file_exists( WP_PLUGIN_DIR . '/' . $plugin['plugin_file'] ) ) {
+				continue;
+			}
+
 			$installed_version = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin['plugin_file'] )['Version'];
 
 			if ( version_compare( $installed_version, $plugin['version'], '<' ) ) {

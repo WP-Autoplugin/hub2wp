@@ -9,9 +9,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 class H2WP_Settings {
 
 	/**
-	 * Option name.
+	 * Option name for settings.
 	 */
 	const OPTION_NAME = 'h2wp_settings';
+
+	/**
+	 * Option name for private repositories.
+	 */
+	const PRIVATE_REPOS_OPTION = 'h2wp_private_repos';
 
 	/**
 	 * Initialize the settings.
@@ -20,6 +25,8 @@ class H2WP_Settings {
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 		add_action( 'admin_menu', array( __CLASS__, 'add_settings_page' ) );
 		add_action( 'update_option_' . self::OPTION_NAME, array( __CLASS__, 'handle_monitored_plugins_update' ), 10, 3 );
+		add_action( 'admin_init', array( __CLASS__, 'handle_private_repo_actions' ) );
+		add_action( 'admin_notices', array( __CLASS__, 'display_private_repo_notices' ) );
 	}
 
 	/**
@@ -86,8 +93,489 @@ class H2WP_Settings {
 
 				<?php submit_button(); ?>
 			</form>
+
+			<hr />
+
+			<?php self::render_private_repos_section(); ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Render the private repositories section.
+	 */
+	public static function render_private_repos_section() {
+		$private_repos = self::get_private_repos();
+		?>
+		<h2><?php esc_html_e( 'Private Repositories', 'hub2wp' ); ?></h2>
+		<p class="description">
+			<?php esc_html_e( 'Add private GitHub repositories to browse and install them through hub2wp. Requires a personal access token with "repo" scope.', 'hub2wp' ); ?>
+		</p>
+
+		<form method="post" action="">
+			<?php wp_nonce_field( 'h2wp_add_private_repo', 'h2wp_private_repo_nonce' ); ?>
+			<input type="hidden" name="h2wp_action" value="add_private_repo" />
+			
+			<table class="form-table">
+				<tr>
+					<th scope="row">
+						<label for="h2wp_private_repo_input">
+							<?php esc_html_e( 'Add Private Repository', 'hub2wp' ); ?>
+						</label>
+					</th>
+					<td>
+						<input 
+							type="text" 
+							id="h2wp_private_repo_input"
+							name="h2wp_private_repo" 
+							value="" 
+							placeholder="owner/repo" 
+							size="50"
+						/>
+						<button type="submit" class="button button-secondary">
+							<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
+						</button>
+						<p class="description">
+							<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-plugin)', 'hub2wp' ); ?>
+						</p>
+					</td>
+				</tr>
+			</table>
+		</form>
+
+		<?php if ( ! empty( $private_repos ) ) : ?>
+			<h3><?php esc_html_e( 'Existing Private Repositories', 'hub2wp' ); ?></h3>
+			<table class="wp-list-table widefat fixed striped">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
+						<th><?php esc_html_e( 'Added', 'hub2wp' ); ?></th>
+						<th><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $private_repos as $repo_key => $repo_data ) : ?>
+						<tr>
+							<td>
+								<strong><?php echo esc_html( $repo_key ); ?></strong>
+								<br />
+								<small>
+									<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
+										<?php esc_html_e( 'View on GitHub', 'hub2wp' ); ?>
+									</a>
+								</small>
+							</td>
+							<td>
+								<?php
+								if ( isset( $repo_data['added'] ) ) {
+									echo esc_html( human_time_diff( $repo_data['added'], time() ) . ' ' . __( 'ago', 'hub2wp' ) );
+								} else {
+									esc_html_e( 'Unknown', 'hub2wp' );
+								}
+								?>
+							</td>
+							<td>
+								<form method="post" action="" style="display: inline;">
+									<?php wp_nonce_field( 'h2wp_remove_private_repo', 'h2wp_remove_repo_nonce' ); ?>
+									<input type="hidden" name="h2wp_action" value="remove_private_repo" />
+									<input type="hidden" name="h2wp_repo_key" value="<?php echo esc_attr( $repo_key ); ?>" />
+									<button type="submit" class="button button-small button-link-delete" onclick="return confirm('<?php echo esc_js( sprintf( __( 'Remove "%s" from private repositories?', 'hub2wp' ), $repo_key ) ); ?>');">
+										<?php esc_html_e( 'Remove', 'hub2wp' ); ?>
+									</button>
+								</form>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p class="description">
+				<?php
+				printf(
+					/* translators: %s: URL to the Private tab */
+					__( 'These repositories will be monitored for updates. You can install them from a ZIP file or via the <a href="%s">Private tab</a> in Plugins > Add GitHub Plugin.', 'hub2wp' ),
+					esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser&tab=private' ) )
+					);
+				?>
+			</p>
+		<?php else : ?>
+			<p class="description">
+				<?php esc_html_e( 'No private repositories added yet.', 'hub2wp' ); ?>
+			</p>
+		<?php endif; ?>
+		<?php
+	}
+
+	/**
+	 * Handle private repository actions (add/remove).
+	 */
+	public static function handle_private_repo_actions() {
+		if ( ! isset( $_POST['h2wp_action'] ) ) {
+			return;
+		}
+
+		$action = sanitize_text_field( wp_unslash( $_POST['h2wp_action'] ) );
+
+		if ( 'add_private_repo' === $action ) {
+			self::handle_add_private_repo();
+		} elseif ( 'remove_private_repo' === $action ) {
+			self::handle_remove_private_repo();
+		}
+	}
+
+	/**
+	 * Handle adding a private repository.
+	 */
+	private static function handle_add_private_repo() {
+		if ( ! isset( $_POST['h2wp_private_repo_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo_nonce'] ) ), 'h2wp_add_private_repo' ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_nonce_error',
+				__( 'Security check failed. Please try again.', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_permission_error',
+				__( 'You do not have permission to add private repositories.', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		if ( ! isset( $_POST['h2wp_private_repo'] ) || empty( $_POST['h2wp_private_repo'] ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_empty_repo',
+				__( 'Please enter a repository in the format owner/repo.', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo'] ) );
+
+		// Validate format: owner/repo
+		if ( ! self::validate_repo_format( $repo_input ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_invalid_format',
+				__( 'Invalid repository format. Please use "owner/repo" format (e.g., mycompany/private-plugin).', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		// Normalize to lowercase
+		$repo_key = strtolower( $repo_input );
+
+		// Check if already exists
+		if ( self::private_repo_exists( $repo_key ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_repo_exists',
+				sprintf( __( 'Repository "%s" is already in your private repositories list.', 'hub2wp' ), $repo_key ),
+				'warning'
+			);
+			return;
+		}
+
+		// Validate access token exists
+		$access_token = self::get_access_token();
+		if ( empty( $access_token ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_no_token',
+				__( 'A personal access token is required to access private repositories. Please add your token above and save settings first.', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		// Verify the repository exists and is accessible
+		$verification = self::verify_private_repo( $repo_key, $access_token );
+		if ( is_wp_error( $verification ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_verification_failed',
+				$verification->get_error_message(),
+				'error'
+			);
+			return;
+		}
+
+		// Add the repository
+		$result = self::add_private_repo( $repo_key );
+		if ( is_wp_error( $result ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_add_failed',
+				$result->get_error_message(),
+				'error'
+			);
+			return;
+		}
+
+		add_settings_error(
+			'h2wp_private_repos',
+			'h2wp_repo_added',
+			sprintf( __( 'Repository "%s" has been added successfully.', 'hub2wp' ), $repo_key ),
+			'success'
+		);
+	}
+
+	/**
+	 * Handle removing a private repository.
+	 */
+	private static function handle_remove_private_repo() {
+		if ( ! isset( $_POST['h2wp_remove_repo_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_remove_repo_nonce'] ) ), 'h2wp_remove_private_repo' ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_nonce_error',
+				__( 'Security check failed. Please try again.', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_permission_error',
+				__( 'You do not have permission to remove private repositories.', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		if ( ! isset( $_POST['h2wp_repo_key'] ) || empty( $_POST['h2wp_repo_key'] ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_missing_repo',
+				__( 'No repository specified for removal.', 'hub2wp' ),
+				'error'
+			);
+			return;
+		}
+
+		$repo_key = sanitize_text_field( wp_unslash( $_POST['h2wp_repo_key'] ) );
+
+		$result = self::remove_private_repo( $repo_key );
+		if ( is_wp_error( $result ) ) {
+			add_settings_error(
+				'h2wp_private_repos',
+				'h2wp_remove_failed',
+				$result->get_error_message(),
+				'error'
+			);
+			return;
+		}
+
+		add_settings_error(
+			'h2wp_private_repos',
+			'h2wp_repo_removed',
+			sprintf( __( 'Repository "%s" has been removed.', 'hub2wp' ), $repo_key ),
+			'success'
+		);
+	}
+
+	/**
+	 * Display notices for private repository actions.
+	 */
+	public static function display_private_repo_notices() {
+		// Only show on our settings page
+		$screen = get_current_screen();
+		if ( ! $screen || 'settings_page_h2wp_settings_page' !== $screen->id ) {
+			return;
+		}
+
+		// Note: settings_errors() is not called here because WordPress automatically
+		// displays settings errors on options pages. Calling it manually would cause
+		// duplicate notices. The add_settings_error() calls in handle_private_repo_actions()
+		// are sufficient for notices to appear.
+	}
+
+	/**
+	 * Validate repository format (owner/repo).
+	 *
+	 * @param string $repo The repository string to validate.
+	 * @return bool True if valid, false otherwise.
+	 */
+	public static function validate_repo_format( $repo ) {
+		// Format: owner/repo where both parts contain only allowed characters
+		// GitHub usernames/repos can contain alphanumeric, hyphens, underscores
+		// but cannot start or end with hyphens
+		$pattern = '/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/';
+		return preg_match( $pattern, $repo ) === 1;
+	}
+
+	/**
+	 * Verify a private repository exists and is accessible.
+	 *
+	 * @param string $repo_key The repository in owner/repo format.
+	 * @param string $access_token The GitHub access token.
+	 * @return bool|WP_Error True if verified, WP_Error on failure.
+	 */
+	public static function verify_private_repo( $repo_key, $access_token ) {
+		if ( empty( $access_token ) ) {
+			return new WP_Error(
+				'missing_token',
+				__( 'Access token is required to verify private repositories.', 'hub2wp' )
+			);
+		}
+
+		$url = 'https://api.github.com/repos/' . $repo_key;
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $access_token,
+					'Accept'        => 'application/vnd.github.v3+json',
+					'User-Agent'    => 'hub2wp/1.0',
+				),
+				'timeout' => 30,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return new WP_Error(
+				'request_failed',
+				sprintf( __( 'Failed to connect to GitHub: %s', 'hub2wp' ), $response->get_error_message() )
+			);
+		}
+
+		$status_code = wp_remote_retrieve_response_code( $response );
+
+		if ( 404 === $status_code ) {
+			return new WP_Error(
+				'repo_not_found',
+				sprintf( __( 'Repository "%s" not found or you do not have access to it. Please check the name and ensure your access token has the "repo" scope.', 'hub2wp' ), $repo_key )
+			);
+		}
+
+		if ( 401 === $status_code ) {
+			return new WP_Error(
+				'unauthorized',
+				__( 'Your access token is invalid or does not have permission to access this repository. Please check your token and ensure it has the "repo" scope.', 'hub2wp' )
+			);
+		}
+
+		if ( 403 === $status_code ) {
+			$body = wp_remote_retrieve_body( $response );
+			$data = json_decode( $body, true );
+			
+			if ( isset( $data['message'] ) && strpos( $data['message'], 'rate limit' ) !== false ) {
+				return new WP_Error(
+					'rate_limited',
+					__( 'GitHub API rate limit exceeded. Please wait a few minutes before trying again.', 'hub2wp' )
+				);
+			}
+
+			return new WP_Error(
+				'forbidden',
+				__( 'Your access token does not have permission to access this repository. Please ensure it has the "repo" scope.', 'hub2wp' )
+			);
+		}
+
+		if ( 200 !== $status_code ) {
+			return new WP_Error(
+				'api_error',
+				sprintf( __( 'GitHub API returned error code %d. Please try again later.', 'hub2wp' ), $status_code )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get all private repositories.
+	 *
+	 * @return array Array of private repos keyed by owner/repo.
+	 */
+	public static function get_private_repos() {
+		return get_option( self::PRIVATE_REPOS_OPTION, array() );
+	}
+
+	/**
+	 * Check if a private repository exists.
+	 *
+	 * @param string $repo_key The repository in owner/repo format.
+	 * @return bool True if exists, false otherwise.
+	 */
+	public static function private_repo_exists( $repo_key ) {
+		$repos = self::get_private_repos();
+		return isset( $repos[ $repo_key ] );
+	}
+
+	/**
+	 * Add a private repository.
+	 *
+	 * @param string $repo_key The repository in owner/repo format.
+	 * @return bool|WP_Error True on success, WP_Error on failure.
+	 */
+	public static function add_private_repo( $repo_key ) {
+		$repos = self::get_private_repos();
+		
+		if ( isset( $repos[ $repo_key ] ) ) {
+			return new WP_Error(
+				'repo_exists',
+				sprintf( __( 'Repository "%s" already exists.', 'hub2wp' ), $repo_key )
+			);
+		}
+
+		list( $owner, $repo ) = explode( '/', $repo_key, 2 );
+
+		$repos[ $repo_key ] = array(
+			'owner'    => $owner,
+			'repo'     => $repo,
+			'added'    => time(),
+			'added_by' => get_current_user_id(),
+		);
+
+		$result = update_option( self::PRIVATE_REPOS_OPTION, $repos );
+		
+		if ( ! $result ) {
+			return new WP_Error(
+				'save_failed',
+				__( 'Failed to save private repository. Please try again.', 'hub2wp' )
+			);
+		}
+
+		return true;
+	}
+
+	/**
+	 * Remove a private repository.
+	 *
+	 * @param string $repo_key The repository in owner/repo format.
+	 * @return bool|WP_Error True on success, WP_Error on failure.
+	 */
+	public static function remove_private_repo( $repo_key ) {
+		$repos = self::get_private_repos();
+		
+		if ( ! isset( $repos[ $repo_key ] ) ) {
+			return new WP_Error(
+				'repo_not_found',
+				sprintf( __( 'Repository "%s" not found.', 'hub2wp' ), $repo_key )
+			);
+		}
+
+		unset( $repos[ $repo_key ] );
+
+		$result = update_option( self::PRIVATE_REPOS_OPTION, $repos );
+		
+		if ( ! $result ) {
+			return new WP_Error(
+				'remove_failed',
+				__( 'Failed to remove private repository. Please try again.', 'hub2wp' )
+			);
+		}
+
+		return true;
 	}
 
 	public static function next_run_schedule() {

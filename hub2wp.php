@@ -2,7 +2,7 @@
 /**
  * Plugin Name: hub2wp
  * Description: Browse, install, and update WordPress plugins directly from GitHub repositories.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Balázs Piller
  * Text Domain: hub2wp
  * Domain Path: /languages
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'H2WP_VERSION', '1.0.1' );
+define( 'H2WP_VERSION', '1.0.2' );
 define( 'H2WP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'H2WP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'H2WP_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );

@@ -64,20 +64,29 @@ class H2WP_Admin_Page {
 		$access_token = H2WP_Settings::get_access_token();
 		$api = new H2WP_GitHub_API( $access_token );
 
+		// Check if we're viewing private repos
+		$is_private_tab = isset( $_GET['tab'] ) && 'private' === $_GET['tab'];
+
 		$query = 'topic:wordpress-plugin';
 		$user_query = '';
-		if ( isset( $_GET['s'] ) && ! empty( $_GET['s'] ) ) {
+		if ( ! $is_private_tab && isset( $_GET['s'] ) && ! empty( $_GET['s'] ) ) {
 			$user_query = sanitize_text_field( $_GET['s'] );
 			$query = $user_query . ' topic:wordpress-plugin';
 		}
 
-		if ( isset( $_GET['tag'] ) && ! empty( $_GET['tag'] ) ) {
+		if ( ! $is_private_tab && isset( $_GET['tag'] ) && ! empty( $_GET['tag'] ) ) {
 			$queried_tag = sanitize_text_field( $_GET['tag'] );
 			$query .= ' topic:' . $queried_tag;
 		}
 
 		$page = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1;
-		$results = $api->search_plugins( $query, $page );
+
+		// If viewing private repos, fetch them separately
+		if ( $is_private_tab ) {
+			$results = self::get_private_repos_data( $api );
+		} else {
+			$results = $api->search_plugins( $query, $page );
+		}
 
 		if ( is_wp_error( $results ) ) {
 			echo '<div class="wrap"><div class="notice notice-error"><p>' . esc_html( $results->get_error_message() ) . '</p></div></div>';
@@ -90,7 +99,8 @@ class H2WP_Admin_Page {
 		// Top bar with tags and search
 		echo '<div class="h2wp-top-bar">';
 		echo '<div class="h2wp-popular-tags">';
-		echo '<a href="' . esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser' ) ) . '" class="h2wp-tag ' . ( ! isset( $_GET['tag'] ) && ! isset( $_GET['s'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'All', 'hub2wp' ) . '</a>';
+		echo '<a href="' . esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser' ) ) . '" class="h2wp-tag ' . ( ! isset( $_GET['tag'] ) && ! isset( $_GET['s'] ) && ! $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'All', 'hub2wp' ) . '</a>';
+		
 		$popular_tags = array(
 			'woocommerce'             => __( 'WooCommerce', 'hub2wp' ),
 			'seo'                     => __( 'SEO', 'hub2wp' ),
@@ -103,21 +113,172 @@ class H2WP_Admin_Page {
 		);
 
 		foreach ( $popular_tags as $tag => $label ) {
-			echo '<a href="' . esc_url( add_query_arg( 'tag', strtolower( $tag ), remove_query_arg( array( 'paged', 's' ) ) ) ) . '" class="h2wp-tag ' . ( ( isset( $_GET['tag'] ) && strtolower( $tag ) === $_GET['tag'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html( $label ) . '</a>';
+			echo '<a href="' . esc_url( add_query_arg( 'tag', strtolower( $tag ), remove_query_arg( array( 'paged', 's', 'tab' ) ) ) ) . '" class="h2wp-tag ' . ( ( ! $is_private_tab && isset( $_GET['tag'] ) && strtolower( $tag ) === $_GET['tag'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html( $label ) . '</a>';
 		}
+
 		if ( ! empty( $queried_tag ) && ! in_array( $queried_tag, array_map( 'strtolower', array_keys( $popular_tags ) ) ) ) {
-			echo '<a href="' . esc_url( add_query_arg( 'tag', $queried_tag, remove_query_arg( 'paged' ) ) ) . '" class="h2wp-tag h2wp-tag-active">' . esc_html( $queried_tag ) . '</a>';
+			echo '<a href="' . esc_url( add_query_arg( 'tag', $queried_tag, remove_query_arg( array( 'paged', 'tab' ) ) ) ) . '" class="h2wp-tag h2wp-tag-active">' . esc_html( $queried_tag ) . '</a>';
+		}
+
+		// Private repos tab
+		echo '<a href="' . esc_url( add_query_arg( 'tab', 'private', remove_query_arg( array( 'paged', 's', 'tag' ) ) ) ) . '" class="h2wp-tag h2wp-tag-private ' . ( $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'Private', 'hub2wp' ) . '</a>';
+
+		echo '</div>';
+
+		// Search form (only show when not on private tab)
+		if ( ! $is_private_tab ) {
+			echo '<form method="get" class="h2wp-search-form">';
+			echo '<input type="hidden" name="page" value="h2wp-plugin-browser" />';
+			echo '<input type="search" name="s" value="' . esc_attr( $user_query ) . '" placeholder="' . esc_attr__( 'Search plugins...', 'hub2wp' ) . '" />';
+			submit_button( __( 'Search', 'hub2wp' ), 'primary', 'search', false );
+			echo '</form>';
 		}
 		echo '</div>';
 
-		// Search form
-		echo '<form method="get" class="h2wp-search-form">';
-		echo '<input type="hidden" name="page" value="h2wp-plugin-browser" />';
-		echo '<input type="search" name="s" value="' . esc_attr( $user_query ) . '" placeholder="' . esc_attr__( 'Search plugins...', 'hub2wp' ) . '" />';
-		submit_button( __( 'Search', 'hub2wp' ), 'primary', 'search', false );
-		echo '</form>';
+		// Display results
+		if ( $is_private_tab ) {
+			self::render_private_repos_section( $results );
+		} else {
+			self::render_public_repos_section( $results, $page );
+		}
+
 		echo '</div>';
 
+		// Modal HTML
+		self::render_modal();
+	}
+
+	/**
+	 * Get private repositories data.
+	 *
+	 * @param H2WP_GitHub_API $api GitHub API instance.
+	 * @return array|WP_Error Array of private repo data or error.
+	 */
+	private static function get_private_repos_data( $api ) {
+		$private_repos = H2WP_Settings::get_private_repos();
+
+		if ( empty( $private_repos ) ) {
+			return array(
+				'items'       => array(),
+				'total_count' => 0,
+				'errors'      => array(),
+			);
+		}
+
+		$items  = array();
+		$errors = array();
+
+		foreach ( $private_repos as $repo_key => $repo_data ) {
+			list( $owner, $repo ) = explode( '/', $repo_key, 2 );
+
+			$repo_details = $api->get_private_repo_details( $owner, $repo );
+
+			if ( is_wp_error( $repo_details ) ) {
+				$errors[] = array(
+					'repo'  => $repo_key,
+					'error' => $repo_details->get_error_message(),
+				);
+				continue;
+			}
+
+			// Transform API response to match search results format
+			$items[] = array(
+				'id'                => $repo_details['id'],
+				'name'              => $repo_details['name'],
+				'full_name'         => $repo_details['full_name'],
+				'description'       => isset( $repo_details['description'] ) ? $repo_details['description'] : '',
+				'owner'             => array(
+					'login'      => $repo_details['owner']['login'],
+					'avatar_url' => $repo_details['owner']['avatar_url'],
+					'html_url'   => $repo_details['owner']['html_url'],
+				),
+				'stargazers_count'  => $repo_details['stargazers_count'],
+				'forks_count'       => $repo_details['forks_count'],
+				'watchers_count'    => $repo_details['watchers_count'],
+				'open_issues_count' => $repo_details['open_issues_count'],
+				'updated_at'        => $repo_details['updated_at'],
+				'created_at'        => $repo_details['created_at'],
+				'html_url'          => $repo_details['html_url'],
+				'homepage'          => isset( $repo_details['homepage'] ) ? $repo_details['homepage'] : '',
+				'topics'            => isset( $repo_details['topics'] ) ? $repo_details['topics'] : array(),
+				'language'          => isset( $repo_details['language'] ) ? $repo_details['language'] : '',
+				'private'           => true,
+			);
+		}
+
+		return array(
+			'items'       => $items,
+			'total_count' => count( $items ),
+			'errors'      => $errors,
+		);
+	}
+
+	/**
+	 * Render private repositories section.
+	 *
+	 * @param array $results Private repos data.
+	 */
+	private static function render_private_repos_section( $results ) {
+		// Display any errors
+		if ( ! empty( $results['errors'] ) ) {
+			echo '<div class="notice notice-warning is-dismissible">';
+			echo '<p><strong>' . esc_html__( 'Some private repositories could not be accessed:', 'hub2wp' ) . '</strong></p>';
+			echo '<ul>';
+			foreach ( $results['errors'] as $error_data ) {
+				echo '<li><code>' . esc_html( $error_data['repo'] ) . '</code>: ' . esc_html( $error_data['error'] ) . '</li>';
+			}
+			echo '</ul>';
+			echo '<p>' . sprintf(
+				/* translators: %s: settings page URL */
+				__( 'You can manage your private repositories in the %s.', 'hub2wp' ),
+				'<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'settings', 'hub2wp' ) . '</a>'
+			) . '</p>';
+			echo '</div>';
+		}
+
+		// Show message if no private repos configured
+		if ( empty( $results['items'] ) && empty( $results['errors'] ) ) {
+			echo '<div class="no-plugin-results">';
+			echo '<p>' . esc_html__( 'No private repositories configured.', 'hub2wp' ) . '</p>';
+			echo '<p>' . sprintf(
+				/* translators: %s: settings page URL */
+				__( 'Add private repositories in the %s.', 'hub2wp' ),
+				'<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'settings page', 'hub2wp' ) . '</a>'
+			) . '</p>';
+			echo '</div>';
+			return;
+		}
+
+		// Show message if all repos failed
+		if ( empty( $results['items'] ) && ! empty( $results['errors'] ) ) {
+			echo '<div class="no-plugin-results">';
+			echo '<p>' . esc_html__( 'Unable to access any private repositories.', 'hub2wp' ) . '</p>';
+			echo '<p>' . esc_html__( 'Please check your GitHub access token has the "repo" scope and that the repositories exist.', 'hub2wp' ) . '</p>';
+			echo '</div>';
+			return;
+		}
+
+		// Display private repos
+		if ( ! empty( $results['items'] ) ) {
+			echo '<div class="h2wp-private-repos-notice notice notice-info is-dismissible" style="margin: 20px 0;">';
+			echo '<p>' . esc_html__( 'These are your private GitHub repositories. They require a personal access token with "repo" scope to access.', 'hub2wp' ) . '</p>';
+			echo '</div>';
+
+			echo '<div class="h2wp-plugins-grid">';
+			foreach ( $results['items'] as $item ) {
+				self::render_plugin_card( $item, true );
+			}
+			echo '</div>';
+		}
+	}
+
+	/**
+	 * Render public repositories section.
+	 *
+	 * @param array $results Search results.
+	 * @param int   $page    Current page number.
+	 */
+	private static function render_public_repos_section( $results, $page ) {
 		if ( ! empty( $results['items'] ) ) {
 			echo '<div class="h2wp-plugins-grid">';
 			foreach ( $results['items'] as $item ) {
@@ -136,7 +297,7 @@ class H2WP_Admin_Page {
 					'prev_text' => __( '«' ),
 					'next_text' => __( '»' ),
 					'total'   => $total_pages,
-					'current' => $page
+					'current' => $page,
 				) );
 				echo '</div>';
 				echo '</div>';
@@ -146,18 +307,15 @@ class H2WP_Admin_Page {
 			echo '<p>' . esc_html__( 'No plugins found. Try a different search.', 'hub2wp' ) . '</p>';
 			echo '</div>';
 		}
-		echo '</div>';
-
-		// Modal HTML
-		self::render_modal();
 	}
 
 	/**
 	 * Render a single plugin card.
 	 *
-	 * @param array $item Plugin data.
+	 * @param array $item    Plugin data.
+	 * @param bool  $is_private Whether this is a private repository.
 	 */
-	private static function render_plugin_card( $item ) {
+	private static function render_plugin_card( $item, $is_private = false ) {
 		$name = $item['name'];
 		$display_name = ucwords( str_replace( array( '-', 'wp', 'wordpress', 'seo' ), array( ' ', 'WP', 'WordPress', 'SEO' ), $name ) );
 		$description = isset( $item['description'] ) ? $item['description'] : '';
@@ -182,6 +340,12 @@ class H2WP_Admin_Page {
 		// Make plugin name clickable for modal.
 		echo '<h3 class="h2wp-plugin-name" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" style="cursor:pointer;">' . esc_html( $display_name ) . '</h3>';
 		echo '<div class="h2wp-plugin-author">By <a href="https://github.com/' . esc_attr( $owner ) . '">' . esc_html( $owner ) . '</a></div>';
+		
+		// Add private badge if applicable
+		if ( $is_private ) {
+			echo '<span class="h2wp-private-badge">' . esc_html__( 'Private', 'hub2wp' ) . '</span>';
+		}
+		
 		echo '</div>';
 		echo '</div>';
 

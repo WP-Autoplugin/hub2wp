@@ -662,7 +662,14 @@ class H2WP_GitHub_API {
 			$default_args['headers']['Authorization'] = 'token ' . $this->access_token;
 		}
 
-		$args = wp_parse_args( $args, $default_args );
+		// wp_parse_args() is a shallow merge, so a caller that passes custom
+		// headers (e.g. Accept) would silently overwrite the entire headers array,
+		// dropping Authorization. Deep-merge the headers sub-array manually first.
+		if ( isset( $args['headers'] ) && isset( $default_args['headers'] ) ) {
+			$args['headers'] = array_merge( $default_args['headers'], (array) $args['headers'] );
+		}
+
+		$args     = wp_parse_args( $args, $default_args );
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {

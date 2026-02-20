@@ -9,6 +9,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 class H2WP_Plugin_Updater {
 
 	/**
+	 * Whether check_for_updates() has already been called in this request.
+	 *
+	 * @var bool
+	 */
+	private static $update_check_done = false;
+
+	/**
 	 * Initialize the updater.
 	 */
 	public static function init() {
@@ -25,6 +32,9 @@ class H2WP_Plugin_Updater {
 
 		// Filter plugin information
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 99, 3 );
+
+		// Intercept downloads for private-repo updates so they are authenticated.
+		add_filter( 'upgrader_pre_download', array( __CLASS__, 'authenticated_download' ), 10, 3 );
 	}
 
 	/**
@@ -69,6 +79,16 @@ class H2WP_Plugin_Updater {
 	public static function inject_plugin_updates( $transient ) {
 		if ( empty( $transient ) || ! is_object( $transient ) ) {
 			return $transient;
+		}
+
+		// Refresh the stored version data from GitHub if stale.
+		// We gate this behind a 6-hour transient so the API is not hit on every
+		// single filter invocation, while still being much more responsive than
+		// the once-daily cron (which may never run in some environments).
+		if ( false === get_transient( 'h2wp_last_update_check' ) && ! self::$update_check_done ) {
+			self::$update_check_done = true;
+			set_transient( 'h2wp_last_update_check', 1, 6 * HOUR_IN_SECONDS );
+			self::check_for_updates();
 		}
 
 		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
@@ -132,12 +152,17 @@ class H2WP_Plugin_Updater {
 				$api          = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
 				$repo_details = $api->get_repo_details( $owner, $repo );
 				$readme_html  = $api->get_readme_html( $owner, $repo );
-				$watchers     = $api->get_watchers_count( $owner, $repo );
-				$og_image     = $api->get_og_image( $owner, $repo );
 
 				if ( is_wp_error( $repo_details ) || is_wp_error( $readme_html ) ) {
 					return $result;
 				}
+
+				// watchers and og_image are scraped from the public GitHub HTML page,
+				// which is inaccessible for private repos. Fall back gracefully.
+				$watchers_raw = $api->get_watchers_count( $owner, $repo );
+				$watchers     = is_wp_error( $watchers_raw ) ? 0 : $watchers_raw;
+				$og_image_raw = $api->get_og_image( $owner, $repo );
+				$og_image     = is_wp_error( $og_image_raw ) ? ( isset( $repo_details['owner']['avatar_url'] ) ? $repo_details['owner']['avatar_url'] : '' ) : $og_image_raw;
 
 				$info = new stdClass();
 
@@ -190,7 +215,7 @@ class H2WP_Plugin_Updater {
 					'forks'        => isset( $repo_details['forks_count'] ) ? intval( $repo_details['forks_count'] ) : 0,
 					'open_issues'  => isset( $repo_details['open_issues_count'] ) ? intval( $repo_details['open_issues_count'] ) : 0,
 					'watchers'     => intval( $watchers ),
-					'language'     => esc_html( $primary_language ),
+					'language'     => isset( $repo_details['language'] ) ? esc_html( $repo_details['language'] ) : '',
 					'last_commit'  => isset( $repo_details['updated_at'] ) ? esc_html( $repo_details['updated_at'] ) : '',
 					'created_at'   => isset( $repo_details['created_at'] ) ? esc_html( $repo_details['created_at'] ) : '',
 					'license'      => esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'hub2wp' ) ),
@@ -377,6 +402,96 @@ class H2WP_Plugin_Updater {
 			$h2wp_sources['hub2wp']['plugin_file'] = H2WP_PLUGIN_BASENAME;
 			update_option( 'h2wp_plugins', $h2wp_sources );
 		}
+	}
+
+	/**
+	 * Intercept the upgrader's package download for private GitHub repos.
+	 *
+	 * WordPress's built-in download_url() never sends an Authorization header,
+	 * so update downloads for private repos would fail with a 404/401.
+	 * This filter downloads the zip ourselves with the stored access token and
+	 * returns the local temp-file path so the upgrader can continue normally.
+	 *
+	 * Hooked to: upgrader_pre_download
+	 *
+	 * @param false|string $reply    Current pre-download reply (false = not handled yet).
+	 * @param string       $package  The package URL to download.
+	 * @param WP_Upgrader  $upgrader The upgrader instance.
+	 * @return false|string|WP_Error Local file path on success, WP_Error on failure,
+	 *                               or false to let WP handle it normally.
+	 */
+	public static function authenticated_download( $reply, $package, $upgrader ) {
+		// Let other filters or WP's default handle it if it's already resolved.
+		if ( false !== $reply ) {
+			return $reply;
+		}
+
+		// Only intercept GitHub API zipball URLs.
+		if ( false === strpos( $package, 'api.github.com/repos/' ) ) {
+			return $reply;
+		}
+
+		$access_token = H2WP_Settings::get_access_token();
+		if ( empty( $access_token ) ) {
+			return $reply;
+		}
+
+		// Only intercept packages that belong to one of our tracked private repos.
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$is_private   = false;
+		foreach ( $h2wp_plugins as $plugin ) {
+			if (
+				isset( $plugin['download_url'] ) &&
+				$plugin['download_url'] === $package &&
+				! empty( $plugin['private'] )
+			) {
+				$is_private = true;
+				break;
+			}
+		}
+
+		if ( ! $is_private ) {
+			return $reply;
+		}
+
+		// Stream the zip to a temp file with the Authorization header.
+		$tmpfname = wp_tempnam( $package );
+
+		$response = wp_remote_get(
+			$package,
+			array(
+				'timeout'     => 300,
+				'stream'      => true,
+				'filename'    => $tmpfname,
+				'redirection' => 5,
+				'headers'     => array(
+					'Authorization' => 'token ' . $access_token,
+					'Accept'        => 'application/vnd.github+json',
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			@unlink( $tmpfname );
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		if ( 200 !== (int) $code ) {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			@unlink( $tmpfname );
+			return new WP_Error(
+				'h2wp_download_error',
+				sprintf(
+					/* translators: %d: HTTP status code */
+					__( 'Could not download the update zip (HTTP %d). Please verify your access token has the "repo" scope.', 'hub2wp' ),
+					$code
+				)
+			);
+		}
+
+		return $tmpfname;
 	}
 
 	/**

@@ -593,6 +593,7 @@ class H2WP_GitHub_API {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
+					// translators: %s: required WordPress version.
 					__( 'This plugin requires WordPress version %s or higher.', 'hub2wp' ),
 					$headers['requires at least']
 				),
@@ -603,6 +604,7 @@ class H2WP_GitHub_API {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
+					// translators: %s: required PHP version.
 					__( 'This plugin requires PHP version %s or higher.', 'hub2wp' ),
 					$headers['requires php']
 				),
@@ -678,6 +680,7 @@ class H2WP_GitHub_API {
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
+			// Translators: %s: HTTP status code.
 			return new WP_Error( "h2wp_api_error_$code", sprintf( __( 'GitHub API HTTP error: %s', 'hub2wp' ), $code ) );
 		}
 

@@ -22,6 +22,7 @@ class H2WP_Settings {
 		add_action( 'admin_init', array( __CLASS__, 'handle_private_repo_actions' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'display_private_repo_notices' ) );
 		add_action( 'admin_post_h2wp_clear_cache', array( __CLASS__, 'handle_clear_cache' ) );
+		add_action( 'wp_ajax_h2wp_clear_cache', array( __CLASS__, 'ajax_clear_cache' ) );
 	}
 
 	/**
@@ -74,6 +75,10 @@ class H2WP_Settings {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'hub2wp Settings', 'hub2wp' ); ?></h1>
+			<p style="margin-top:0;">
+				<?php esc_html_e( 'Configure your GitHub access token, cache settings, and manage monitored repositories.', 'hub2wp' ); ?><br>
+				<?php esc_html_e( 'hub2wp works fine without a personal access token, but it is required to access private repositories and to increase the GitHub API rate limit.', 'hub2wp' ); ?>
+			</p>
 			<form method="post" action="options.php" style="margin-bottom: 2em;">
 				<?php settings_fields( 'h2wp_settings_group' ); ?>
 				<?php do_settings_sections( 'h2wp_settings_page' ); ?>
@@ -81,19 +86,63 @@ class H2WP_Settings {
 				<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
 					<?php submit_button( null, 'primary', 'submit', false ); ?>
 					<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0;">
-							<?php wp_nonce_field( 'h2wp_clear_cache', 'h2wp_clear_cache_nonce' ); ?>
-							<input type="hidden" name="action" value="h2wp_clear_cache" />
-							<?php submit_button( __( 'Clear Cache', 'hub2wp' ), 'secondary', 'h2wp_clear_cache_submit', false ); ?>
-						</form>
+						<button type="button" id="h2wp-clear-cache-btn" class="button button-secondary">
+							<?php esc_html_e( 'Clear Cache', 'hub2wp' ); ?>
+						</button>
+						<span id="h2wp-clear-cache-status" style="display:none;"></span>
 						<p class="description" style="margin:0;"><?php esc_html_e( 'Delete all cached GitHub API responses. The cache will be rebuilt on the next request.', 'hub2wp' ); ?></p>
 					</div>
 				</div>
 			</form>
+			<script>
+			( function() {
+				var btn    = document.getElementById( 'h2wp-clear-cache-btn' );
+				var status = document.getElementById( 'h2wp-clear-cache-status' );
+				if ( ! btn ) { return; }
+				btn.addEventListener( 'click', function() {
+					btn.disabled    = true;
+					var originalText = btn.textContent.trim();
+					btn.textContent = <?php echo wp_json_encode( __( 'Clearing…', 'hub2wp' ) ); ?>;
+					status.style.display = 'none';
+
+					var data = new FormData();
+					data.append( 'action', 'h2wp_clear_cache' );
+					data.append( 'nonce', <?php echo wp_json_encode( wp_create_nonce( 'h2wp_clear_cache' ) ); ?> );
+
+					fetch( ajaxurl, { method: 'POST', body: data } )
+						.then( function( r ) { return r.json(); } )
+						.then( function( response ) {
+							status.style.display = '';
+							if ( response.success ) {
+								status.style.color = '#00a32a';
+								status.textContent = response.data.message;
+							} else {
+								status.style.color = '#d63638';
+								status.textContent = ( response.data && response.data.message )
+									? response.data.message
+									: <?php echo wp_json_encode( __( 'An error occurred.', 'hub2wp' ) ); ?>;
+							}
+							btn.disabled    = false;
+							btn.textContent = originalText;
+						} )
+						.catch( function() {
+							status.style.display = '';
+							status.style.color   = '#d63638';
+							status.textContent   = <?php echo wp_json_encode( __( 'Request failed. Please try again.', 'hub2wp' ) ); ?>;
+							btn.disabled    = false;
+							btn.textContent = originalText;
+						} );
+				} );
+			} )();
+			</script>
 
 			<hr />
 
 			<?php self::render_monitored_plugins_section(); ?>
+
+			<hr />
+
+			<?php self::next_run_schedule(); ?>
 		</div>
 		<?php
 	}
@@ -103,108 +152,151 @@ class H2WP_Settings {
 	 */
 	public static function render_monitored_plugins_section() {
 		$monitored_plugins = get_option( 'h2wp_plugins', array() );
+		$count             = count( $monitored_plugins );
+		// Auto-expand if there are form submission notices so feedback is visible.
+		$expanded          = ! empty( get_settings_errors( 'h2wp_private_repos' ) );
 		?>
-		<h2><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></h2>
-		<p class="description">
-			<?php esc_html_e( 'Add GitHub repositories to monitor them for updates and browse them through hub2wp. Private repositories require a personal access token with "repo" scope.', 'hub2wp' ); ?>
+		<p style="margin:0;">
+			<strong><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></strong>
+			<?php if ( $count > 0 ) : ?>
+				<span style="color:#646970;">(<?php echo esc_html( $count ); ?>)</span>
+			<?php endif; ?>
+			&mdash;
+			<a href="#" id="h2wp-toggle-monitored" aria-expanded="<?php echo $expanded ? 'true' : 'false'; ?>" aria-controls="h2wp-monitored-content" style="text-decoration: none;">
+				<span class="dashicons <?php echo $expanded ? 'dashicons-arrow-up-alt2' : 'dashicons-arrow-down-alt2'; ?>" style="vertical-align:middle;font-size:16px;width:16px;height:16px;"></span>
+				<span id="h2wp-toggle-monitored-label"><?php echo $expanded ? esc_html__( 'Hide', 'hub2wp' ) : esc_html__( 'Show', 'hub2wp' ); ?></span>
+			</a>
 		</p>
 
-		<form method="post" action="">
-			<?php wp_nonce_field( 'h2wp_add_private_repo', 'h2wp_private_repo_nonce' ); ?>
-			<input type="hidden" name="h2wp_action" value="add_private_repo" />
-			
-			<table class="form-table">
-				<tr>
-					<th scope="row">
-						<label for="h2wp_private_repo_input">
-							<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
-						</label>
-					</th>
-					<td>
-						<input 
-							type="text" 
-							id="h2wp_private_repo_input"
-							name="h2wp_private_repo" 
-							value="" 
-							placeholder="owner/repo" 
-							size="50"
-						/>
-						<button type="submit" class="button button-secondary">
-							<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
-						</button>
-						<p class="description">
-							<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-plugin)', 'hub2wp' ); ?>
-						</p>
-					</td>
-				</tr>
-			</table>
-		</form>
+		<div id="h2wp-monitored-content" style="display:<?php echo $expanded ? '' : 'none'; ?>;">
+			<p class="description" style="margin-top:1em;">
+				<?php esc_html_e( 'Add GitHub repositories to monitor them for updates. Private repositories require a personal access token with "repo" scope.', 'hub2wp' ); ?>
+			</p>
 
-		<?php if ( ! empty( $monitored_plugins ) ) : ?>
-			<h3><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></h3>
-			<table class="wp-list-table widefat fixed striped">
-				<thead>
+			<form method="post" action="">
+				<?php wp_nonce_field( 'h2wp_add_private_repo', 'h2wp_private_repo_nonce' ); ?>
+				<input type="hidden" name="h2wp_action" value="add_private_repo" />
+
+				<table class="form-table">
 					<tr>
-						<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
-						<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
-						<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
+						<th scope="row">
+							<label for="h2wp_private_repo_input">
+								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
+							</label>
+						</th>
+						<td>
+							<input
+								type="text"
+								id="h2wp_private_repo_input"
+								name="h2wp_private_repo"
+								value=""
+								placeholder="owner/repo"
+								size="50"
+							/>
+							<button type="submit" class="button button-secondary">
+								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
+							</button>
+							<p class="description">
+								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-plugin)', 'hub2wp' ); ?>
+							</p>
+						</td>
 					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $monitored_plugins as $repo_key => $repo_data ) : ?>
+				</table>
+			</form>
+
+			<?php if ( ! empty( $monitored_plugins ) ) : ?>
+				<h3><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></h3>
+				<table class="wp-list-table widefat fixed striped">
+					<thead>
 						<tr>
-							<td>
-								<strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
-								<br />
-								<small>
-									<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
-										<?php echo esc_html( $repo_key ); ?>
-									</a>
-									<?php if ( ! empty( $repo_data['plugin_file'] ) ) : ?>
-										&rarr; <code><?php echo esc_html( $repo_data['plugin_file'] ); ?></code>
-									<?php endif; ?>
-								</small>
-							</td>
-							<td>
-								<?php
-								if ( ! empty( $repo_data['plugin_file'] ) ) {
-									esc_html_e( 'Installed', 'hub2wp' );
-								} else {
-									esc_html_e( 'Not Installed', 'hub2wp' );
-								}
-								if ( ! empty( $repo_data['private'] ) ) {
-									echo ' <span class="dashicons dashicons-lock" title="' . esc_attr__( 'Private Repository', 'hub2wp' ) . '"></span>';
-								}
-								?>
-							</td>
-							<td>
-								<form method="post" action="" style="display: inline;">
-									<?php wp_nonce_field( 'h2wp_remove_private_repo', 'h2wp_remove_repo_nonce' ); ?>
-									<input type="hidden" name="h2wp_action" value="remove_private_repo" />
-									<input type="hidden" name="h2wp_repo_key" value="<?php echo esc_attr( $repo_key ); ?>" />
-									<button type="submit" class="button button-small button-link-delete" onclick="return confirm('<?php echo esc_js( sprintf( __( 'Stop monitoring "%s"?', 'hub2wp' ), $repo_key ) ); ?>');">
-										<?php esc_html_e( 'Remove', 'hub2wp' ); ?>
-									</button>
-								</form>
-							</td>
+							<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
+							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
+							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
 						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-			<p class="description">
-				<?php
-				printf(
-					/* translators: %s: URL to the Private tab */
-					__( 'These repositories will be monitored for updates. Private repositories can be installed via the <a href="%s">Private tab</a> in Plugins > Add GitHub Plugin.', 'hub2wp' ),
-					esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser&tab=private' ) )
+					</thead>
+					<tbody>
+						<?php foreach ( $monitored_plugins as $repo_key => $repo_data ) : ?>
+							<tr>
+								<td>
+									<strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
+									<br />
+									<small>
+										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
+											<?php echo esc_html( $repo_key ); ?>
+										</a>
+										<?php if ( ! empty( $repo_data['plugin_file'] ) ) : ?>
+											&rarr; <code><?php echo esc_html( $repo_data['plugin_file'] ); ?></code>
+										<?php endif; ?>
+									</small>
+								</td>
+								<td>
+									<?php
+									if ( ! empty( $repo_data['plugin_file'] ) ) {
+										esc_html_e( 'Installed', 'hub2wp' );
+									} else {
+										esc_html_e( 'Not Installed', 'hub2wp' );
+									}
+									if ( ! empty( $repo_data['private'] ) ) {
+										echo ' <span class="dashicons dashicons-lock" title="' . esc_attr__( 'Private Repository', 'hub2wp' ) . '"></span>';
+									}
+									?>
+								</td>
+								<td>
+									<form method="post" action="" style="display: inline;">
+										<?php wp_nonce_field( 'h2wp_remove_private_repo', 'h2wp_remove_repo_nonce' ); ?>
+										<input type="hidden" name="h2wp_action" value="remove_private_repo" />
+										<input type="hidden" name="h2wp_repo_key" value="<?php echo esc_attr( $repo_key ); ?>" />
+										<?php // Translators: %s is the repository name (owner/repo). ?>
+										<button type="submit" class="button button-small button-link-delete" onclick="return confirm('<?php echo esc_js( sprintf( __( 'Stop monitoring "%s"?', 'hub2wp' ), $repo_key ) ); ?>');">
+											<?php esc_html_e( 'Remove', 'hub2wp' ); ?>
+										</button>
+									</form>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p class="description">
+					<?php
+					echo wp_kses_post(
+						sprintf(
+							/* translators: %s: URL to the Private tab */
+							__( 'These repositories will be monitored for updates. Private repositories can be installed via the <a href="%s">Private tab</a> in Plugins > Add GitHub Plugin.', 'hub2wp' ),
+							esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser&tab=private' ) )
+						)
 					);
-				?>
-			</p>
-		<?php else : ?>
-			<p class="description">
-				<?php esc_html_e( 'No repositories added yet.', 'hub2wp' ); ?>
-			</p>
-		<?php endif; ?>
+					?>
+				</p>
+			<?php else : ?>
+				<p class="description">
+					<?php esc_html_e( 'No repositories added yet.', 'hub2wp' ); ?>
+				</p>
+			<?php endif; ?>
+		</div>
+		<script>
+		( function() {
+			var btn     = document.getElementById( 'h2wp-toggle-monitored' );
+			var content = document.getElementById( 'h2wp-monitored-content' );
+			var label   = document.getElementById( 'h2wp-toggle-monitored-label' );
+			var icon    = btn ? btn.querySelector( '.dashicons' ) : null;
+			if ( ! btn || ! content ) { return; }
+			btn.addEventListener( 'click', function( e ) {
+				e.preventDefault();
+				var isExpanded = this.getAttribute( 'aria-expanded' ) === 'true';
+				if ( isExpanded ) {
+					content.style.display = 'none';
+					this.setAttribute( 'aria-expanded', 'false' );
+					if ( icon )  { icon.classList.replace( 'dashicons-arrow-up-alt2',   'dashicons-arrow-down-alt2' ); }
+					if ( label ) { label.textContent = <?php echo wp_json_encode( __( 'Show', 'hub2wp' ) ); ?>; }
+				} else {
+					content.style.display = '';
+					this.setAttribute( 'aria-expanded', 'true' );
+					if ( icon )  { icon.classList.replace( 'dashicons-arrow-down-alt2', 'dashicons-arrow-up-alt2' ); }
+					if ( label ) { label.textContent = <?php echo wp_json_encode( __( 'Hide', 'hub2wp' ) ); ?>; }
+				}
+			} );
+		} )();
+		</script>
 		<?php
 	}
 
@@ -212,6 +304,16 @@ class H2WP_Settings {
 	 * Handle private repository actions (add/remove).
 	 */
 	public static function handle_private_repo_actions() {
+		// Verify at least one of the expected nonces before reading any POST data.
+		$add_nonce_valid    = isset( $_POST['h2wp_private_repo_nonce'] )
+			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo_nonce'] ) ), 'h2wp_add_private_repo' );
+		$remove_nonce_valid = isset( $_POST['h2wp_remove_repo_nonce'] )
+			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_remove_repo_nonce'] ) ), 'h2wp_remove_private_repo' );
+
+		if ( ! $add_nonce_valid && ! $remove_nonce_valid ) {
+			return;
+		}
+
 		if ( ! isset( $_POST['h2wp_action'] ) ) {
 			return;
 		}
@@ -281,6 +383,7 @@ class H2WP_Settings {
 			add_settings_error(
 				'h2wp_private_repos',
 				'h2wp_repo_exists',
+				// Translators: %s is the repository name (owner/repo).
 				sprintf( __( 'Repository "%s" is already in your monitored plugins list.', 'hub2wp' ), $repo_key ),
 				'warning'
 			);
@@ -338,6 +441,7 @@ class H2WP_Settings {
 		add_settings_error(
 			'h2wp_private_repos',
 			'h2wp_repo_added',
+			// Translators: %s is the repository name (owner/repo).
 			sprintf( __( 'Repository "%s" has been added successfully.', 'hub2wp' ), $repo_key ),
 			'success'
 		);
@@ -384,6 +488,7 @@ class H2WP_Settings {
 			add_settings_error(
 				'h2wp_private_repos',
 				'h2wp_remove_failed',
+				// Translators: %s is the repository name (owner/repo).
 				sprintf( __( 'Repository "%s" not found.', 'hub2wp' ), $repo_key ),
 				'error'
 			);
@@ -406,6 +511,7 @@ class H2WP_Settings {
 		add_settings_error(
 			'h2wp_private_repos',
 			'h2wp_repo_removed',
+			// Translators: %s is the repository name (owner/repo).
 			sprintf( __( 'Repository "%s" has been removed.', 'hub2wp' ), $repo_key ),
 			'success'
 		);
@@ -428,13 +534,31 @@ class H2WP_Settings {
 		wp_safe_redirect(
 			add_query_arg(
 				array(
-					'page'          => 'h2wp_settings_page',
-					'h2wp_cleared'  => '1',
+					'page'               => 'h2wp_settings_page',
+					'h2wp_cleared'       => '1',
+					'h2wp_cleared_nonce' => wp_create_nonce( 'h2wp_cleared' ),
 				),
 				admin_url( 'options-general.php' )
 			)
 		);
 		exit;
+	}
+
+	/**
+	 * AJAX handler for clearing the cache.
+	 *
+	 * Hooked to: wp_ajax_h2wp_clear_cache
+	 */
+	public static function ajax_clear_cache() {
+		check_ajax_referer( 'h2wp_clear_cache', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'You do not have permission to do this.', 'hub2wp' ) ) );
+		}
+
+		H2WP_Cache::clear_all();
+
+		wp_send_json_success( array( 'message' => __( 'Cache cleared successfully.', 'hub2wp' ) ) );
 	}
 
 	/**
@@ -448,7 +572,9 @@ class H2WP_Settings {
 		}
 
 		// Show a success notice after cache has been cleared.
-		if ( isset( $_GET['h2wp_cleared'] ) && '1' === $_GET['h2wp_cleared'] ) {
+		if ( isset( $_GET['h2wp_cleared'], $_GET['h2wp_cleared_nonce'] )
+			&& '1' === $_GET['h2wp_cleared']
+			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['h2wp_cleared_nonce'] ) ), 'h2wp_cleared' ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Cache cleared successfully.', 'hub2wp' ) . '</p></div>';
 		}
 
@@ -502,6 +628,7 @@ class H2WP_Settings {
 		if ( is_wp_error( $response ) ) {
 			return new WP_Error(
 				'request_failed',
+				// translators: %s is the error message from the HTTP request.
 				sprintf( __( 'Failed to connect to GitHub: %s', 'hub2wp' ), $response->get_error_message() )
 			);
 		}
@@ -511,6 +638,7 @@ class H2WP_Settings {
 		if ( 404 === $status_code ) {
 			return new WP_Error(
 				'repo_not_found',
+				// translators: %s is the repository name (owner/repo).
 				sprintf( __( 'Repository "%s" not found or you do not have access to it. If it is a private repository, please ensure your access token has the "repo" scope.', 'hub2wp' ), $repo_key )
 			);
 		}
@@ -525,7 +653,7 @@ class H2WP_Settings {
 		if ( 403 === $status_code ) {
 			$body = wp_remote_retrieve_body( $response );
 			$data = json_decode( $body, true );
-			
+
 			if ( isset( $data['message'] ) && strpos( $data['message'], 'rate limit' ) !== false ) {
 				return new WP_Error(
 					'rate_limited',
@@ -542,6 +670,7 @@ class H2WP_Settings {
 		if ( 200 !== $status_code ) {
 			return new WP_Error(
 				'api_error',
+				// translators: %d is the HTTP status code returned by the GitHub API.
 				sprintf( __( 'GitHub API returned error code %d. Please try again later.', 'hub2wp' ), $status_code )
 			);
 		}
@@ -555,13 +684,13 @@ class H2WP_Settings {
 		<p>
 			<?php
 			$next_check = wp_next_scheduled( 'h2wp_daily_update_check' );
-			// translators: %s: human-readable time difference (e.g. "1 hour"), %s: link to run the update check, %d: number of API calls
 			printf(
-				esc_html__( 'The daily update check is scheduled to run in %s. %s (note: the GitHub API will be called %d times).', 'hub2wp' ),
-				'<span>' . $next_check ? human_time_diff( time(), $next_check ) : __( 'less than 1 minute', 'hub2wp' ) . '</span>',
+				// translators: %s: human-readable time difference (e.g. "1 hour"), %s: link to run the update check, %d: number of API calls
+				esc_html__( 'The daily update check is scheduled to run in %1$s. %2$s (note: the GitHub API will be called %3$d times).', 'hub2wp' ),
+				'<span>' . esc_html( $next_check ? human_time_diff( time(), $next_check ) : __( 'less than 1 minute', 'hub2wp' ) ) . '</span>',
 				sprintf(
 					'<a href="%s">%s</a>',
-					wp_nonce_url( admin_url( 'options-general.php?page=h2wp_settings_page&action=h2wp_run_update_check' ), 'h2wp_run_update_check' ),
+					esc_html( wp_nonce_url( admin_url( 'options-general.php?page=h2wp_settings_page&action=h2wp_run_update_check' ), 'h2wp_run_update_check' ) ),
 					esc_html__( 'Run now', 'hub2wp' )
 				),
 				count( get_option( 'h2wp_plugins', array() ) )
@@ -583,7 +712,7 @@ class H2WP_Settings {
 			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'hub2wp' ); ?>
 			<?php printf(
 				/* translators: %s: URL to create a personal access token */
-				__( 'Get a free token from %s.', 'hub2wp' ),
+				esc_html__( 'Get a free token from %s.', 'hub2wp' ),
 				'<a href="https://github.com/settings/tokens" target="_blank">GitHub</a>'
 			); ?>
 		</p>

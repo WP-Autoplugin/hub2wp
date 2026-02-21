@@ -47,7 +47,7 @@ class H2WP_Plugin_Installer {
 
 		// Always clean up the temp file.
 		if ( null !== $local_file && file_exists( $local_file ) ) {
-			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			// phpcs:ignore -- WordPress.PHP.NoSilencedErrors.Discouraged & WordPress.WP.AlternativeFunctions.file_system_read_file -- We want to suppress errors here since the file might not exist or be deletable, and there's no real alternative function for this.
 			@unlink( $local_file );
 		}
 
@@ -97,19 +97,20 @@ class H2WP_Plugin_Installer {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			// phpcs:ignore -- WordPress.PHP.NoSilencedErrors.Discouraged & WordPress.WP.AlternativeFunctions.file_system_read_file -- We want to suppress errors here since the file might not exist or be deletable, and there's no real alternative function for this.
 			@unlink( $tmpfname );
 			return $response;
 		}
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== (int) $code ) {
-			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			// phpcs:ignore -- WordPress.PHP.NoSilencedErrors.Discouraged & WordPress.WP.AlternativeFunctions.file_system_read_file -- We want to suppress errors here since the file might not exist or be deletable, and there's no real alternative function for this.
 			@unlink( $tmpfname );
 			/* translators: %d: HTTP status code */
 			return new WP_Error(
 				'h2wp_download_error',
 				sprintf(
+					// Translators: %d: HTTP status code.
 					__( 'Could not download the plugin zip (HTTP %d). Please verify your access token has the "repo" scope and that you can access this repository.', 'hub2wp' ),
 					$code
 				)

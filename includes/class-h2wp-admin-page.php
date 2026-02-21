@@ -79,21 +79,21 @@ class H2WP_Admin_Page {
 		$api = new H2WP_GitHub_API( $access_token );
 
 		// Check if we're viewing private repos
-		$is_private_tab = isset( $_GET['tab'] ) && 'private' === $_GET['tab'];
+		$is_private_tab = isset( $_GET['tab'] ) && 'private' === $_GET['tab']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		$query = 'topic:wordpress-plugin';
 		$user_query = '';
-		if ( ! $is_private_tab && isset( $_GET['s'] ) && ! empty( $_GET['s'] ) ) {
-			$user_query = sanitize_text_field( $_GET['s'] );
+		if ( ! $is_private_tab && isset( $_GET['s'] ) && ! empty( $_GET['s'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$user_query = sanitize_text_field( wp_unslash( $_GET['s'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			$query = $user_query . ' topic:wordpress-plugin';
 		}
 
-		if ( ! $is_private_tab && isset( $_GET['tag'] ) && ! empty( $_GET['tag'] ) ) {
-			$queried_tag = sanitize_text_field( $_GET['tag'] );
+		if ( ! $is_private_tab && isset( $_GET['tag'] ) && ! empty( $_GET['tag'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$queried_tag = sanitize_text_field( wp_unslash( $_GET['tag'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			$query .= ' topic:' . $queried_tag;
 		}
 
-		$page = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1;
+		$page = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		// If viewing private repos, fetch them separately
 		if ( $is_private_tab ) {
@@ -113,7 +113,7 @@ class H2WP_Admin_Page {
 		// Top bar with tags and search
 		echo '<div class="h2wp-top-bar">';
 		echo '<div class="h2wp-popular-tags">';
-		echo '<a href="' . esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser' ) ) . '" class="h2wp-tag ' . ( ! isset( $_GET['tag'] ) && ! isset( $_GET['s'] ) && ! $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'All', 'hub2wp' ) . '</a>';
+		echo '<a href="' . esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser' ) ) . '" class="h2wp-tag ' . ( ! isset( $_GET['tag'] ) && ! isset( $_GET['s'] ) && ! $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'All', 'hub2wp' ) . '</a>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		
 		$popular_tags = array(
 			'woocommerce'             => __( 'WooCommerce', 'hub2wp' ),
@@ -127,7 +127,7 @@ class H2WP_Admin_Page {
 		);
 
 		foreach ( $popular_tags as $tag => $label ) {
-			echo '<a href="' . esc_url( add_query_arg( 'tag', strtolower( $tag ), remove_query_arg( array( 'paged', 's', 'tab' ) ) ) ) . '" class="h2wp-tag ' . ( ( ! $is_private_tab && isset( $_GET['tag'] ) && strtolower( $tag ) === $_GET['tag'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html( $label ) . '</a>';
+			echo '<a href="' . esc_url( add_query_arg( 'tag', strtolower( $tag ), remove_query_arg( array( 'paged', 's', 'tab' ) ) ) ) . '" class="h2wp-tag ' . ( ( ! $is_private_tab && isset( $_GET['tag'] ) && strtolower( $tag ) === $_GET['tag'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html( $label ) . '</a>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		}
 
 		if ( ! empty( $queried_tag ) && ! in_array( $queried_tag, array_map( 'strtolower', array_keys( $popular_tags ) ) ) ) {
@@ -249,11 +249,11 @@ class H2WP_Admin_Page {
 				echo '<li><code>' . esc_html( $error_data['repo'] ) . '</code>: ' . esc_html( $error_data['error'] ) . '</li>';
 			}
 			echo '</ul>';
-			echo '<p>' . sprintf(
+			echo '<p>' . wp_kses_post( sprintf(
 				/* translators: %s: settings page URL */
 				__( 'You can manage your monitored plugins in the %s.', 'hub2wp' ),
 				'<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'settings', 'hub2wp' ) . '</a>'
-			) . '</p>';
+			) ) . '</p>';
 			echo '</div>';
 		}
 
@@ -261,11 +261,11 @@ class H2WP_Admin_Page {
 		if ( empty( $results['items'] ) && empty( $results['errors'] ) ) {
 			echo '<div class="no-plugin-results">';
 			echo '<p>' . esc_html__( 'No private repositories configured.', 'hub2wp' ) . '</p>';
-			echo '<p>' . sprintf(
+			echo '<p>' . wp_kses_post( sprintf(
 				/* translators: %s: settings page URL */
 				__( 'Add repositories in the %s.', 'hub2wp' ),
 				'<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'settings page', 'hub2wp' ) . '</a>'
-			) . '</p>';
+			) ) . '</p>';
 			echo '</div>';
 			return;
 		}
@@ -312,14 +312,14 @@ class H2WP_Admin_Page {
 				$total_pages = ceil( $results['total_count'] / 10 );
 				echo '<div class="tablenav bottom">';
 				echo '<div class="tablenav-pages h2wp-pagination">';
-				echo paginate_links( array(
+				echo wp_kses_post( paginate_links( array(
 					'base'    => add_query_arg( 'paged', '%#%' ),
 					'format'  => '',
-					'prev_text' => __( '«' ),
-					'next_text' => __( '»' ),
+					'prev_text' => '«',
+					'next_text' => '»',
 					'total'   => $total_pages,
 					'current' => $page,
-				) );
+				) ) );
 				echo '</div>';
 				echo '</div>';
 			}
@@ -483,7 +483,7 @@ class H2WP_Admin_Page {
 						</div>
 						<div class="h2wp-modal-changelog-content h2wp-hidden"></div>
 						<div class="h2wp-modal-installation-content h2wp-hidden">
-							' . $instructions . '
+						' . wp_kses_post( $instructions ) . '
 						</div>
 					</div>
 					<div class="h2wp-modal-sidebar">

@@ -6,6 +6,10 @@
  * Author: Balázs Piller
  * Text Domain: hub2wp
  * Domain Path: /languages
+ * Requires at least: 5.8
+ * Requires PHP: 5.7
+ * License: GPL2
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

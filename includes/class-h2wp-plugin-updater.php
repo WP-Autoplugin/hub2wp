@@ -35,6 +35,10 @@ class H2WP_Plugin_Updater {
 
 		// Intercept downloads for private-repo updates so they are authenticated.
 		add_filter( 'upgrader_pre_download', array( __CLASS__, 'authenticated_download' ), 10, 3 );
+
+		// Rename the GitHub-generated folder (owner-repo-hash) to the plugin's
+		// existing folder name so WordPress keeps it active after an update.
+		add_filter( 'upgrader_source_selection', array( __CLASS__, 'fix_source_folder' ), 10, 4 );
 	}
 
 	/**
@@ -402,6 +406,71 @@ class H2WP_Plugin_Updater {
 			$h2wp_sources['hub2wp']['plugin_file'] = H2WP_PLUGIN_BASENAME;
 			update_option( 'h2wp_plugins', $h2wp_sources );
 		}
+	}
+
+	/**
+	 * Rename the extracted source folder to match the plugin's existing folder.
+	 *
+	 * GitHub zip files always extract to a folder named
+	 * `{owner}-{repo}-{commithash}/`. If that name differs from the plugin's
+	 * current folder, WordPress moves the new code to the wrong path, the old
+	 * folder is left behind, and the plugin gets deactivated. This filter renames
+	 * the extracted folder before WordPress moves it, keeping the path stable.
+	 *
+	 * Hooked to: upgrader_source_selection
+	 *
+	 * @param string      $source        Path to the extracted source folder.
+	 * @param string      $remote_source Path to the temp directory.
+	 * @param WP_Upgrader $upgrader      The upgrader instance.
+	 * @param array       $hook_extra    Extra data (contains 'plugin' key on updates).
+	 * @return string|WP_Error Corrected source path, or original on failure.
+	 */
+	public static function fix_source_folder( $source, $remote_source, $upgrader, $hook_extra = array() ) {
+		global $wp_filesystem;
+
+		// We only care about plugin upgrades that identify the plugin being updated.
+		if ( empty( $hook_extra['plugin'] ) ) {
+			return $source;
+		}
+
+		$plugin_file = $hook_extra['plugin'];
+
+		// Check if this is one of our tracked plugins.
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$found        = false;
+		foreach ( $h2wp_plugins as $plugin ) {
+			if ( isset( $plugin['plugin_file'] ) && $plugin['plugin_file'] === $plugin_file ) {
+				$found = true;
+				break;
+			}
+		}
+
+		if ( ! $found ) {
+			return $source;
+		}
+
+		// The correct folder name is whatever the plugin is currently installed under.
+		$correct_folder = dirname( $plugin_file );
+		$new_source     = trailingslashit( $remote_source ) . $correct_folder;
+
+		// Nothing to do if it already has the right name.
+		if ( trailingslashit( $new_source ) === trailingslashit( $source ) ) {
+			return $source;
+		}
+
+		if ( ! $wp_filesystem->move( untrailingslashit( $source ), $new_source ) ) {
+			return new WP_Error(
+				'h2wp_rename_error',
+				sprintf(
+					/* translators: 1: extracted folder, 2: expected folder */
+					__( 'Could not rename plugin folder from "%1$s" to "%2$s".', 'hub2wp' ),
+					basename( $source ),
+					$correct_folder
+				)
+			);
+		}
+
+		return trailingslashit( $new_source );
 	}
 
 	/**

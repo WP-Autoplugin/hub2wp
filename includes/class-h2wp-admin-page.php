@@ -40,6 +40,20 @@ class H2WP_Admin_Page {
 	 * @return bool True if installed, false otherwise.
 	 */
 	public static function is_plugin_installed( $owner, $repo ) {
+		return (bool) self::get_installed_plugin_file( $owner, $repo );
+	}
+
+	/**
+	 * Get the plugin file path if a plugin is installed.
+	 *
+	 * @param string $owner Owner name.
+	 * @param string $repo  Repo name.
+	 * @return string|bool Plugin file path if installed, false otherwise.
+	 */
+	public static function get_installed_plugin_file( $owner, $repo ) {
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
 		$plugins = get_plugins();
 		$repo = strtolower( $repo );
 		foreach ( $plugins as $plugin_file => $plugin_data ) {
@@ -47,7 +61,7 @@ class H2WP_Admin_Page {
 			$folder_name = strtolower( dirname( $plugin_file ) );
 			$plugin_name = strtolower( basename( $plugin_file, '.php' ) );
 			if ( $repo === $folder_name || $repo === $plugin_name || $repo === sanitize_title( $plugin_data['Name'] ) ) {
-				return true;
+				return $plugin_file;
 			}
 		}
 		return false;

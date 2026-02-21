@@ -289,6 +289,12 @@ class H2WP_Settings {
 
 		// Add the repository
 		list( $owner, $repo ) = explode( '/', $repo_key, 2 );
+		
+		$plugin_file = false;
+		if ( class_exists( 'H2WP_Admin_Page' ) ) {
+			$plugin_file = H2WP_Admin_Page::get_installed_plugin_file( $owner, $repo );
+		}
+
 		$monitored_plugins[ $repo_key ] = array(
 			'owner'            => $owner,
 			'repo'             => $repo,
@@ -299,6 +305,10 @@ class H2WP_Settings {
 			'last_checked'     => time(),
 			'last_updated'     => time(),
 		);
+
+		if ( $plugin_file ) {
+			$monitored_plugins[ $repo_key ]['plugin_file'] = $plugin_file;
+		}
 
 		$result = update_option( 'h2wp_plugins', $monitored_plugins );
 		if ( ! $result ) {

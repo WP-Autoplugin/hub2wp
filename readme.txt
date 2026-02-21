@@ -38,8 +38,7 @@ No, but you have a higher request limit if you use one.
 = 1.0.2 =
 * New: Added support for private GitHub repositories.
 * New: Private repositories tab in plugin browser.
-* New: Settings page UI for managing private repositories.
-* New: Visual indicators for private repositories in plugin cards.
+* New: Settings page UI for managing repositories / monitored plugins.
 
 = 1.0.1 =
 * Fix: Update plugin data saved in the activation hook.

@@ -86,12 +86,13 @@ class H2WP_Plugin_Updater {
 		}
 
 		// Refresh the stored version data from GitHub if stale.
-		// We gate this behind a 6-hour transient so the API is not hit on every
-		// single filter invocation, while still being much more responsive than
-		// the once-daily cron (which may never run in some environments).
+		// We gate this behind a transient (duration configured in Settings) so
+		// the API is not hit on every single filter invocation, while still
+		// being much more responsive than the once-daily cron (which may never
+		// run in some environments).
 		if ( false === get_transient( 'h2wp_last_update_check' ) && ! self::$update_check_done ) {
 			self::$update_check_done = true;
-			set_transient( 'h2wp_last_update_check', 1, 6 * HOUR_IN_SECONDS );
+			set_transient( 'h2wp_last_update_check', 1, H2WP_Settings::get_cache_duration() );
 			self::check_for_updates();
 		}
 

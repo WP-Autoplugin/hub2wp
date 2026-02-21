@@ -21,6 +21,7 @@ class H2WP_Settings {
 		add_action( 'admin_menu', array( __CLASS__, 'add_settings_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'handle_private_repo_actions' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'display_private_repo_notices' ) );
+		add_action( 'admin_post_h2wp_clear_cache', array( __CLASS__, 'handle_clear_cache' ) );
 	}
 
 	/**
@@ -73,11 +74,21 @@ class H2WP_Settings {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'hub2wp Settings', 'hub2wp' ); ?></h1>
-			<form method="post" action="options.php">
+			<form method="post" action="options.php" style="margin-bottom: 2em;">
 				<?php settings_fields( 'h2wp_settings_group' ); ?>
 				<?php do_settings_sections( 'h2wp_settings_page' ); ?>
 
-				<?php submit_button(); ?>
+				<div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+					<?php submit_button( null, 'primary', 'submit', false ); ?>
+					<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0;">
+							<?php wp_nonce_field( 'h2wp_clear_cache', 'h2wp_clear_cache_nonce' ); ?>
+							<input type="hidden" name="action" value="h2wp_clear_cache" />
+							<?php submit_button( __( 'Clear Cache', 'hub2wp' ), 'secondary', 'h2wp_clear_cache_submit', false ); ?>
+						</form>
+						<p class="description" style="margin:0;"><?php esc_html_e( 'Delete all cached GitHub API responses. The cache will be rebuilt on the next request.', 'hub2wp' ); ?></p>
+					</div>
+				</div>
 			</form>
 
 			<hr />
@@ -401,6 +412,32 @@ class H2WP_Settings {
 	}
 
 	/**
+	 * Handle clearing all cached plugin data.
+	 *
+	 * Hooked to: admin_post_h2wp_clear_cache
+	 */
+	public static function handle_clear_cache() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to do this.', 'hub2wp' ) );
+		}
+
+		check_admin_referer( 'h2wp_clear_cache', 'h2wp_clear_cache_nonce' );
+
+		H2WP_Cache::clear_all();
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'          => 'h2wp_settings_page',
+					'h2wp_cleared'  => '1',
+				),
+				admin_url( 'options-general.php' )
+			)
+		);
+		exit;
+	}
+
+	/**
 	 * Display notices for private repository actions.
 	 */
 	public static function display_private_repo_notices() {
@@ -408,6 +445,11 @@ class H2WP_Settings {
 		$screen = get_current_screen();
 		if ( ! $screen || 'settings_page_h2wp_settings_page' !== $screen->id ) {
 			return;
+		}
+
+		// Show a success notice after cache has been cleared.
+		if ( isset( $_GET['h2wp_cleared'] ) && '1' === $_GET['h2wp_cleared'] ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Cache cleared successfully.', 'hub2wp' ) . '</p></div>';
 		}
 
 		// Note: settings_errors() is not called here because WordPress automatically

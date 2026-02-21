@@ -135,8 +135,8 @@ class H2WP_Settings {
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
-						<th><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
-						<th><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
+						<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
+						<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -149,6 +149,9 @@ class H2WP_Settings {
 									<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
 										<?php echo esc_html( $repo_key ); ?>
 									</a>
+									<?php if ( ! empty( $repo_data['plugin_file'] ) ) : ?>
+										&rarr; <code><?php echo esc_html( $repo_data['plugin_file'] ); ?></code>
+									<?php endif; ?>
 								</small>
 							</td>
 							<td>

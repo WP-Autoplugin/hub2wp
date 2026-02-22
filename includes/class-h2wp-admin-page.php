@@ -308,8 +308,8 @@ class H2WP_Admin_Page {
 			echo '</div>';
 
 			// Pagination
-			if ( $results['total_count'] > 12 ) {
-				$total_pages = ceil( min( $results['total_count'], 1000 ) / 12 ); // GitHub Search API caps at 1000 results
+			if ( $results['total_count'] > H2WP_RESULTS_PER_PAGE ) {
+				$total_pages = ceil( min( $results['total_count'], 1000 ) / H2WP_RESULTS_PER_PAGE ); // GitHub Search API caps at 1000 results
 				echo '<div class="tablenav bottom">';
 				echo '<div class="tablenav-pages h2wp-pagination">';
 				echo wp_kses_post( paginate_links( array(
@@ -322,6 +322,18 @@ class H2WP_Admin_Page {
 				) ) );
 				echo '</div>';
 				echo '</div>';
+
+				// Show a notice on the last page if total results exceed GitHub's 1000-result cap
+				if ( $results['total_count'] > 1000 && $page >= $total_pages ) {
+					$hidden_count = number_format( $results['total_count'] - 1000 );
+					echo '<div class="notice notice-warning inline" style="margin: 16px 0;">';
+					echo '<p>' . wp_kses_post( sprintf(
+						/* translators: 1: number of hidden results */
+						__( '<strong>GitHub Search API limit reached.</strong> Only the first 1,000 results are accessible. There are at least %s more plugins matching your search that cannot be shown. Try refining your search or adding topic filters to narrow down the results.', 'hub2wp' ),
+						'<strong>' . esc_html( $hidden_count ) . '</strong>'
+					) ) . '</p>';
+					echo '</div>';
+				}
 			}
 		} else {
 			echo '<div class="no-plugin-results">';

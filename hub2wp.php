@@ -20,6 +20,7 @@ define( 'H2WP_VERSION', '1.0.2' );
 define( 'H2WP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'H2WP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'H2WP_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+define( 'H2WP_RESULTS_PER_PAGE', 12 );
 
 // Include autoload.
 require_once H2WP_PLUGIN_DIR . 'vendor/autoload.php';

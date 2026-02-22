@@ -56,7 +56,7 @@ class H2WP_GitHub_API {
 			array(
 				'q'        => $query,
 				'page'     => $page,
-				'per_page' => 12,
+				'per_page' => H2WP_RESULTS_PER_PAGE,
 				'sort'     => $sort, // Can be one of: stars, forks, help-wanted-issues, updated.
 				'order'    => $order,
 			),

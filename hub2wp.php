@@ -24,12 +24,6 @@ define( 'H2WP_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
 // Include autoload.
 require_once H2WP_PLUGIN_DIR . 'vendor/autoload.php';
 
-// Load text domain.
-function h2wp_load_textdomain() {
-	load_plugin_textdomain( 'hub2wp', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
-}
-add_action( 'plugins_loaded', 'h2wp_load_textdomain' );
-
 // Activation hook.
 register_activation_hook( __FILE__, array( 'H2WP_Plugin_Updater', 'activate' ) );
 

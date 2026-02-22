@@ -308,17 +308,17 @@ class H2WP_Admin_Page {
 			echo '</div>';
 
 			// Pagination
-			if ( $results['total_count'] > 10 ) {
-				$total_pages = ceil( $results['total_count'] / 10 );
+			if ( $results['total_count'] > 12 ) {
+				$total_pages = ceil( min( $results['total_count'], 1000 ) / 12 ); // GitHub Search API caps at 1000 results
 				echo '<div class="tablenav bottom">';
 				echo '<div class="tablenav-pages h2wp-pagination">';
 				echo wp_kses_post( paginate_links( array(
-					'base'    => add_query_arg( 'paged', '%#%' ),
-					'format'  => '',
+					'base'      => add_query_arg( 'paged', '%#%' ),
+					'format'    => '',
 					'prev_text' => '«',
 					'next_text' => '»',
-					'total'   => $total_pages,
-					'current' => $page,
+					'total'     => $total_pages,
+					'current'   => $page,
 				) ) );
 				echo '</div>';
 				echo '</div>';

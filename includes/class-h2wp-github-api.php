@@ -56,7 +56,7 @@ class H2WP_GitHub_API {
 			array(
 				'q'        => $query,
 				'page'     => $page,
-				'per_page' => 12,
+				'per_page' => H2WP_RESULTS_PER_PAGE,
 				'sort'     => $sort, // Can be one of: stars, forks, help-wanted-issues, updated.
 				'order'    => $order,
 			),
@@ -92,6 +92,9 @@ class H2WP_GitHub_API {
 	/**
 	 * Get repository details.
 	 *
+	 * This method works for both public and private repositories
+	 * when an access token with appropriate permissions is provided.
+	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
 	 * @return array|WP_Error Repository details or error.
@@ -117,6 +120,103 @@ class H2WP_GitHub_API {
 
 		H2WP_Cache::set( $cache_key, $data );
 		return $data;
+	}
+
+	/**
+	 * Get private repository details.
+	 *
+	 * This is a wrapper around get_repo_details() specifically for private repositories.
+	 * It verifies that an access token exists before making the request.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return array|WP_Error Repository details or error.
+	 */
+	public function get_private_repo_details( $owner, $repo ) {
+		if ( empty( $this->access_token ) ) {
+			return new WP_Error(
+				'h2wp_missing_token',
+				__( 'Access token is required to fetch private repository details.', 'hub2wp' )
+			);
+		}
+
+		// Verify access before fetching full details
+		$access_check = $this->verify_private_repo_access( $owner, $repo );
+		if ( is_wp_error( $access_check ) ) {
+			return $access_check;
+		}
+
+		return $this->get_repo_details( $owner, $repo );
+	}
+
+	/**
+	 * Verify that the access token can access a private repository.
+	 *
+	 * This method makes a lightweight API call to verify access permissions.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return bool|WP_Error True if accessible, WP_Error otherwise.
+	 */
+	public function verify_private_repo_access( $owner, $repo ) {
+		if ( empty( $this->access_token ) ) {
+			return new WP_Error(
+				'h2wp_missing_token',
+				__( 'Access token is required to verify private repository access.', 'hub2wp' )
+			);
+		}
+
+		$url = $this->base_url . '/repos/' . $owner . '/' . $repo;
+		$response = $this->request( $url, array( 'method' => 'HEAD' ) );
+
+		if ( is_wp_error( $response ) ) {
+			$error_code = $response->get_error_code();
+			
+			// Provide more specific error messages based on HTTP status
+			if ( 'h2wp_api_error_404' === $error_code ) {
+				return new WP_Error(
+					'h2wp_repo_not_found',
+					sprintf(
+						/* translators: %s: repository owner/repo */
+						__( 'Repository "%s" not found or you do not have access to it. Please verify the repository name and ensure your access token has the "repo" scope.', 'hub2wp' ),
+						$owner . '/' . $repo
+					)
+				);
+			}
+
+			if ( 'h2wp_api_error_401' === $error_code ) {
+				return new WP_Error(
+					'h2wp_unauthorized',
+					__( 'Your access token is invalid or does not have permission to access this repository. Please check your token and ensure it has the "repo" scope.', 'hub2wp' )
+				);
+			}
+
+			if ( 'h2wp_api_error_403' === $error_code ) {
+				return new WP_Error(
+					'h2wp_forbidden',
+					__( 'Your access token does not have permission to access this repository. Please ensure it has the "repo" scope.', 'hub2wp' )
+				);
+			}
+
+			return $response;
+		}
+
+		// Check if the repository is actually private
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( is_array( $body ) && isset( $body['private'] ) && false === $body['private'] ) {
+			// Repository is public, warn the user but still allow it
+			return new WP_Error(
+				'h2wp_repo_is_public',
+				sprintf(
+					/* translators: %s: repository owner/repo */
+					__( 'Note: Repository "%s" is public. It will work, but you may want to use the regular search instead.', 'hub2wp' ),
+					$owner . '/' . $repo
+				),
+				array( 'is_public' => true )
+			);
+		}
+
+		return true;
 	}
 
 	/**
@@ -493,6 +593,7 @@ class H2WP_GitHub_API {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
+					// translators: %s: required WordPress version.
 					__( 'This plugin requires WordPress version %s or higher.', 'hub2wp' ),
 					$headers['requires at least']
 				),
@@ -503,6 +604,7 @@ class H2WP_GitHub_API {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
+					// translators: %s: required PHP version.
 					__( 'This plugin requires PHP version %s or higher.', 'hub2wp' ),
 					$headers['requires php']
 				),
@@ -562,7 +664,14 @@ class H2WP_GitHub_API {
 			$default_args['headers']['Authorization'] = 'token ' . $this->access_token;
 		}
 
-		$args = wp_parse_args( $args, $default_args );
+		// wp_parse_args() is a shallow merge, so a caller that passes custom
+		// headers (e.g. Accept) would silently overwrite the entire headers array,
+		// dropping Authorization. Deep-merge the headers sub-array manually first.
+		if ( isset( $args['headers'] ) && isset( $default_args['headers'] ) ) {
+			$args['headers'] = array_merge( $default_args['headers'], (array) $args['headers'] );
+		}
+
+		$args     = wp_parse_args( $args, $default_args );
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {
@@ -571,6 +680,7 @@ class H2WP_GitHub_API {
 
 		$code = wp_remote_retrieve_response_code( $response );
 		if ( 200 !== $code ) {
+			// Translators: %s: HTTP status code.
 			return new WP_Error( "h2wp_api_error_$code", sprintf( __( 'GitHub API HTTP error: %s', 'hub2wp' ), $code ) );
 		}
 

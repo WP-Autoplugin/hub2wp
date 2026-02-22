@@ -2,29 +2,28 @@
 /**
  * Plugin Name: hub2wp
  * Description: Browse, install, and update WordPress plugins directly from GitHub repositories.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Balázs Piller
  * Text Domain: hub2wp
  * Domain Path: /languages
+ * Requires at least: 5.8
+ * Requires PHP: 5.7
+ * License: GPL2
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'H2WP_VERSION', '1.0.1' );
+define( 'H2WP_VERSION', '1.0.2' );
 define( 'H2WP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'H2WP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'H2WP_PLUGIN_BASENAME', plugin_basename( __FILE__ ) );
+define( 'H2WP_RESULTS_PER_PAGE', 12 );
 
 // Include autoload.
 require_once H2WP_PLUGIN_DIR . 'vendor/autoload.php';
-
-// Load text domain.
-function h2wp_load_textdomain() {
-	load_plugin_textdomain( 'hub2wp', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
-}
-add_action( 'plugins_loaded', 'h2wp_load_textdomain' );
 
 // Activation hook.
 register_activation_hook( __FILE__, array( 'H2WP_Plugin_Updater', 'activate' ) );

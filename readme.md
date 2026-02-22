@@ -79,16 +79,16 @@ hub2wp will continue to evolve with the following planned features:
 ## FAQs
 
 **Do I need a GitHub token?**  
-No, but adding one increases the API request limit, which may be useful for high usage scenarios.
+No, but adding one increases the API request limit, which may be useful for high usage scenarios. Without a token, you can make up to 60 API requests per hour, which is sufficient for most users. You only need a token if you have a large number of plugins or if you want to use private repositories.
 
 **Will this plugin interfere with WordPress.org plugins?**  
 No, hub2wp operates independently of WordPress.org and only manages plugins sourced from GitHub.
 
 **What happens if a plugin is updated on GitHub?**  
-If the plugin has been installed on your site via hub2wp, then you will be notified, and you can update the plugin with a single click.
+hub2wp will check for updates based on the `Stable tag:` version in the default branch. If a new version is detected, you will receive an update notification in your WordPress dashboard, allowing you to update the plugin directly from there.
 
 **Can I use hub2wp for private repositories?**  
-Not yet, but support for private repositories is planned for a future release.
+Yes, you can add private repositories to hub2wp by providing a GitHub token with the appropriate permissions. Private repositories will be listed in a separate tab in the plugin browser.
 
 ---
 
@@ -99,6 +99,11 @@ hub2wp is open source and welcomes contributions. If you encounter issues or hav
 ---
 
 ## Changelog
+
+### 1.0.2
+- New: Added support for private GitHub repositories.
+- New: Private repositories tab in plugin browser.
+- New: Settings page UI for managing repositories / monitored plugins.
 
 ### 1.0.1
 - Fix: Update plugin data saved in the activation hook.

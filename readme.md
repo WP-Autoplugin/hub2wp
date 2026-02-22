@@ -2,7 +2,7 @@
 
 hub2wp is a WordPress plugin that lets you discover, install, and update plugins hosted on GitHub directly from your WordPress dashboard. By leveraging GitHub's plugin ecosystem, it provides a straightforward way to extend your WordPress site beyond the plugins available on WordPress.org.
 
-hub2wp does not require any changes to existing plugins or approvals from a central authority to make plugins discoverable or updatable. All it takes is for developers to add the `wordpress-plugin` tag to their public GitHub repository. hub2wp automatically verifies that a repository is a valid WordPress plugin. Thousands of valid plugins are already available on GitHub, ready to be installed right away!
+hub2wp does not require any changes to existing plugins or approvals from a central authority to make plugins discoverable or updatable. All it takes is for developers to add the `wordpress-plugin` tag to their public GitHub repository. hub2wp automatically verifies that a repository is a valid WordPress plugin. Thousands of valid plugins are already available on GitHub, ready to be installed right away! Private repositories are also supported, and you can manually set up update monitoring for plugins installed outside hub2wp.
 
 ![GitHub Plugin Browsing](assets/hub2wp-screenshot-1.png)
 
@@ -17,6 +17,8 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
 - **Update Management**: Receive notifications and perform updates for GitHub plugins directly from your admin panel, like you would for WordPress.org plugins.
 - **Optional GitHub Token Support**: Increase the GitHub API rate limit by adding a personal access token. Normal usage does not require a token, thanks to GitHub's generous API limits for unauthenticated requests.
 - **Caching**: Built-in caching minimizes API requests for faster performance and reduced API quota usage.
+- **Manual Update Monitoring**: Set up update monitoring for plugins installed outside hub2wp.
+- **Private Repository Support**: Browse, install, and update plugins from private GitHub repositories.
 
 ---
 
@@ -45,9 +47,8 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
 hub2wp will continue to evolve with the following planned features:
 
 - **Release Tracking**: Monitor GitHub releases for updates instead of just the default branch.
-- **Manual Update Monitoring**: Allow manual setup of update monitoring for plugins installed outside hub2wp.
-- **Private Repository Support**: Extend functionality to private GitHub repositories.
 - **Custom Branch Monitoring**: Enable update tracking for specific branches other than the main branch.
+- **Theme Support**: Expand hub2wp to also support themes hosted on GitHub.
 
 ---
 
@@ -100,7 +101,7 @@ hub2wp is open source and welcomes contributions. If you encounter issues or hav
 
 ## Changelog
 
-### 1.0.2
+### 1.1.0
 - New: Added support for private GitHub repositories.
 - New: Private repositories tab in plugin browser.
 - New: Settings page UI for managing repositories / monitored plugins.

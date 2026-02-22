@@ -3,7 +3,7 @@ Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.8
 Tested up to: 6.9
-Stable tag: 1.0.2
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -35,7 +35,7 @@ No, but you have a higher request limit if you use one.
 
 == Changelog ==
 
-= 1.0.2 =
+= 1.1.0 =
 * New: Added support for private GitHub repositories.
 * New: Private repositories tab in plugin browser.
 * New: Settings page UI for managing repositories / monitored plugins.

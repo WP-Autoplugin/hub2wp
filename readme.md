@@ -49,6 +49,7 @@ hub2wp will continue to evolve with the following planned features:
 - **Release Tracking**: Monitor GitHub releases for updates instead of just the default branch.
 - **Custom Branch Monitoring**: Enable update tracking for specific branches other than the main branch.
 - **Theme Support**: Expand hub2wp to also support themes hosted on GitHub.
+- **Full WP-CLI Integration**: Provide WP-CLI commands for managing GitHub plugins via the command line.
 
 ---
 
@@ -67,6 +68,11 @@ hub2wp will continue to evolve with the following planned features:
 ![Plugin Details Popup](assets/hub2wp-screenshot-2.png)
 
 </details>
+
+<details>
+<summary>Set up Update Monitoring for Plugins on the Settings Page</summary>
+
+![Set up Update Monitoring for Plugins on the Settings Page](assets/hub2wp-screenshot-4.png)
 
 <details>
 <summary>Update Processing via GitHub API</summary>

@@ -74,6 +74,8 @@ hub2wp will continue to evolve with the following planned features:
 
 ![Set up Update Monitoring for Plugins on the Settings Page](assets/hub2wp-screenshot-4.png)
 
+</details>
+
 <details>
 <summary>Update Processing via GitHub API</summary>
 

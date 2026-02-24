@@ -274,7 +274,7 @@
     position: relative;
     overflow: hidden;
     height: 40px;
-    background: #1d2327;
+    border-bottom: 1px solid #dcdcde;
 }
 
 .h2wp-theme-card .h2wp-theme-hero-image {
@@ -284,15 +284,6 @@
     filter: blur(16px) saturate(120%);
     transform: scale(1.3);
     background-color: #fff;
-}
-
-.h2wp-theme-card .h2wp-theme-hero-overlay {
-    position: absolute;
-    inset: 0;
-    background:
-        radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.22), transparent 48%),
-        linear-gradient(160deg, rgba(16, 17, 20, 0.28), rgba(16, 17, 20, 0.54));
-    pointer-events: none;
 }
 
 .h2wp-theme-card .h2wp-theme-header {

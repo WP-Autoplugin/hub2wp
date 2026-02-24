@@ -18,6 +18,7 @@ class H2WP_Admin_Page {
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
 		add_action( 'admin_footer-themes.php', array( __CLASS__, 'render_themes_screen_button' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'display_rate_limit_notice' ) );
+		add_filter( 'admin_title', array( __CLASS__, 'filter_admin_title' ), 10, 2 );
 		add_filter( 'plugin_action_links_' . H2WP_PLUGIN_BASENAME, array( __CLASS__, 'add_action_links' ) );
 	}
 
@@ -211,6 +212,27 @@ class H2WP_Admin_Page {
 	}
 
 	/**
+	 * Ensure hidden admin pages keep a meaningful <title>.
+	 *
+	 * @param string $admin_title Full admin title.
+	 * @param string $title       Page title segment.
+	 * @return string
+	 */
+	public static function filter_admin_title( $admin_title, $title ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		if ( 'h2wp-theme-browser' !== $page ) {
+			return $admin_title;
+		}
+
+		$site_name = get_bloginfo( 'name' );
+		$wp_name   = __( 'WordPress' );
+		$page_name = __( 'Add GitHub Themes', 'hub2wp' );
+
+		return sprintf( '%1$s %2$s %3$s %4$s', $page_name, "\xE2\x80\xB9", $site_name, "\xE2\x80\x94 $wp_name" );
+	}
+
+	/**
 	 * Render a browser page for repository type.
 	 *
 	 * @param string $repo_type Repository type.
@@ -234,7 +256,7 @@ class H2WP_Admin_Page {
 		// Check if we're viewing private repos
 		$is_private_tab = ( 'plugin' === $repo_type ) && isset( $_GET['tab'] ) && 'private' === $_GET['tab']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-		$query      = 'topic:' . $topic . ( 'theme' === $repo_type ? ' -topic:wordpress-plugin' : '' );
+		$query      = 'topic:' . $topic . ( 'theme' === $repo_type ? ' -topic:wordpress-plugin -topic:build-tool' : '' );
 		$user_query = '';
 		$queried_tag = '';
 		if ( ! $is_private_tab && isset( $_GET['s'] ) && ! empty( $_GET['s'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -325,7 +347,7 @@ class H2WP_Admin_Page {
 		echo '</div>';
 
 		// Modal HTML
-		self::render_modal();
+		self::render_modal( $repo_type );
 	}
 
 	/**
@@ -548,7 +570,6 @@ class H2WP_Admin_Page {
 		echo '<div class="h2wp-theme-screenshot">';
 		if ( $avatar ) {
 			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-theme-hero-image h2wp-plugin-thumbnail" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme" style="cursor:pointer;" />';
-			echo '<span class="h2wp-theme-hero-overlay" aria-hidden="true"></span>';
 		} else {
 			echo '<div class="h2wp-plugin-icon-placeholder"></div>';
 		}
@@ -655,9 +676,11 @@ class H2WP_Admin_Page {
 
 	/**
 	 * Render the modal structure.
+	 *
+	 * @param string $repo_type Repository type (plugin|theme).
 	 */
-	private static function render_modal() {
-		$instructions = H2WP_Plugin_Updater::get_installation_instructions();
+	private static function render_modal( $repo_type = 'plugin' ) {
+		$instructions = H2WP_Plugin_Updater::get_installation_instructions( '', $repo_type );
 		echo '
 		<div id="h2wp-plugin-modal" class="h2wp-modal">
 			<div class="h2wp-modal-content">

@@ -240,23 +240,35 @@ class H2WP_Plugin_Updater {
 	 * Format installation instructions.
 	 *
 	 * @param string $plugin_id Plugin identifier (owner/repo).
+	 * @param string $repo_type Repository type (plugin|theme).
 	 * @return string Formatted installation instructions.
 	 */
-	public static function get_installation_instructions( $plugin_id = '' ) {
+	public static function get_installation_instructions( $plugin_id = '', $repo_type = 'plugin' ) {
+		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+
+		$is_theme    = ( 'theme' === $repo_type );
+		$admin_path  = $is_theme ? esc_html__( 'Appearance &rarr; Themes &rarr; GitHub Themes', 'hub2wp' ) : esc_html__( 'Plugins &rarr; Add GitHub Plugin', 'hub2wp' );
+		$install_verb = $is_theme ? esc_html__( 'theme', 'hub2wp' ) : esc_html__( 'plugin', 'hub2wp' );
+		$manual_path = $is_theme ? '/wp-content/themes/' : '/wp-content/plugins/';
+
 		$instructions  = '<h4>' . esc_html__( 'Installation via hub2wp', 'hub2wp' ) . '</h4>';
 		$instructions .= '<ol>';
 		$instructions .= '<li>' . sprintf(
-			/* translators: %s: Plugin navigation path */
+			/* translators: %s: Navigation path in WordPress admin */
 			__( 'Navigate to <strong>%s</strong> in your WordPress admin panel', 'hub2wp' ),
-			'<strong>' . esc_html__( 'Plugins &rarr; Add GitHub Plugin', 'hub2wp' ) . '</strong>'
+			'<strong>' . $admin_path . '</strong>'
 		) . '</li>';
 		$instructions .= '<li>' . sprintf(
-			/* translators: %s: Plugin identifier */
+			/* translators: %s: Repository identifier */
 			__( 'Search for <strong class="h2wp-modal-title">%s</strong>', 'hub2wp' ),
 			esc_html( $plugin_id )
 		) . '</li>';
 		$instructions .= '<li>' . esc_html__( 'Click the "Install" button', 'hub2wp' ) . '</li>';
-		$instructions .= '<li>' . esc_html__( 'Activate the plugin through the WordPress Plugins menu', 'hub2wp' ) . '</li>';
+		$instructions .= '<li>' . sprintf(
+			/* translators: %s: Extension type (plugin/theme). */
+			esc_html__( 'Activate the %s in WordPress', 'hub2wp' ),
+			$install_verb
+		) . '</li>';
 		$instructions .= '</ol>';
 
 		$instructions .= '<h4>' . esc_html__( 'Manual Installation', 'hub2wp' ) . '</h4>';
@@ -264,10 +276,14 @@ class H2WP_Plugin_Updater {
 		$instructions .= '<li>' . esc_html__( 'Download the latest release from the GitHub repository', 'hub2wp' ) . '</li>';
 		$instructions .= '<li>' . sprintf(
 			/* translators: %s: Directory path */
-			__( 'Upload the plugin files to your <code>%s</code> directory', 'hub2wp' ),
-			'/wp-content/plugins/'
+			__( 'Upload the files to your <code>%s</code> directory', 'hub2wp' ),
+			$manual_path
 		) . '</li>';
-		$instructions .= '<li>' . esc_html__( 'Activate the plugin through the WordPress Plugins menu', 'hub2wp' ) . '</li>';
+		$instructions .= '<li>' . sprintf(
+			/* translators: %s: Extension type (plugin/theme). */
+			esc_html__( 'Activate the %s in WordPress', 'hub2wp' ),
+			$install_verb
+		) . '</li>';
 		$instructions .= '</ol>';
 
 		return $instructions;

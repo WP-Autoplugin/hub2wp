@@ -2,6 +2,7 @@ jQuery(document).ready(function($) {
     // Function to open modal with plugin details.
     function loadGpbModal(data) {
         var modal = $('#h2wp-plugin-modal');
+        var repoType = data.repo_type || h2wp_ajax_object.repo_type || 'plugin';
         modal.find('.h2wp-modal-title').text(data.display_name);
         modal.find('.h2wp-modal-author').html('<a href="' + data.author_url + '" target="_blank">' + data.author + '</a>');
         modal.find('.h2wp-modal-description').html(data.description);
@@ -17,11 +18,12 @@ jQuery(document).ready(function($) {
         } else {
             modal.find('.h2wp-install-plugin').removeClass('h2wp-installed h2wp-button-disabled').text('Install Now');
         }
-        modal.find('.h2wp-install-plugin').data('owner', data.owner).data('repo', data.repo);
+        modal.find('.h2wp-install-plugin').data('owner', data.owner).data('repo', data.repo).data('type', repoType);
+        modal.find('.h2wp-activate-plugin').data('owner', data.owner).data('repo', data.repo).data('type', repoType);
         modal.find('.h2wp-activate-plugin').addClass('h2wp-hidden');
 
         // Also update the updated_at in the plugin card (.h2wp-meta-updated)
-        $('.h2wp-meta-updated[data-owner="' + data.owner + '"][data-repo="' + data.repo + '"] span').text(data.updated_at);
+        $('.h2wp-meta-updated[data-owner="' + data.owner + '"][data-repo="' + data.repo + '"][data-type="' + repoType + '"] span').text(data.updated_at);
 
         // Set current tab to "readme" and show the content.
         modal.find('.h2wp-modal-tab-active').removeClass('h2wp-modal-tab-active');
@@ -61,7 +63,8 @@ jQuery(document).ready(function($) {
             action: 'h2wp_check_compatibility',
             nonce: h2wp_ajax_object.nonce,
             owner: data.owner,
-            repo: data.repo
+            repo: data.repo,
+            repo_type: data.repo_type || h2wp_ajax_object.repo_type || 'plugin'
         };
 
         modal.find('.h2wp-modal-compatibility').html('Checking compatibility...').parent().addClass('h2wp-loading');
@@ -89,7 +92,7 @@ jQuery(document).ready(function($) {
                         modal.find('.h2wp-install-plugin').addClass('h2wp-hidden');
                         modal.find('.h2wp-activate-plugin').addClass('h2wp-hidden');
                         // Also disable the "Install Now" button inside the plugin card.
-                        $('.h2wp-install-plugin[data-owner="' + data.owner + '"][data-repo="' + data.repo + '"]').addClass('h2wp-installed h2wp-button-disabled').text('Incompatible');
+                        $('.h2wp-install-plugin[data-owner="' + data.owner + '"][data-repo="' + data.repo + '"][data-type="' + (data.repo_type || h2wp_ajax_object.repo_type || 'plugin') + '"]').addClass('h2wp-installed h2wp-button-disabled').text('Incompatible');
                     }
 
                     if (response.data.reason) {
@@ -98,7 +101,7 @@ jQuery(document).ready(function($) {
 
                     // Update compatibility details in the modal sidebar
                     if (response.data.headers) {
-                        modal.find('.h2wp-modal-version').text(response.data.headers['stable tag'] || 'Unknown');
+                        modal.find('.h2wp-modal-version').text(response.data.headers['version'] || response.data.headers['stable tag'] || 'Unknown');
                         modal.find('.h2wp-modal-compatibility-required-wp-version').text(response.data.headers['requires at least'] || 'Unknown');
                         modal.find('.h2wp-modal-compatibility-tested-wp-version').text(response.data.headers['tested up to'] || 'Unknown');
                         modal.find('.h2wp-modal-compatibility-required-php-version').text(response.data.headers['requires php'] || 'Unknown');
@@ -126,6 +129,7 @@ jQuery(document).ready(function($) {
         e.preventDefault();
         var owner = $(this).data('owner');
         var repo = $(this).data('repo');
+        var repoType = $(this).data('type') || h2wp_ajax_object.repo_type || 'plugin';
 
         if (!owner || !repo) {
             return;
@@ -139,7 +143,8 @@ jQuery(document).ready(function($) {
                 action: 'h2wp_get_plugin_details',
                 nonce: h2wp_ajax_object.nonce,
                 owner: owner,
-                repo: repo
+                repo: repo,
+                repo_type: repoType
             },
             beforeSend: function() {
                 $('#h2wp-plugin-modal').addClass('h2wp-modal-loading').fadeIn();
@@ -181,6 +186,7 @@ jQuery(document).ready(function($) {
         var button = $(this);
         var owner = button.data('owner');
         var repo = button.data('repo');
+        var repoType = button.data('type') || h2wp_ajax_object.repo_type || 'plugin';
 
         if (!owner || !repo) {
             return;
@@ -190,22 +196,25 @@ jQuery(document).ready(function($) {
             action: 'h2wp_install_plugin',
             nonce: h2wp_ajax_object.nonce,
             owner: owner,
-            repo: repo
+            repo: repo,
+            repo_type: repoType
         };
 
         // Make AJAX request to install plugin.
         $.ajax({
             url: h2wp_ajax_object.ajax_url,
             method: 'POST',
+            dataType: 'json',
             data: pluginData,
             beforeSend: function() {
                 button.addClass('h2wp-loading').text('Installing...');
             },
             success: function(response) {
-                if (response.success) {
+                if (response && response.success && response.data) {
                     button.addClass('h2wp-hidden').siblings('.h2wp-activate-plugin').removeClass('h2wp-hidden').attr( 'href', response.data.activate_url );
+                    button.closest('.theme-actions').find('.h2wp-button-disabled,.disabled').addClass('h2wp-hidden');
                 } else {
-                    alert(response.data.message);
+                    alert((response && response.data && response.data.message) ? response.data.message : (h2wp_ajax_object.error_message || 'An error occurred.'));
                 }
             },
             error: function() {
@@ -238,6 +247,7 @@ jQuery(document).ready(function($) {
 
         var owner = $(this).closest('#h2wp-plugin-modal').find('.h2wp-install-plugin').data('owner');
         var repo = $(this).closest('#h2wp-plugin-modal').find('.h2wp-install-plugin').data('repo');
+        var repoType = $(this).closest('#h2wp-plugin-modal').find('.h2wp-install-plugin').data('type') || h2wp_ajax_object.repo_type || 'plugin';
 
         if (!owner || !repo) {
             return;
@@ -251,7 +261,8 @@ jQuery(document).ready(function($) {
                 action: 'h2wp_get_changelog',
                 nonce: h2wp_ajax_object.nonce,
                 owner: owner,
-                repo: repo
+                repo: repo,
+                repo_type: repoType
             },
             beforeSend: function() {
                 tabContent.html('<div class="h2wp-loading">Loading changelog...</div>');

@@ -13,7 +13,10 @@ class H2WP_Admin_Page {
 	 */
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'add_menu_page' ) );
+		add_action( 'admin_menu', array( __CLASS__, 'add_theme_browser_page' ) );
+		add_action( 'admin_menu', array( __CLASS__, 'hide_theme_browser_submenu' ), 999 );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
+		add_action( 'admin_footer-themes.php', array( __CLASS__, 'render_themes_screen_button' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'display_rate_limit_notice' ) );
 		add_filter( 'plugin_action_links_' . H2WP_PLUGIN_BASENAME, array( __CLASS__, 'add_action_links' ) );
 	}
@@ -33,6 +36,53 @@ class H2WP_Admin_Page {
 	}
 
 	/**
+	 * Register the hidden theme browser page.
+	 */
+	public static function add_theme_browser_page() {
+		add_submenu_page(
+			'themes.php',
+			__( 'GitHub Themes', 'hub2wp' ),
+			__( 'GitHub Themes', 'hub2wp' ),
+			'install_themes',
+			'h2wp-theme-browser',
+			array( __CLASS__, 'render_theme_page' )
+		);
+	}
+
+	/**
+	 * Hide the GitHub themes page from the Appearance submenu.
+	 */
+	public static function hide_theme_browser_submenu() {
+		remove_submenu_page( 'themes.php', 'h2wp-theme-browser' );
+	}
+
+	/**
+	 * Add a "GitHub Themes" button beside "Add Theme" on Appearance > Themes.
+	 */
+	public static function render_themes_screen_button() {
+		if ( ! current_user_can( 'install_themes' ) ) {
+			return;
+		}
+
+		$url = admin_url( 'themes.php?page=h2wp-theme-browser' );
+		?>
+		<script>
+			document.addEventListener('DOMContentLoaded', function () {
+				var addThemeButton = document.querySelector('.wrap a.page-title-action');
+				if (!addThemeButton) {
+					return;
+				}
+				var githubThemesButton = document.createElement('a');
+				githubThemesButton.className = 'page-title-action';
+				githubThemesButton.href = <?php echo wp_json_encode( $url ); ?>;
+				githubThemesButton.textContent = <?php echo wp_json_encode( __( 'GitHub Themes', 'hub2wp' ) ); ?>;
+				addThemeButton.insertAdjacentElement('afterend', githubThemesButton);
+			});
+		</script>
+		<?php
+	}
+
+	/**
 	 * Check if a plugin is installed.
 	 *
 	 * @param string $owner Owner name.
@@ -41,6 +91,22 @@ class H2WP_Admin_Page {
 	 */
 	public static function is_plugin_installed( $owner, $repo ) {
 		return (bool) self::get_installed_plugin_file( $owner, $repo );
+	}
+
+	/**
+	 * Check if a repository is already installed as a plugin or theme.
+	 *
+	 * @param string $owner     Owner name.
+	 * @param string $repo      Repo name.
+	 * @param string $repo_type Repository type.
+	 * @return bool
+	 */
+	public static function is_repo_installed( $owner, $repo, $repo_type = 'plugin' ) {
+		if ( 'theme' === $repo_type ) {
+			return (bool) self::get_installed_theme_stylesheet( $owner, $repo );
+		}
+
+		return self::is_plugin_installed( $owner, $repo );
 	}
 
 	/**
@@ -68,24 +134,112 @@ class H2WP_Admin_Page {
 	}
 
 	/**
+	 * Get the installed stylesheet slug if a matching theme is installed.
+	 *
+	 * @param string $owner Owner name.
+	 * @param string $repo  Repo name.
+	 * @return string|bool
+	 */
+	public static function get_installed_theme_stylesheet( $owner, $repo ) {
+		$themes = wp_get_themes();
+		$repo   = strtolower( $repo );
+
+		foreach ( $themes as $stylesheet => $theme ) {
+			$theme_name = strtolower( $theme->get( 'Name' ) );
+			if ( $repo === strtolower( $stylesheet ) || $repo === sanitize_title( $theme_name ) ) {
+				return $stylesheet;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Get repository browser type from query string.
+	 *
+	 * @return string plugin|theme
+	 */
+	public static function get_repo_type() {
+		$repo_type = isset( $_GET['repo_type'] ) ? sanitize_key( wp_unslash( $_GET['repo_type'] ) ) : 'plugin'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+	}
+
+	/**
+	 * Get UI labels for the current repository type.
+	 *
+	 * @param string $repo_type Repository type.
+	 * @return array
+	 */
+	private static function get_repo_labels( $repo_type ) {
+		if ( 'theme' === $repo_type ) {
+			return array(
+				'singular'      => __( 'Theme', 'hub2wp' ),
+				'plural'        => __( 'Themes', 'hub2wp' ),
+				'search'        => __( 'Search themes...', 'hub2wp' ),
+				'not_found'     => __( 'No themes found. Try a different search.', 'hub2wp' ),
+				'github_page'   => __( 'GitHub Theme Page »', 'hub2wp' ),
+				'homepage'      => __( 'Theme Homepage »', 'hub2wp' ),
+				'modal_github'  => __( 'View theme on GitHub', 'hub2wp' ),
+				'more_than_1000'=> __( '<strong>GitHub Search API limit reached.</strong> Only the first 1,000 results are accessible. There are at least %s more themes matching your search that cannot be shown. Try refining your search or adding topic filters to narrow down the results.', 'hub2wp' ),
+			);
+		}
+
+		return array(
+			'singular'      => __( 'Plugin', 'hub2wp' ),
+			'plural'        => __( 'Plugins', 'hub2wp' ),
+			'search'        => __( 'Search plugins...', 'hub2wp' ),
+			'not_found'     => __( 'No plugins found. Try a different search.', 'hub2wp' ),
+			'github_page'   => __( 'GitHub Plugin Page »', 'hub2wp' ),
+			'homepage'      => __( 'Plugin Homepage »', 'hub2wp' ),
+			'modal_github'  => __( 'View plugin on GitHub', 'hub2wp' ),
+			'more_than_1000'=> __( '<strong>GitHub Search API limit reached.</strong> Only the first 1,000 results are accessible. There are at least %s more plugins matching your search that cannot be shown. Try refining your search or adding topic filters to narrow down the results.', 'hub2wp' ),
+		);
+	}
+
+	/**
 	 * Render the admin page.
 	 */
 	public static function render_page() {
-		if ( ! current_user_can( 'install_plugins' ) ) {
+		self::render_browser_page( 'plugin' );
+	}
+
+	/**
+	 * Render the themes browser page.
+	 */
+	public static function render_theme_page() {
+		self::render_browser_page( 'theme' );
+	}
+
+	/**
+	 * Render a browser page for repository type.
+	 *
+	 * @param string $repo_type Repository type.
+	 */
+	private static function render_browser_page( $repo_type ) {
+		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$required_cap = ( 'theme' === $repo_type ) ? 'install_themes' : 'install_plugins';
+
+		if ( ! current_user_can( $required_cap ) ) {
 			wp_die( esc_html__( 'You do not have sufficient permissions.', 'hub2wp' ) );
 		}
 
 		$access_token = H2WP_Settings::get_access_token();
-		$api = new H2WP_GitHub_API( $access_token );
+		$api          = new H2WP_GitHub_API( $access_token );
+		$labels       = self::get_repo_labels( $repo_type );
+		$topic        = ( 'theme' === $repo_type ) ? 'wordpress-theme' : 'wordpress-plugin';
+		$base_page_url = ( 'theme' === $repo_type )
+			? admin_url( 'themes.php?page=h2wp-theme-browser' )
+			: admin_url( 'plugins.php?page=h2wp-plugin-browser' );
 
 		// Check if we're viewing private repos
-		$is_private_tab = isset( $_GET['tab'] ) && 'private' === $_GET['tab']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$is_private_tab = ( 'plugin' === $repo_type ) && isset( $_GET['tab'] ) && 'private' === $_GET['tab']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-		$query = 'topic:wordpress-plugin';
+		$query      = 'topic:' . $topic . ( 'theme' === $repo_type ? ' -topic:wordpress-plugin' : '' );
 		$user_query = '';
+		$queried_tag = '';
 		if ( ! $is_private_tab && isset( $_GET['s'] ) && ! empty( $_GET['s'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			$user_query = sanitize_text_field( wp_unslash( $_GET['s'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			$query = $user_query . ' topic:wordpress-plugin';
+			$query      = $user_query . ' topic:' . $topic . ( 'theme' === $repo_type ? ' -topic:wordpress-plugin' : '' );
 		}
 
 		if ( ! $is_private_tab && isset( $_GET['tag'] ) && ! empty( $_GET['tag'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -108,23 +262,33 @@ class H2WP_Admin_Page {
 		}
 
 		echo '<div class="wrap">';
-		echo '<h1 class="wp-heading-inline">' . esc_html__( 'Add GitHub Plugins', 'hub2wp' ) . '</h1>';
+		echo '<h1 class="wp-heading-inline">' . esc_html( sprintf( __( 'Add GitHub %s', 'hub2wp' ), $labels['plural'] ) ) . '</h1>';
 
 		// Top bar with tags and search
 		echo '<div class="h2wp-top-bar">';
 		echo '<div class="h2wp-popular-tags">';
-		echo '<a href="' . esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser' ) ) . '" class="h2wp-tag ' . ( ! isset( $_GET['tag'] ) && ! isset( $_GET['s'] ) && ! $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'All', 'hub2wp' ) . '</a>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		
-		$popular_tags = array(
-			'woocommerce'             => __( 'WooCommerce', 'hub2wp' ),
-			'seo'                     => __( 'SEO', 'hub2wp' ),
-			'artificial-intelligence' => __( 'AI', 'hub2wp' ),
-			'security'                => __( 'Security', 'hub2wp' ),
-			'social'                  => __( 'Social', 'hub2wp' ),
-			'forms'                   => __( 'Forms', 'hub2wp' ),
-			'gallery'                 => __( 'Gallery', 'hub2wp' ),
-			'caching'                 => __( 'Caching', 'hub2wp' ),
-		);
+		echo '<a href="' . esc_url( $base_page_url ) . '" class="h2wp-tag ' . ( ! isset( $_GET['tag'] ) && ! isset( $_GET['s'] ) && ! $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'All', 'hub2wp' ) . '</a>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		$popular_tags = ( 'theme' === $repo_type )
+			? array(
+				'block-theme'            => __( 'Block Theme', 'hub2wp' ),
+				'full-site-editing'      => __( 'FSE', 'hub2wp' ),
+				'woocommerce'            => __( 'WooCommerce', 'hub2wp' ),
+				'portfolio'              => __( 'Portfolio', 'hub2wp' ),
+				'blog'                   => __( 'Blog', 'hub2wp' ),
+				'starter-theme'          => __( 'Starter', 'hub2wp' ),
+				'accessibility'          => __( 'Accessibility', 'hub2wp' ),
+			)
+			: array(
+				'woocommerce'             => __( 'WooCommerce', 'hub2wp' ),
+				'seo'                     => __( 'SEO', 'hub2wp' ),
+				'artificial-intelligence' => __( 'AI', 'hub2wp' ),
+				'security'                => __( 'Security', 'hub2wp' ),
+				'social'                  => __( 'Social', 'hub2wp' ),
+				'forms'                   => __( 'Forms', 'hub2wp' ),
+				'gallery'                 => __( 'Gallery', 'hub2wp' ),
+				'caching'                 => __( 'Caching', 'hub2wp' ),
+			);
 
 		foreach ( $popular_tags as $tag => $label ) {
 			echo '<a href="' . esc_url( add_query_arg( 'tag', strtolower( $tag ), remove_query_arg( array( 'paged', 's', 'tab' ) ) ) ) . '" class="h2wp-tag ' . ( ( ! $is_private_tab && isset( $_GET['tag'] ) && strtolower( $tag ) === $_GET['tag'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html( $label ) . '</a>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -135,15 +299,17 @@ class H2WP_Admin_Page {
 		}
 
 		// Private repos tab
-		echo '<a href="' . esc_url( add_query_arg( 'tab', 'private', remove_query_arg( array( 'paged', 's', 'tag' ) ) ) ) . '" class="h2wp-tag h2wp-tag-private ' . ( $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'Private', 'hub2wp' ) . '</a>';
+		if ( 'plugin' === $repo_type ) {
+			echo '<a href="' . esc_url( add_query_arg( 'tab', 'private', remove_query_arg( array( 'paged', 's', 'tag' ) ) ) ) . '" class="h2wp-tag h2wp-tag-private ' . ( $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'Private', 'hub2wp' ) . '</a>';
+		}
 
 		echo '</div>';
 
 		// Search form (only show when not on private tab)
 		if ( ! $is_private_tab ) {
 			echo '<form method="get" class="h2wp-search-form">';
-			echo '<input type="hidden" name="page" value="h2wp-plugin-browser" />';
-			echo '<input type="search" name="s" value="' . esc_attr( $user_query ) . '" placeholder="' . esc_attr__( 'Search plugins...', 'hub2wp' ) . '" />';
+			echo '<input type="hidden" name="page" value="' . esc_attr( 'theme' === $repo_type ? 'h2wp-theme-browser' : 'h2wp-plugin-browser' ) . '" />';
+			echo '<input type="search" name="s" value="' . esc_attr( $user_query ) . '" placeholder="' . esc_attr( $labels['search'] ) . '" />';
 			submit_button( __( 'Search', 'hub2wp' ), 'primary', 'search', false );
 			echo '</form>';
 		}
@@ -151,9 +317,9 @@ class H2WP_Admin_Page {
 
 		// Display results
 		if ( $is_private_tab ) {
-			self::render_private_repos_section( $results );
+			self::render_private_repos_section( $results, $repo_type );
 		} else {
-			self::render_public_repos_section( $results, $page );
+			self::render_public_repos_section( $results, $page, $repo_type );
 		}
 
 		echo '</div>';
@@ -237,9 +403,10 @@ class H2WP_Admin_Page {
 	/**
 	 * Render private repositories section.
 	 *
-	 * @param array $results Private repos data.
+	 * @param array  $results   Private repos data.
+	 * @param string $repo_type Repository type.
 	 */
-	private static function render_private_repos_section( $results ) {
+	private static function render_private_repos_section( $results, $repo_type ) {
 		// Display any errors
 		if ( ! empty( $results['errors'] ) ) {
 			echo '<div class="notice notice-warning is-dismissible">';
@@ -285,27 +452,46 @@ class H2WP_Admin_Page {
 			echo '<p>' . esc_html__( 'These are your private GitHub repositories. They require a personal access token with "repo" scope to access.', 'hub2wp' ) . '</p>';
 			echo '</div>';
 
-			echo '<div class="h2wp-plugins-grid">';
-			foreach ( $results['items'] as $item ) {
-				self::render_plugin_card( $item, true );
+			if ( 'theme' === $repo_type ) {
+				echo '<div class="h2wp-themes-grid">';
+				foreach ( $results['items'] as $item ) {
+					self::render_theme_card( $item, true );
+				}
+				echo '</div>';
+			} else {
+				echo '<div class="h2wp-plugins-grid">';
+				foreach ( $results['items'] as $item ) {
+					self::render_plugin_card( $item, true, $repo_type );
+				}
+				echo '</div>';
 			}
-			echo '</div>';
 		}
 	}
 
 	/**
 	 * Render public repositories section.
 	 *
-	 * @param array $results Search results.
-	 * @param int   $page    Current page number.
+	 * @param array  $results   Search results.
+	 * @param int    $page      Current page number.
+	 * @param string $repo_type Repository type.
 	 */
-	private static function render_public_repos_section( $results, $page ) {
+	private static function render_public_repos_section( $results, $page, $repo_type ) {
+		$labels = self::get_repo_labels( $repo_type );
+
 		if ( ! empty( $results['items'] ) ) {
-			echo '<div class="h2wp-plugins-grid">';
-			foreach ( $results['items'] as $item ) {
-				self::render_plugin_card( $item );
+			if ( 'theme' === $repo_type ) {
+				echo '<div class="h2wp-themes-grid">';
+				foreach ( $results['items'] as $item ) {
+					self::render_theme_card( $item );
+				}
+				echo '</div>';
+			} else {
+				echo '<div class="h2wp-plugins-grid">';
+				foreach ( $results['items'] as $item ) {
+					self::render_plugin_card( $item, false, $repo_type );
+				}
+				echo '</div>';
 			}
-			echo '</div>';
 
 			// Pagination
 			if ( $results['total_count'] > H2WP_RESULTS_PER_PAGE ) {
@@ -327,28 +513,88 @@ class H2WP_Admin_Page {
 				if ( $results['total_count'] > 1000 && $page >= $total_pages ) {
 					$hidden_count = number_format( $results['total_count'] - 1000 );
 					echo '<div class="notice notice-warning inline" style="margin: 16px 0;">';
-					echo '<p>' . wp_kses_post( sprintf(
-						/* translators: 1: number of hidden results */
-						__( '<strong>GitHub Search API limit reached.</strong> Only the first 1,000 results are accessible. There are at least %s more plugins matching your search that cannot be shown. Try refining your search or adding topic filters to narrow down the results.', 'hub2wp' ),
-						'<strong>' . esc_html( $hidden_count ) . '</strong>'
-					) ) . '</p>';
-					echo '</div>';
+						echo '<p>' . wp_kses_post( sprintf(
+							/* translators: 1: number of hidden results */
+							$labels['more_than_1000'],
+							'<strong>' . esc_html( $hidden_count ) . '</strong>'
+						) ) . '</p>';
+						echo '</div>';
+					}
 				}
+			} else {
+				echo '<div class="no-plugin-results">';
+				echo '<p>' . esc_html( $labels['not_found'] ) . '</p>';
+				echo '</div>';
 			}
-		} else {
-			echo '<div class="no-plugin-results">';
-			echo '<p>' . esc_html__( 'No plugins found. Try a different search.', 'hub2wp' ) . '</p>';
-			echo '</div>';
 		}
+
+	/**
+	 * Render a theme card with WordPress theme-browser style markup.
+	 *
+	 * @param array $item       Theme data.
+	 * @param bool  $is_private Whether this is a private repository.
+	 */
+	private static function render_theme_card( $item, $is_private = false ) {
+		$name         = $item['name'];
+		$display_name = ucwords( str_replace( array( '-', 'wp', 'wordpress', 'seo' ), array( ' ', 'WP', 'WordPress', 'SEO' ), $name ) );
+		$description  = isset( $item['description'] ) ? $item['description'] : '';
+		$owner        = isset( $item['owner']['login'] ) ? $item['owner']['login'] : '';
+		$avatar       = isset( $item['owner']['avatar_url'] ) ? $item['owner']['avatar_url'] : '';
+		$stars        = isset( $item['stargazers_count'] ) ? number_format( $item['stargazers_count'] ) : 0;
+		$forks        = isset( $item['forks_count'] ) ? number_format( $item['forks_count'] ) : 0;
+		$updated      = isset( $item['updated_at'] ) ? human_time_diff( strtotime( $item['updated_at'] ) ) . ' ago' : '';
+
+		echo '<div class="h2wp-theme-card">';
+		echo '<div class="h2wp-theme-screenshot">';
+		if ( $avatar ) {
+			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-theme-hero-image h2wp-plugin-thumbnail" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme" style="cursor:pointer;" />';
+			echo '<span class="h2wp-theme-hero-overlay" aria-hidden="true"></span>';
+		} else {
+			echo '<div class="h2wp-plugin-icon-placeholder"></div>';
+		}
+		echo '</div>';
+
+		echo '<div class="h2wp-theme-header">';
+		echo '<h3 class="h2wp-theme-name">' . esc_html( $display_name ) . '</h3>';
+		echo '<span class="h2wp-theme-author-text">' . esc_html__( 'By', 'hub2wp' ) . ' <a href="https://github.com/' . esc_attr( $owner ) . '">' . esc_html( $owner ) . '</a></span>';
+		if ( $avatar ) {
+			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-theme-author-avatar" />';
+		}
+		echo '</div>';
+		echo '<div class="h2wp-theme-description"><p>' . esc_html( wp_trim_words( $description, 20 ) ) . '</p></div>';
+
+		echo '<div class="h2wp-theme-actions">';
+		if ( self::is_repo_installed( $owner, $name, 'theme' ) ) {
+			echo '<a href="#" class="h2wp-button h2wp-button-disabled h2wp-install-plugin" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme" disabled>' . esc_html__( 'Installed', 'hub2wp' ) . '</a>';
+		} else {
+			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-install-plugin" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html__( 'Install Now', 'hub2wp' ) . '</a>';
+			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-activate-plugin h2wp-hidden" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html__( 'Activate', 'hub2wp' ) . '</a>';
+		}
+		echo '<a href="#" class="h2wp-more-details-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html__( 'More Details', 'hub2wp' ) . '</a>';
+		if ( $is_private ) {
+			echo '<span class="h2wp-private-badge">' . esc_html__( 'Private', 'hub2wp' ) . '</span>';
+		}
+		echo '</div>';
+
+		echo '<div class="h2wp-plugin-meta">';
+		echo '<div class="h2wp-meta-stats">';
+		echo '<span class="h2wp-meta-stat"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"></path></svg>' . esc_html( $stars ) . '</span>';
+		echo '<span class="h2wp-meta-stat"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"></path></svg>' . esc_html( $forks ) . '</span>';
+		echo '</div>';
+		echo '<span class="h2wp-meta-stat h2wp-meta-updated" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme"><svg viewBox="0 0 16 16" title="' . esc_attr( $updated ) . '">';
+		echo '<path fill-rule="evenodd" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm8.5-4a.5.5 0 00-1 0v4a.5.5 0 00.146.354l2.5 2.5a.5.5 0 00.708-.708L8.5 7.793V4z"></path></svg><span>' . esc_html( $updated ) . '</span></span>';
+		echo '</div>';
+		echo '</div>';
 	}
 
 	/**
 	 * Render a single plugin card.
 	 *
-	 * @param array $item    Plugin data.
-	 * @param bool  $is_private Whether this is a private repository.
+	 * @param array  $item       Plugin data.
+	 * @param bool   $is_private Whether this is a private repository.
+	 * @param string $repo_type  Repository type.
 	 */
-	private static function render_plugin_card( $item, $is_private = false ) {
+	private static function render_plugin_card( $item, $is_private = false, $repo_type = 'plugin' ) {
 		$name = $item['name'];
 		$display_name = ucwords( str_replace( array( '-', 'wp', 'wordpress', 'seo' ), array( ' ', 'WP', 'WordPress', 'SEO' ), $name ) );
 		$description = isset( $item['description'] ) ? $item['description'] : '';
@@ -363,7 +609,7 @@ class H2WP_Admin_Page {
 		echo '<div class="h2wp-plugin-icon">';
 		if ( $avatar ) {
 			// Add data attributes for AJAX.
-			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-plugin-thumbnail" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" style="cursor:pointer;" />';
+			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-plugin-thumbnail" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '" style="cursor:pointer;" />';
 		} else {
 			echo '<div class="h2wp-plugin-icon-placeholder"></div>';
 		}
@@ -371,7 +617,7 @@ class H2WP_Admin_Page {
 
 		echo '<div class="h2wp-plugin-info">';
 		// Make plugin name clickable for modal.
-		echo '<h3 class="h2wp-plugin-name" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" style="cursor:pointer;">' . esc_html( $display_name ) . '</h3>';
+		echo '<h3 class="h2wp-plugin-name" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '" style="cursor:pointer;">' . esc_html( $display_name ) . '</h3>';
 		echo '<div class="h2wp-plugin-author">By <a href="https://github.com/' . esc_attr( $owner ) . '">' . esc_html( $owner ) . '</a></div>';
 		
 		// Add private badge if applicable
@@ -385,15 +631,15 @@ class H2WP_Admin_Page {
 		echo '<div class="h2wp-plugin-description">' . esc_html( wp_trim_words( $description, 20 ) ) . '</div>';
 
 		echo '<div class="h2wp-plugin-actions">';
-		if ( self::is_plugin_installed( $owner, $name ) ) {
-			echo '<a href="#" class="h2wp-button h2wp-button-disabled h2wp-install-plugin" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" disabled>' . esc_html__( 'Installed', 'hub2wp' ) . '</a>';
+		if ( self::is_repo_installed( $owner, $name, $repo_type ) ) {
+			echo '<a href="#" class="h2wp-button h2wp-button-disabled h2wp-install-plugin" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '" disabled>' . esc_html__( 'Installed', 'hub2wp' ) . '</a>';
 		} else {
-			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-install-plugin" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '">' . esc_html__( 'Install Now', 'hub2wp' ) . '</a>';
-			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-activate-plugin h2wp-hidden" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '">' . esc_html__( 'Activate', 'hub2wp' ) . '</a>';
+			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-install-plugin" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '">' . esc_html__( 'Install Now', 'hub2wp' ) . '</a>';
+			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-activate-plugin h2wp-hidden" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '">' . esc_html__( 'Activate', 'hub2wp' ) . '</a>';
 		}
 
 		// Add data attributes for "More Details" link.
-		echo '<a href="javascript:void(0);" class="h2wp-more-details-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '">' . esc_html__( 'More Details', 'hub2wp' ) . '</a>';
+		echo '<a href="javascript:void(0);" class="h2wp-more-details-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '">' . esc_html__( 'More Details', 'hub2wp' ) . '</a>';
 		echo '</div>';
 
 		echo '<div class="h2wp-plugin-meta">';
@@ -401,7 +647,7 @@ class H2WP_Admin_Page {
 		echo '<span class="h2wp-meta-stat"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"></path></svg>' . esc_html( $stars ) . '</span>';
 		echo '<span class="h2wp-meta-stat"><svg viewBox="0 0 16 16"><path fill-rule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z"></path></svg>' . esc_html( $forks ) . '</span>';
 		echo '</div>';
-		echo '<span class="h2wp-meta-stat h2wp-meta-updated" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '"><svg viewBox="0 0 16 16" title="' . esc_attr( $updated ) . '">';
+		echo '<span class="h2wp-meta-stat h2wp-meta-updated" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '"><svg viewBox="0 0 16 16" title="' . esc_attr( $updated ) . '">';
 		echo '<path fill-rule="evenodd" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm8.5-4a.5.5 0 00-1 0v4a.5.5 0 00.146.354l2.5 2.5a.5.5 0 00.708-.708L8.5 7.793V4z"></path></svg><span>' . esc_html( $updated ) . '</span></span>';
 		echo '</div>';
 		echo '</div>';
@@ -490,7 +736,7 @@ class H2WP_Admin_Page {
 							</div>
 
 							<p class="h2wp-modal-links">
-								<a href="#" target="_blank" class="h2wp-modal-github-link">' . esc_html__( 'View plugin on GitHub', 'hub2wp' ) . '</a>
+								<a href="#" target="_blank" class="h2wp-modal-github-link">' . esc_html__( 'View on GitHub', 'hub2wp' ) . '</a>
 							</p>
 						</div>
 						<div class="h2wp-modal-changelog-content h2wp-hidden"></div>
@@ -513,8 +759,8 @@ class H2WP_Admin_Page {
 							</div>
 
 							<div class="h2wp-modal-links">
-								<p><a href="#" target="_blank" class="h2wp-modal-github-link">' . esc_html__( 'GitHub Plugin Page &raquo;', 'hub2wp' ) . '</a></p>
-								<p><a href="#" target="_blank" class="h2wp-modal-homepage-link">' . esc_html__( 'Plugin Homepage &raquo;', 'hub2wp' ) . '</a></p>
+									<p><a href="#" target="_blank" class="h2wp-modal-github-link">' . esc_html__( 'GitHub Repository &raquo;', 'hub2wp' ) . '</a></p>
+									<p><a href="#" target="_blank" class="h2wp-modal-homepage-link">' . esc_html__( 'Homepage &raquo;', 'hub2wp' ) . '</a></p>
 							</div>
 
 							<h3>' . esc_html__( 'Stars', 'hub2wp' ) . '</h3>
@@ -528,8 +774,8 @@ class H2WP_Admin_Page {
 					</div>
 				</div>
 				<div class="h2wp-modal-footer">
-					<a href="#" class="h2wp-button h2wp-button-secondary h2wp-install-plugin h2wp-modal-install-button" data-owner="" data-repo="">' . esc_html__( 'Install Now', 'hub2wp' ) . '</a>
-					<a href="#" class="h2wp-button h2wp-button-secondary h2wp-activate-plugin h2wp-modal-activate-button h2wp-hidden" data-owner="" data-repo="">' . esc_html__( 'Activate', 'hub2wp' ) . '</a>
+					<a href="#" class="h2wp-button h2wp-button-secondary h2wp-install-plugin h2wp-modal-install-button" data-owner="" data-repo="" data-type="plugin">' . esc_html__( 'Install Now', 'hub2wp' ) . '</a>
+					<a href="#" class="h2wp-button h2wp-button-secondary h2wp-activate-plugin h2wp-modal-activate-button h2wp-hidden" data-owner="" data-repo="" data-type="plugin">' . esc_html__( 'Activate', 'hub2wp' ) . '</a>
 				</div>
 			</div>
 			<div class="h2wp-modal-spinner"><img src="' . esc_url( admin_url( 'images/spinner.gif' ) ) . '" alt="" /></div>
@@ -540,17 +786,20 @@ class H2WP_Admin_Page {
 	 * Enqueue admin assets.
 	 */
 	public static function enqueue_assets( $hook ) {
-		if ( 'plugins_page_h2wp-plugin-browser' === $hook ) {
+		if ( 'plugins_page_h2wp-plugin-browser' === $hook || 'appearance_page_h2wp-theme-browser' === $hook ) {
+			$repo_type = ( 'appearance_page_h2wp-theme-browser' === $hook ) ? 'theme' : 'plugin';
+
 			wp_enqueue_style( 'h2wp-admin-styles', H2WP_PLUGIN_URL . 'assets/css/admin-styles.css', array(), H2WP_VERSION );
 			wp_enqueue_script( 'h2wp-admin-scripts', H2WP_PLUGIN_URL . 'assets/js/admin-scripts.js', array( 'jquery' ), H2WP_VERSION, true );
 
 			// Localize script with AJAX URL and nonce.
 			wp_localize_script( 'h2wp-admin-scripts', 'h2wp_ajax_object', array(
-				'ajax_url' => admin_url( 'admin-ajax.php' ),
-				'nonce'    => wp_create_nonce( 'h2wp_plugin_details_nonce' ),
+				'ajax_url'  => admin_url( 'admin-ajax.php' ),
+				'nonce'     => wp_create_nonce( 'h2wp_plugin_details_nonce' ),
+				'repo_type' => $repo_type,
 			) );
+			}
 		}
-	}
 
 	/**
 	 * Display a notice if the rate limit is low.

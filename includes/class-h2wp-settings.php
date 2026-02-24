@@ -142,6 +142,10 @@ class H2WP_Settings {
 
 			<hr />
 
+			<?php self::render_monitored_themes_section(); ?>
+
+			<hr />
+
 			<?php self::next_run_schedule(); ?>
 		</div>
 		<?php
@@ -301,6 +305,146 @@ class H2WP_Settings {
 	}
 
 	/**
+	 * Render the monitored themes section.
+	 */
+	public static function render_monitored_themes_section() {
+		$monitored_themes = get_option( 'h2wp_themes', array() );
+		$count            = count( $monitored_themes );
+		$expanded         = ! empty( get_settings_errors( 'h2wp_theme_repos' ) );
+		?>
+		<p style="margin:0;">
+			<strong><?php esc_html_e( 'Monitored Themes', 'hub2wp' ); ?></strong>
+			<?php if ( $count > 0 ) : ?>
+				<span style="color:#646970;">(<?php echo esc_html( $count ); ?>)</span>
+			<?php endif; ?>
+			&mdash;
+			<a href="#" id="h2wp-toggle-monitored-themes" aria-expanded="<?php echo $expanded ? 'true' : 'false'; ?>" aria-controls="h2wp-monitored-themes-content" style="text-decoration: none;">
+				<span class="dashicons <?php echo $expanded ? 'dashicons-arrow-up-alt2' : 'dashicons-arrow-down-alt2'; ?>" style="vertical-align:middle;font-size:16px;width:16px;height:16px;"></span>
+				<span id="h2wp-toggle-monitored-themes-label"><?php echo $expanded ? esc_html__( 'Hide', 'hub2wp' ) : esc_html__( 'Show', 'hub2wp' ); ?></span>
+			</a>
+		</p>
+
+		<div id="h2wp-monitored-themes-content" style="display:<?php echo $expanded ? '' : 'none'; ?>;">
+			<p class="description" style="margin-top:1em;">
+				<?php esc_html_e( 'Add GitHub repositories for themes. They will be stored for theme monitoring workflows.', 'hub2wp' ); ?>
+			</p>
+
+			<form method="post" action="">
+				<?php wp_nonce_field( 'h2wp_add_private_theme_repo', 'h2wp_private_theme_repo_nonce' ); ?>
+				<input type="hidden" name="h2wp_action" value="add_private_theme_repo" />
+
+				<table class="form-table">
+					<tr>
+						<th scope="row">
+							<label for="h2wp_private_theme_repo_input">
+								<?php esc_html_e( 'Add Theme Repository', 'hub2wp' ); ?>
+							</label>
+						</th>
+						<td>
+							<input
+								type="text"
+								id="h2wp_private_theme_repo_input"
+								name="h2wp_private_theme_repo"
+								value=""
+								placeholder="owner/repo"
+								size="50"
+							/>
+							<button type="submit" class="button button-secondary">
+								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
+							</button>
+							<p class="description">
+								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-theme)', 'hub2wp' ); ?>
+							</p>
+						</td>
+					</tr>
+				</table>
+			</form>
+
+			<?php if ( ! empty( $monitored_themes ) ) : ?>
+				<h3><?php esc_html_e( 'Monitored Themes', 'hub2wp' ); ?></h3>
+				<table class="wp-list-table widefat fixed striped">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
+							<th style="width:100px;max-width:100px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
+							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $monitored_themes as $repo_key => $repo_data ) : ?>
+							<tr>
+								<td>
+									<strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
+									<br />
+									<small>
+										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
+											<?php echo esc_html( $repo_key ); ?>
+										</a>
+										<?php if ( ! empty( $repo_data['stylesheet'] ) ) : ?>
+											&rarr; <code><?php echo esc_html( $repo_data['stylesheet'] ); ?></code>
+										<?php endif; ?>
+									</small>
+								</td>
+								<td>
+									<?php
+									if ( ! empty( $repo_data['stylesheet'] ) ) {
+										esc_html_e( 'Installed', 'hub2wp' );
+									} else {
+										esc_html_e( 'Not Installed', 'hub2wp' );
+									}
+									if ( ! empty( $repo_data['private'] ) ) {
+										echo ' <span class="dashicons dashicons-lock" title="' . esc_attr__( 'Private Repository', 'hub2wp' ) . '"></span>';
+									}
+									?>
+								</td>
+								<td>
+									<form method="post" action="" style="display: inline;">
+										<?php wp_nonce_field( 'h2wp_remove_private_theme_repo', 'h2wp_remove_theme_repo_nonce' ); ?>
+										<input type="hidden" name="h2wp_action" value="remove_private_theme_repo" />
+										<input type="hidden" name="h2wp_repo_key" value="<?php echo esc_attr( $repo_key ); ?>" />
+										<button type="submit" class="button button-small button-link-delete" onclick="return confirm('<?php echo esc_js( sprintf( __( 'Stop monitoring "%s"?', 'hub2wp' ), $repo_key ) ); ?>');">
+											<?php esc_html_e( 'Remove', 'hub2wp' ); ?>
+										</button>
+									</form>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php else : ?>
+				<p class="description">
+					<?php esc_html_e( 'No theme repositories added yet.', 'hub2wp' ); ?>
+				</p>
+			<?php endif; ?>
+		</div>
+		<script>
+		( function() {
+			var btn     = document.getElementById( 'h2wp-toggle-monitored-themes' );
+			var content = document.getElementById( 'h2wp-monitored-themes-content' );
+			var label   = document.getElementById( 'h2wp-toggle-monitored-themes-label' );
+			var icon    = btn ? btn.querySelector( '.dashicons' ) : null;
+			if ( ! btn || ! content ) { return; }
+			btn.addEventListener( 'click', function( e ) {
+				e.preventDefault();
+				var isExpanded = this.getAttribute( 'aria-expanded' ) === 'true';
+				if ( isExpanded ) {
+					content.style.display = 'none';
+					this.setAttribute( 'aria-expanded', 'false' );
+					if ( icon )  { icon.classList.replace( 'dashicons-arrow-up-alt2',   'dashicons-arrow-down-alt2' ); }
+					if ( label ) { label.textContent = <?php echo wp_json_encode( __( 'Show', 'hub2wp' ) ); ?>; }
+				} else {
+					content.style.display = '';
+					this.setAttribute( 'aria-expanded', 'true' );
+					if ( icon )  { icon.classList.replace( 'dashicons-arrow-down-alt2', 'dashicons-arrow-up-alt2' ); }
+					if ( label ) { label.textContent = <?php echo wp_json_encode( __( 'Hide', 'hub2wp' ) ); ?>; }
+				}
+			} );
+		} )();
+		</script>
+		<?php
+	}
+
+	/**
 	 * Handle private repository actions (add/remove).
 	 */
 	public static function handle_private_repo_actions() {
@@ -309,8 +453,12 @@ class H2WP_Settings {
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo_nonce'] ) ), 'h2wp_add_private_repo' );
 		$remove_nonce_valid = isset( $_POST['h2wp_remove_repo_nonce'] )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_remove_repo_nonce'] ) ), 'h2wp_remove_private_repo' );
+		$add_theme_nonce_valid = isset( $_POST['h2wp_private_theme_repo_nonce'] )
+			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo_nonce'] ) ), 'h2wp_add_private_theme_repo' );
+		$remove_theme_nonce_valid = isset( $_POST['h2wp_remove_theme_repo_nonce'] )
+			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_remove_theme_repo_nonce'] ) ), 'h2wp_remove_private_theme_repo' );
 
-		if ( ! $add_nonce_valid && ! $remove_nonce_valid ) {
+		if ( ! $add_nonce_valid && ! $remove_nonce_valid && ! $add_theme_nonce_valid && ! $remove_theme_nonce_valid ) {
 			return;
 		}
 
@@ -324,6 +472,10 @@ class H2WP_Settings {
 			self::handle_add_private_repo();
 		} elseif ( 'remove_private_repo' === $action ) {
 			self::handle_remove_private_repo();
+		} elseif ( 'add_private_theme_repo' === $action ) {
+			self::handle_add_private_theme_repo();
+		} elseif ( 'remove_private_theme_repo' === $action ) {
+			self::handle_remove_private_theme_repo();
 		}
 	}
 
@@ -515,6 +667,104 @@ class H2WP_Settings {
 			sprintf( __( 'Repository "%s" has been removed.', 'hub2wp' ), $repo_key ),
 			'success'
 		);
+	}
+
+	/**
+	 * Handle adding a theme repository.
+	 */
+	private static function handle_add_private_theme_repo() {
+		if ( ! isset( $_POST['h2wp_private_theme_repo_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo_nonce'] ) ), 'h2wp_add_private_theme_repo' ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_nonce_error', __( 'Security check failed. Please try again.', 'hub2wp' ), 'error' );
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_permission_error', __( 'You do not have permission to add theme repositories.', 'hub2wp' ), 'error' );
+			return;
+		}
+		if ( ! isset( $_POST['h2wp_private_theme_repo'] ) || empty( $_POST['h2wp_private_theme_repo'] ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_empty_repo', __( 'Please enter a repository in the format owner/repo.', 'hub2wp' ), 'error' );
+			return;
+		}
+
+		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo'] ) );
+		if ( ! self::validate_repo_format( $repo_input ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_invalid_format', __( 'Invalid repository format. Please use "owner/repo" format.', 'hub2wp' ), 'error' );
+			return;
+		}
+
+		$repo_key          = strtolower( $repo_input );
+		$monitored_themes  = get_option( 'h2wp_themes', array() );
+		if ( isset( $monitored_themes[ $repo_key ] ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_repo_exists', sprintf( __( 'Repository "%s" is already in your monitored themes list.', 'hub2wp' ), $repo_key ), 'warning' );
+			return;
+		}
+
+		$repo_data = self::verify_repo( $repo_key, self::get_access_token() );
+		if ( is_wp_error( $repo_data ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_verification_failed', $repo_data->get_error_message(), 'error' );
+			return;
+		}
+
+		list( $owner, $repo ) = explode( '/', $repo_key, 2 );
+		$stylesheet = false;
+		if ( class_exists( 'H2WP_Admin_Page' ) ) {
+			$stylesheet = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );
+		}
+
+		$monitored_themes[ $repo_key ] = array(
+			'owner'        => $owner,
+			'repo'         => $repo,
+			'name'         => isset( $repo_data['name'] ) ? $repo_data['name'] : $repo,
+			'private'      => isset( $repo_data['private'] ) ? $repo_data['private'] : false,
+			'added'        => time(),
+			'added_by'     => get_current_user_id(),
+			'last_checked' => time(),
+			'last_updated' => time(),
+		);
+
+		if ( $stylesheet ) {
+			$monitored_themes[ $repo_key ]['stylesheet'] = $stylesheet;
+		}
+
+		if ( ! update_option( 'h2wp_themes', $monitored_themes ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_add_failed', __( 'Failed to save theme repository. Please try again.', 'hub2wp' ), 'error' );
+			return;
+		}
+
+		add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_repo_added', sprintf( __( 'Theme repository "%s" has been added successfully.', 'hub2wp' ), $repo_key ), 'success' );
+	}
+
+	/**
+	 * Handle removing a theme repository.
+	 */
+	private static function handle_remove_private_theme_repo() {
+		if ( ! isset( $_POST['h2wp_remove_theme_repo_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_remove_theme_repo_nonce'] ) ), 'h2wp_remove_private_theme_repo' ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_nonce_error', __( 'Security check failed. Please try again.', 'hub2wp' ), 'error' );
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_permission_error', __( 'You do not have permission to remove theme repositories.', 'hub2wp' ), 'error' );
+			return;
+		}
+		if ( ! isset( $_POST['h2wp_repo_key'] ) || empty( $_POST['h2wp_repo_key'] ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_missing_repo', __( 'No repository specified for removal.', 'hub2wp' ), 'error' );
+			return;
+		}
+
+		$repo_key         = sanitize_text_field( wp_unslash( $_POST['h2wp_repo_key'] ) );
+		$monitored_themes = get_option( 'h2wp_themes', array() );
+		if ( ! isset( $monitored_themes[ $repo_key ] ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_remove_missing', sprintf( __( 'Theme repository "%s" not found.', 'hub2wp' ), $repo_key ), 'error' );
+			return;
+		}
+
+		unset( $monitored_themes[ $repo_key ] );
+		if ( ! update_option( 'h2wp_themes', $monitored_themes ) ) {
+			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_remove_failed', __( 'Failed to remove theme repository. Please try again.', 'hub2wp' ), 'error' );
+			return;
+		}
+
+		add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_repo_removed', sprintf( __( 'Theme repository "%s" has been removed.', 'hub2wp' ), $repo_key ), 'success' );
 	}
 
 	/**

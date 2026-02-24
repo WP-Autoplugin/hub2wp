@@ -255,6 +255,132 @@
     display: none;
 }
 
+/* Theme cards (custom, independent from wp-admin themes.css) */
+.h2wp-themes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.h2wp-theme-card {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+.h2wp-theme-card .h2wp-theme-screenshot {
+    position: relative;
+    overflow: hidden;
+    height: 40px;
+    background: #1d2327;
+}
+
+.h2wp-theme-card .h2wp-theme-hero-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    filter: blur(16px) saturate(120%);
+    transform: scale(1.3);
+    background-color: #fff;
+}
+
+.h2wp-theme-card .h2wp-theme-hero-overlay {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.22), transparent 48%),
+        linear-gradient(160deg, rgba(16, 17, 20, 0.28), rgba(16, 17, 20, 0.54));
+    pointer-events: none;
+}
+
+.h2wp-theme-card .h2wp-theme-header {
+    padding: 12px;
+    background: #fff;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.h2wp-theme-card .h2wp-theme-name {
+    margin: 0;
+    background: #fff;
+    font-size: 20px;
+    line-height: 1.2;
+    font-weight: 600;
+}
+
+.h2wp-theme-card .h2wp-theme-description {
+    padding: 0 12px 12px;
+    margin: 0;
+    background: #fff;
+    box-sizing: border-box;
+    min-height: 52px;
+    color: #50575e;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.h2wp-theme-card .h2wp-theme-description p {
+    margin: 0;
+}
+
+.h2wp-theme-card .h2wp-theme-actions {
+    position: static;
+    padding: 0 12px 12px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.h2wp-theme-card .h2wp-theme-actions .h2wp-button {
+    margin: 0;
+}
+
+.h2wp-theme-card .h2wp-theme-actions .h2wp-private-badge {
+    margin-left: auto;
+}
+
+.h2wp-theme-card .h2wp-theme-author-text {
+    display: inline;
+    margin: 0 0 0 auto;
+    color: #646970;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    place-self: flex-start;
+}
+
+.h2wp-theme-card .h2wp-theme-author-text a {
+    color: #2271b1;
+}
+
+.h2wp-theme-card .h2wp-theme-author-avatar {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1px solid #dcdcde;
+    flex: 0 0 18px;
+}
+
+.h2wp-theme-card .h2wp-plugin-icon-placeholder {
+    width: 100%;
+    height: 100%;
+}
+
+.h2wp-theme-card .h2wp-plugin-meta {
+    margin: auto 0 0;
+    padding: 10px 12px;
+}
+
+.h2wp-theme-card .h2wp-hidden,
+.h2wp-theme-card .h2wp-activate-plugin.h2wp-hidden {
+    display: none !important;
+}
+
 /* Modal Styles */
 .h2wp-modal {
     display: none;

@@ -742,6 +742,30 @@ class H2WP_GitHub_API {
 	}
 
 	/**
+	 * Get parsed headers from a theme style.css file.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return array|WP_Error Parsed headers or error.
+	 */
+	public function get_theme_headers( $owner, $repo ) {
+		$cache_key = 'theme_headers_' . $owner . '_' . $repo;
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$style_content = $this->fetch_theme_style_content( $owner, $repo );
+		if ( is_wp_error( $style_content ) ) {
+			return $style_content;
+		}
+
+		$headers = $this->extract_headers_from_style( $style_content );
+		H2WP_Cache::set( $cache_key, $headers );
+		return $headers;
+	}
+
+	/**
 	 * Make a request to the GitHub API.
 	 *
 	 * @param string $url  Request URL.

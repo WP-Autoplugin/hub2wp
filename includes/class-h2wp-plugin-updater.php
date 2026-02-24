@@ -29,6 +29,7 @@ class H2WP_Plugin_Updater {
 
 		// Filter the update_plugins transient
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject_plugin_updates' ) );
+		add_filter( 'pre_set_site_transient_update_themes', array( __CLASS__, 'inject_theme_updates' ) );
 
 		// Filter plugin information
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 99, 3 );
@@ -42,12 +43,27 @@ class H2WP_Plugin_Updater {
 	}
 
 	/**
-	 * Check for updates for all installed GitHub plugins.
+	 * Debug logger, enabled only when WP_DEBUG is true.
+	 *
+	 * @param string $message Log message.
+	 * @return void
+	 */
+	private static function log_debug( $message ) {
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( '[hub2wp] ' . $message );
+		}
+	}
+
+	/**
+	 * Check for updates for all monitored GitHub plugins and themes.
 	 */
 	public static function check_for_updates() {
 		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$h2wp_themes  = get_option( 'h2wp_themes', array() );
 		$api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
-		$updated = false;
+		$plugins_updated = false;
+		$themes_updated  = false;
+		$now             = time();
 
 		foreach ( $h2wp_plugins as $plugin_id => &$plugin ) {
 			list( $owner, $repo ) = explode( '/', $plugin_id );
@@ -55,6 +71,9 @@ class H2WP_Plugin_Updater {
 			// Get readme headers
 			$headers = $api->get_readme_headers( $owner, $repo );
 			if ( is_wp_error( $headers ) || empty( $headers['stable tag'] ) ) {
+				if ( is_wp_error( $headers ) ) {
+					self::log_debug( sprintf( 'Plugin update check failed for %s: %s', $plugin_id, $headers->get_error_message() ) );
+				}
 				continue;
 			}
 
@@ -63,14 +82,68 @@ class H2WP_Plugin_Updater {
 			$plugin['requires']     = isset( $headers['requires at least'] ) ? $headers['requires at least'] : '';
 			$plugin['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$plugin['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
-			$plugin['last_checked'] = time();
+			$plugin['last_checked'] = $now;
 			$plugin['download_url'] = $api->get_download_url( $owner, $repo );
 
-			$updated = true;
+			$plugins_updated = true;
+		}
+		unset( $plugin );
+
+		if ( $plugins_updated ) {
+			update_option( 'h2wp_plugins', $h2wp_plugins );
 		}
 
-		if ( $updated ) {
-			update_option( 'h2wp_plugins', $h2wp_plugins );
+		foreach ( $h2wp_themes as $theme_id => &$theme ) {
+			list( $owner, $repo ) = explode( '/', $theme_id );
+
+			$headers = $api->get_theme_headers( $owner, $repo );
+			if ( is_wp_error( $headers ) || empty( $headers['version'] ) ) {
+				if ( is_wp_error( $headers ) ) {
+					self::log_debug( sprintf( 'Theme update check failed for %s: %s', $theme_id, $headers->get_error_message() ) );
+				}
+				continue;
+			}
+
+			$theme['version']      = $headers['version'];
+			$theme['requires']     = isset( $headers['requires at least'] ) ? $headers['requires at least'] : '';
+			$theme['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
+			$theme['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
+			$theme['last_checked'] = $now;
+			$theme['download_url'] = $api->get_download_url( $owner, $repo );
+
+			if ( empty( $theme['stylesheet'] ) ) {
+				$theme['stylesheet'] = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );
+			}
+
+			$themes_updated = true;
+		}
+		unset( $theme );
+
+		if ( $themes_updated ) {
+			update_option( 'h2wp_themes', $h2wp_themes );
+		}
+
+		self::log_debug(
+			sprintf(
+				'Update check completed. plugins=%d, themes=%d, plugins_updated=%s, themes_updated=%s',
+				count( $h2wp_plugins ),
+				count( $h2wp_themes ),
+				$plugins_updated ? 'yes' : 'no',
+				$themes_updated ? 'yes' : 'no'
+			)
+		);
+	}
+
+	/**
+	 * Refresh stored version data from GitHub if stale.
+	 *
+	 * @return void
+	 */
+	private static function ensure_update_data_fresh() {
+		if ( false === get_transient( 'h2wp_last_update_check' ) && ! self::$update_check_done ) {
+			self::$update_check_done = true;
+			set_transient( 'h2wp_last_update_check', 1, H2WP_Settings::get_cache_duration() );
+			self::check_for_updates();
 		}
 	}
 
@@ -90,11 +163,7 @@ class H2WP_Plugin_Updater {
 		// the API is not hit on every single filter invocation, while still
 		// being much more responsive than the once-daily cron (which may never
 		// run in some environments).
-		if ( false === get_transient( 'h2wp_last_update_check' ) && ! self::$update_check_done ) {
-			self::$update_check_done = true;
-			set_transient( 'h2wp_last_update_check', 1, H2WP_Settings::get_cache_duration() );
-			self::check_for_updates();
-		}
+		self::ensure_update_data_fresh();
 
 		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
 
@@ -126,6 +195,55 @@ class H2WP_Plugin_Updater {
 				);
 
 				$transient->response[ $plugin['plugin_file'] ] = $item;
+				self::log_debug( sprintf( 'Plugin update available: %s %s -> %s', $plugin['plugin_file'], $installed_version, $plugin['version'] ) );
+			}
+		}
+
+		return $transient;
+	}
+
+	/**
+	 * Inject update information into the update_themes transient.
+	 *
+	 * @param object $transient Update themes transient.
+	 * @return object Modified transient.
+	 */
+	public static function inject_theme_updates( $transient ) {
+		if ( empty( $transient ) || ! is_object( $transient ) ) {
+			return $transient;
+		}
+
+		self::ensure_update_data_fresh();
+
+		$h2wp_themes = get_option( 'h2wp_themes', array() );
+		$themes      = wp_get_themes();
+
+		foreach ( $h2wp_themes as $theme_id => $theme ) {
+			if ( empty( $theme['version'] ) ) {
+				continue;
+			}
+
+			$stylesheet = isset( $theme['stylesheet'] ) ? $theme['stylesheet'] : '';
+			if ( empty( $stylesheet ) || ! isset( $themes[ $stylesheet ] ) ) {
+				list( $owner, $repo ) = explode( '/', $theme_id );
+				$stylesheet = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );
+			}
+
+			if ( empty( $stylesheet ) || ! isset( $themes[ $stylesheet ] ) ) {
+				continue;
+			}
+
+			$installed_version = $themes[ $stylesheet ]->get( 'Version' );
+			if ( version_compare( $installed_version, $theme['version'], '<' ) ) {
+				$transient->response[ $stylesheet ] = array(
+					'theme'       => $stylesheet,
+					'new_version' => $theme['version'],
+					'url'         => "https://github.com/{$theme_id}",
+					'package'     => isset( $theme['download_url'] ) ? $theme['download_url'] : '',
+					'requires'    => isset( $theme['requires'] ) ? $theme['requires'] : '',
+					'requires_php' => isset( $theme['requires_php'] ) ? $theme['requires_php'] : '',
+				);
+				self::log_debug( sprintf( 'Theme update available: %s %s -> %s', $stylesheet, $installed_version, $theme['version'] ) );
 			}
 		}
 
@@ -445,29 +563,43 @@ class H2WP_Plugin_Updater {
 	public static function fix_source_folder( $source, $remote_source, $upgrader, $hook_extra = array() ) {
 		global $wp_filesystem;
 
-		// We only care about plugin upgrades that identify the plugin being updated.
-		if ( empty( $hook_extra['plugin'] ) ) {
+		if ( empty( $hook_extra['plugin'] ) && empty( $hook_extra['theme'] ) ) {
 			return $source;
 		}
 
-		$plugin_file = $hook_extra['plugin'];
+		$is_plugin      = ! empty( $hook_extra['plugin'] );
+		$correct_folder = '';
 
-		// Check if this is one of our tracked plugins.
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-		$found        = false;
-		foreach ( $h2wp_plugins as $plugin ) {
-			if ( isset( $plugin['plugin_file'] ) && $plugin['plugin_file'] === $plugin_file ) {
-				$found = true;
-				break;
+		if ( $is_plugin ) {
+			$plugin_file = $hook_extra['plugin'];
+			$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+			$found        = false;
+			foreach ( $h2wp_plugins as $plugin ) {
+				if ( isset( $plugin['plugin_file'] ) && $plugin['plugin_file'] === $plugin_file ) {
+					$found = true;
+					break;
+				}
 			}
+			if ( ! $found ) {
+				return $source;
+			}
+			$correct_folder = dirname( $plugin_file );
+		} else {
+			$stylesheet  = $hook_extra['theme'];
+			$h2wp_themes = get_option( 'h2wp_themes', array() );
+			$found       = false;
+			foreach ( $h2wp_themes as $theme ) {
+				if ( isset( $theme['stylesheet'] ) && $theme['stylesheet'] === $stylesheet ) {
+					$found = true;
+					break;
+				}
+			}
+			if ( ! $found ) {
+				return $source;
+			}
+			$correct_folder = $stylesheet;
 		}
 
-		if ( ! $found ) {
-			return $source;
-		}
-
-		// The correct folder name is whatever the plugin is currently installed under.
-		$correct_folder = dirname( $plugin_file );
 		$new_source     = trailingslashit( $remote_source ) . $correct_folder;
 
 		// Nothing to do if it already has the right name.
@@ -480,7 +612,7 @@ class H2WP_Plugin_Updater {
 				'h2wp_rename_error',
 				sprintf(
 					/* translators: 1: extracted folder, 2: expected folder */
-					__( 'Could not rename plugin folder from "%1$s" to "%2$s".', 'hub2wp' ),
+					__( 'Could not rename extracted folder from "%1$s" to "%2$s".', 'hub2wp' ),
 					basename( $source ),
 					$correct_folder
 				)
@@ -524,6 +656,7 @@ class H2WP_Plugin_Updater {
 
 		// Only intercept packages that belong to one of our tracked private repos.
 		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$h2wp_themes  = get_option( 'h2wp_themes', array() );
 		$is_private   = false;
 		foreach ( $h2wp_plugins as $plugin ) {
 			if (
@@ -533,6 +666,18 @@ class H2WP_Plugin_Updater {
 			) {
 				$is_private = true;
 				break;
+			}
+		}
+		if ( ! $is_private ) {
+			foreach ( $h2wp_themes as $theme ) {
+				if (
+					isset( $theme['download_url'] ) &&
+					$theme['download_url'] === $package &&
+					! empty( $theme['private'] )
+				) {
+					$is_private = true;
+					break;
+				}
 			}
 		}
 

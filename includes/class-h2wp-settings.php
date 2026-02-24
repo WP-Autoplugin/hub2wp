@@ -20,6 +20,7 @@ class H2WP_Settings {
 		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 		add_action( 'admin_menu', array( __CLASS__, 'add_settings_page' ) );
 		add_action( 'admin_init', array( __CLASS__, 'handle_private_repo_actions' ) );
+		add_action( 'admin_init', array( __CLASS__, 'handle_run_update_check_action' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'display_private_repo_notices' ) );
 		add_action( 'admin_post_h2wp_clear_cache', array( __CLASS__, 'handle_clear_cache' ) );
 		add_action( 'wp_ajax_h2wp_clear_cache', array( __CLASS__, 'ajax_clear_cache' ) );
@@ -480,6 +481,38 @@ class H2WP_Settings {
 	}
 
 	/**
+	 * Handle the "Run now" update check action from the settings page.
+	 */
+	public static function handle_run_update_check_action() {
+		if ( ! isset( $_GET['action'] ) || 'h2wp_run_update_check' !== sanitize_key( wp_unslash( $_GET['action'] ) ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to do this.', 'hub2wp' ) );
+		}
+
+		check_admin_referer( 'h2wp_run_update_check' );
+
+		delete_transient( 'h2wp_last_update_check' );
+		H2WP_Plugin_Updater::check_for_updates();
+		wp_update_plugins();
+		wp_update_themes();
+
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page'                  => 'h2wp_settings_page',
+					'h2wp_update_checked'   => '1',
+					'h2wp_update_check_nonce' => wp_create_nonce( 'h2wp_update_checked' ),
+				),
+				admin_url( 'options-general.php' )
+			)
+		);
+		exit;
+	}
+
+	/**
 	 * Handle adding a repository.
 	 */
 	private static function handle_add_private_repo() {
@@ -826,6 +859,12 @@ class H2WP_Settings {
 			&& '1' === $_GET['h2wp_cleared']
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['h2wp_cleared_nonce'] ) ), 'h2wp_cleared' ) ) {
 			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Cache cleared successfully.', 'hub2wp' ) . '</p></div>';
+		}
+
+		if ( isset( $_GET['h2wp_update_checked'], $_GET['h2wp_update_check_nonce'] )
+			&& '1' === $_GET['h2wp_update_checked']
+			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['h2wp_update_check_nonce'] ) ), 'h2wp_update_checked' ) ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Update check completed for monitored plugins and themes.', 'hub2wp' ) . '</p></div>';
 		}
 
 		// Note: settings_errors() is not called here because WordPress automatically

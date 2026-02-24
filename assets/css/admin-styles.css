@@ -342,7 +342,7 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    place-self: flex-start;
+    place-self: center;
 }
 
 .h2wp-theme-card .h2wp-theme-author-text a {
@@ -355,6 +355,7 @@
     border-radius: 50%;
     border: 1px solid #dcdcde;
     flex: 0 0 18px;
+    place-self: center;
 }
 
 .h2wp-theme-card .h2wp-plugin-icon-placeholder {

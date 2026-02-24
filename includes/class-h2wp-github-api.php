@@ -46,10 +46,16 @@ class H2WP_GitHub_API {
 	 * @return array|WP_Error Search results or error.
 	 */
 	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
+
 		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
+		}
+
+		// Exclude archived repositories if not already included in the query.
+		if ( false === strpos( $query, 'archived:' ) ) {
+			$query .= ' archived:false';
 		}
 
 		$url = add_query_arg(

@@ -185,7 +185,7 @@ class H2WP_Settings {
 					<tr>
 						<th scope="row">
 							<label for="h2wp_private_repo_input">
-								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
+								<?php esc_html_e( 'Add Plugin Repository', 'hub2wp' ); ?>
 							</label>
 						</th>
 						<td>
@@ -943,7 +943,7 @@ class H2WP_Settings {
 					esc_html( wp_nonce_url( admin_url( 'options-general.php?page=h2wp_settings_page&action=h2wp_run_update_check' ), 'h2wp_run_update_check' ) ),
 					esc_html__( 'Run now', 'hub2wp' )
 				),
-				count( get_option( 'h2wp_plugins', array() ) )
+				count( get_option( 'h2wp_plugins', array() ) ) + count( get_option( 'h2wp_themes', array() ) )
 			);
 			?>
 		</p>

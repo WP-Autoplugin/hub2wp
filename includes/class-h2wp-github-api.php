@@ -46,10 +46,16 @@ class H2WP_GitHub_API {
 	 * @return array|WP_Error Search results or error.
 	 */
 	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
+
 		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
+		}
+
+		// Exclude archived repositories if not already included in the query.
+		if ( false === strpos( $query, 'archived:' ) ) {
+			$query .= ' archived:false';
 		}
 
 		$url = add_query_arg(
@@ -480,38 +486,56 @@ class H2WP_GitHub_API {
 	}
 
 	/**
-	 * Check if plugin is compatible with the current WordPress environment.
+	 * Check if a repository is compatible with the current WordPress environment.
 	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
+	 * @param string $repo_type Repository type: plugin|theme.
 	 * @return array Compatibility data (is_compatible, reason) or error.
 	 */
-	public function check_compatibility( $owner, $repo ) {
-		$cache_key = 'compatibility_' . $owner . '_' . $repo;
+	public function check_compatibility( $owner, $repo, $repo_type = 'plugin' ) {
+		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$cache_key = 'compatibility_' . $repo_type . '_' . $owner . '_' . $repo;
 		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$readme_content = $this->fetch_readme_content( $owner, $repo );
-		if ( is_wp_error( $readme_content ) ) {
-			$error_data = array(
-				'is_compatible' => false,
-				'reason'        => __( 'No valid readme file found.', 'hub2wp' ),
-			);
-			H2WP_Cache::set( $cache_key, $error_data );
-			return $error_data;
+		if ( 'theme' === $repo_type ) {
+			$style_content = $this->fetch_theme_style_content( $owner, $repo );
+			if ( is_wp_error( $style_content ) ) {
+				$error_data = array(
+					'is_compatible' => false,
+					'reason'        => __( 'No valid theme style.css file found.', 'hub2wp' ),
+				);
+				H2WP_Cache::set( $cache_key, $error_data );
+				return $error_data;
+			}
+			$headers = $this->extract_headers_from_style( $style_content );
+		} else {
+			$readme_content = $this->fetch_readme_content( $owner, $repo );
+			if ( is_wp_error( $readme_content ) ) {
+				$error_data = array(
+					'is_compatible' => false,
+					'reason'        => __( 'No valid readme file found.', 'hub2wp' ),
+				);
+				H2WP_Cache::set( $cache_key, $error_data );
+				return $error_data;
+			}
+
+			$headers = $this->extract_headers_from_readme( $readme_content );
+			if ( empty( $headers['stable tag'] ) ) {
+				return array(
+					'is_compatible' => false,
+					'reason'        => __( 'No valid readme file found.', 'hub2wp' ),
+				);
+			}
+
+			// Match modal field naming.
+			$headers['version'] = $headers['stable tag'];
 		}
 
-		$headers = $this->extract_headers_from_readme( $readme_content );
-		if ( empty( $headers['stable tag'] ) ) {
-			return array(
-				'is_compatible' => false,
-				'reason'        => __( 'No valid readme file found.', 'hub2wp' ),
-			);
-		}
-
-		$compatibility = $this->evaluate_compatibility( $headers );
+		$compatibility = $this->evaluate_compatibility( $headers, $repo_type );
 		$compatibility['headers'] = $headers;
 		H2WP_Cache::set( $cache_key, $compatibility );
 		return $compatibility;
@@ -560,6 +584,36 @@ class H2WP_GitHub_API {
 	}
 
 	/**
+	 * Fetch style.css content for a theme repository.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return string|WP_Error Theme style.css content or error.
+	 */
+	private function fetch_theme_style_content( $owner, $repo ) {
+		$filenames = array( 'style.css', 'STYLE.CSS' );
+
+		foreach ( $filenames as $filename ) {
+			$url      = $this->base_url . "/repos/{$owner}/{$repo}/contents/{$filename}";
+			$response = $this->request( $url );
+
+			if ( ! is_wp_error( $response ) ) {
+				$data = json_decode( wp_remote_retrieve_body( $response ), true );
+				if ( isset( $data['content'] ) ) {
+					// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- We need to decode that base64.
+					return base64_decode( $data['content'] );
+				}
+			}
+
+			if ( ! is_wp_error( $response ) || $response->get_error_code() !== 'h2wp_api_error_404' ) {
+				return $response;
+			}
+		}
+
+		return new WP_Error( 'h2wp_style_not_found', __( 'No valid theme style.css file found.', 'hub2wp' ) );
+	}
+
+	/**
 	 * Extract headers from readme content using regex.
 	 *
 	 * @param string $readme_content Readme file content.
@@ -583,18 +637,52 @@ class H2WP_GitHub_API {
 	}
 
 	/**
+	 * Extract headers from a theme style.css file.
+	 *
+	 * @param string $style_content style.css content.
+	 * @return array Extracted headers.
+	 */
+	private function extract_headers_from_style( $style_content ) {
+		$fields = array(
+			'requires at least' => '',
+			'tested up to'      => '',
+			'requires php'      => '',
+			'version'           => '',
+		);
+
+		$style_headers_map = array(
+			'requires at least' => 'Requires at least',
+			'tested up to'      => 'Tested up to',
+			'requires php'      => 'Requires PHP',
+			'version'           => 'Version',
+		);
+
+		foreach ( $style_headers_map as $key => $label ) {
+			if ( preg_match( '/^\s*' . preg_quote( $label, '/' ) . ':\s*(.+)$/mi', $style_content, $matches ) ) {
+				$fields[ $key ] = trim( $matches[1] );
+			}
+		}
+
+		return $fields;
+	}
+
+	/**
 	 * Evaluate compatibility based on parsed headers.
 	 *
-	 * @param array $headers Parsed readme headers.
+	 * @param array  $headers   Parsed headers.
+	 * @param string $repo_type Repository type.
 	 * @return array Compatibility data.
 	 */
-	private function evaluate_compatibility( $headers ) {
+	private function evaluate_compatibility( $headers, $repo_type = 'plugin' ) {
+		$entity = 'theme' === $repo_type ? __( 'theme', 'hub2wp' ) : __( 'plugin', 'hub2wp' );
+
 		if ( ! empty( $headers['requires at least'] ) && version_compare( get_bloginfo( 'version' ), $headers['requires at least'], '<' ) ) {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
-					// translators: %s: required WordPress version.
-					__( 'This plugin requires WordPress version %s or higher.', 'hub2wp' ),
+					// translators: 1: extension type (plugin/theme), 2: required WordPress version.
+					__( 'This %1$s requires WordPress version %2$s or higher.', 'hub2wp' ),
+					$entity,
 					$headers['requires at least']
 				),
 			);
@@ -604,8 +692,9 @@ class H2WP_GitHub_API {
 			return array(
 				'is_compatible' => false,
 				'reason'        => sprintf(
-					// translators: %s: required PHP version.
-					__( 'This plugin requires PHP version %s or higher.', 'hub2wp' ),
+					// translators: 1: extension type (plugin/theme), 2: required PHP version.
+					__( 'This %1$s requires PHP version %2$s or higher.', 'hub2wp' ),
+					$entity,
 					$headers['requires php']
 				),
 			);
@@ -614,7 +703,11 @@ class H2WP_GitHub_API {
 		if ( ! empty( $headers['tested up to'] ) && version_compare( get_bloginfo( 'version' ), $headers['tested up to'], '>' ) ) {
 			return array(
 				'is_compatible' => true,
-				'reason'        => __( 'This plugin has not been tested with your WordPress version.', 'hub2wp' ),
+				'reason'        => sprintf(
+					// translators: %s: extension type (plugin/theme).
+					__( 'This %s has not been tested with your WordPress version.', 'hub2wp' ),
+					$entity
+				),
 			);
 		}
 
@@ -644,6 +737,30 @@ class H2WP_GitHub_API {
 		}
 
 		$headers = $this->extract_headers_from_readme( $readme_content );
+		H2WP_Cache::set( $cache_key, $headers );
+		return $headers;
+	}
+
+	/**
+	 * Get parsed headers from a theme style.css file.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return array|WP_Error Parsed headers or error.
+	 */
+	public function get_theme_headers( $owner, $repo ) {
+		$cache_key = 'theme_headers_' . $owner . '_' . $repo;
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$style_content = $this->fetch_theme_style_content( $owner, $repo );
+		if ( is_wp_error( $style_content ) ) {
+			return $style_content;
+		}
+
+		$headers = $this->extract_headers_from_style( $style_content );
 		H2WP_Cache::set( $cache_key, $headers );
 		return $headers;
 	}

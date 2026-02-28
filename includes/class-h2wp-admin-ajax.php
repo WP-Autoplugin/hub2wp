@@ -7,6 +7,37 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Handles AJAX requests for the hub2wp plugin.
  */
 class H2WP_Admin_Ajax {
+	/**
+	 * Clean any buffered output started after the given level.
+	 *
+	 * @param int $buffer_level Buffer level to return to.
+	 * @return void
+	 */
+	private function clean_ajax_buffers( $buffer_level ) {
+		while ( ob_get_level() > $buffer_level ) {
+			ob_end_clean();
+		}
+	}
+	/**
+	 * Normalize repository type from request.
+	 *
+	 * @return string plugin|theme
+	 */
+	private function get_repo_type_from_request() {
+		$repo_type = isset( $_POST['repo_type'] ) ? sanitize_key( wp_unslash( $_POST['repo_type'] ) ) : 'plugin';
+		return in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+	}
+
+	/**
+	 * Check capability for the current repository type.
+	 *
+	 * @param string $repo_type Repository type.
+	 * @return bool
+	 */
+	private function can_manage_repo_type( $repo_type ) {
+		$cap = ( 'theme' === $repo_type ) ? 'install_themes' : 'install_plugins';
+		return current_user_can( $cap );
+	}
 
 	/**
 	 * Constructor.
@@ -26,8 +57,10 @@ class H2WP_Admin_Ajax {
 		// Check nonce.
 		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
+		$repo_type = $this->get_repo_type_from_request();
+
 		// Check user capabilities.
-		if ( ! current_user_can( 'install_plugins' ) ) {
+		if ( ! $this->can_manage_repo_type( $repo_type ) ) {
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
@@ -101,8 +134,9 @@ class H2WP_Admin_Ajax {
 			'author'           => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'author_url'       => isset( $repo_details['owner']['html_url'] ) ? esc_url_raw( $repo_details['owner']['html_url'] ) : '',
 			'updated_at'       => $last_updated,
-			'topics'           => isset( $repo_details['topics'] ) ? $this->extract_topics( $repo_details['topics'] ) : array(),
-			'is_installed'     => H2WP_Admin_Page::is_plugin_installed( $owner, $repo ),
+			'topics'           => isset( $repo_details['topics'] ) ? $this->extract_topics( $repo_details['topics'], $repo_type ) : array(),
+			'is_installed'     => H2WP_Admin_Page::is_repo_installed( $owner, $repo, $repo_type ),
+			'repo_type'        => $repo_type,
 		);
 
 		wp_send_json_success( $data );
@@ -163,8 +197,10 @@ class H2WP_Admin_Ajax {
 		// Check nonce.
 		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
+		$repo_type = $this->get_repo_type_from_request();
+
 		// Check user capabilities.
-		if ( ! current_user_can( 'install_plugins' ) ) {
+		if ( ! $this->can_manage_repo_type( $repo_type ) ) {
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
@@ -176,10 +212,13 @@ class H2WP_Admin_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
+		ob_start();
+
 		// Check if plugin is compatible.
 		$api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
-		$compatibility = $api->check_compatibility( $owner, $repo );
+		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type );
 		if ( ! $compatibility['is_compatible'] ) {
+			$this->clean_ajax_buffers( 0 );
 			wp_send_json_error( array( 'message' => $compatibility['reason'] ) );
 		}
 
@@ -189,14 +228,48 @@ class H2WP_Admin_Ajax {
 		// downloaded with an Authorization header (the upgrader's built-in
 		// download_url() never sends auth headers).
 		$installer = new H2WP_Plugin_Installer();
-		$result    = $installer->install_plugin( $download_url, H2WP_Settings::get_access_token() );
+		$result    = ( 'theme' === $repo_type )
+			? $installer->install_theme( $download_url, H2WP_Settings::get_access_token() )
+			: $installer->install_plugin( $download_url, H2WP_Settings::get_access_token() );
 		if ( is_wp_error( $result ) ) {
+			$this->clean_ajax_buffers( 0 );
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 
-		$plugin_data = $installer->plugin_data;
+		if ( 'theme' === $repo_type ) {
+			$theme_data             = $installer->theme_data;
+			$theme_data['owner']    = $owner;
+			$theme_data['repo']     = $repo;
+			$theme_data['repo_type'] = 'theme';
+			$theme_data['stylesheet'] = $this->find_theme_stylesheet( $theme_data );
+
+			$h2wp_themes = get_option( 'h2wp_themes', array() );
+			$repo_key    = $owner . '/' . $repo;
+			$existing    = isset( $h2wp_themes[ $repo_key ] ) ? $h2wp_themes[ $repo_key ] : array();
+			$h2wp_themes[ $repo_key ]                 = array_merge( $existing, $theme_data );
+			$h2wp_themes[ $repo_key ]['last_checked'] = time();
+			$h2wp_themes[ $repo_key ]['last_updated'] = time();
+			update_option( 'h2wp_themes', $h2wp_themes, false );
+
+			$template = ! empty( $theme_data['template'] ) ? $theme_data['template'] : $theme_data['stylesheet'];
+			$theme_data['activate_url'] = add_query_arg(
+				array(
+					'action'     => 'activate',
+					'stylesheet' => $theme_data['stylesheet'],
+					'template'   => $template,
+					'_wpnonce'   => wp_create_nonce( 'switch-theme_' . $theme_data['stylesheet'] ),
+				),
+				admin_url( 'themes.php' )
+			);
+
+			$this->clean_ajax_buffers( 0 );
+			wp_send_json_success( $theme_data );
+		}
+
+		$plugin_data          = $installer->plugin_data;
 		$plugin_data['owner'] = $owner;
-		$plugin_data['repo'] = $repo;
+		$plugin_data['repo']  = $repo;
+		$plugin_data['repo_type'] = 'plugin';
 
 		$plugin_data['plugin_file'] = $this->find_plugin_file( $plugin_data );
 
@@ -216,6 +289,7 @@ class H2WP_Admin_Ajax {
 			'_wpnonce' => wp_create_nonce( 'activate-plugin_' . $plugin_data['plugin_file'] ),
 		), admin_url( 'plugins.php' ) );
 
+		$this->clean_ajax_buffers( 0 );
 		wp_send_json_success( $plugin_data );
 	}
 
@@ -227,8 +301,10 @@ class H2WP_Admin_Ajax {
 		// Check nonce.
 		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
+		$repo_type = $this->get_repo_type_from_request();
+
 		// Check user capabilities.
-		if ( ! current_user_can( 'install_plugins' ) ) {
+		if ( ! $this->can_manage_repo_type( $repo_type ) ) {
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
@@ -245,7 +321,7 @@ class H2WP_Admin_Ajax {
 		$api          = new H2WP_GitHub_API( $access_token );
 
 		// Check compatibility.
-		$compatibility = $api->check_compatibility( $owner, $repo );
+		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type );
 
 		wp_send_json_success( array( 'is_compatible' => $compatibility['is_compatible'], 'reason' => $compatibility['reason'], 'headers' => ! empty( $compatibility['headers'] ) ? $compatibility['headers'] : array() ) );
 	}
@@ -281,18 +357,24 @@ class H2WP_Admin_Ajax {
 	 * @param array $topics Topics array.
 	 * @return array Filtered topics.
 	 */
-	private function extract_topics( $topics ) {
-		return array_values( array_filter( array_map( function( $topic ) {
-			$skip = array( 'wordpress-plugin', 'wordpress-plugins', 'wordpress', 'plugin', 'wp-plugin', 'wp' );
+	private function extract_topics( $topics, $repo_type = 'plugin' ) {
+		$base_url = ( 'theme' === $repo_type )
+			? admin_url( 'themes.php?page=h2wp-theme-browser' )
+			: admin_url( 'plugins.php?page=h2wp-plugin-browser' );
+
+		return array_values( array_filter( array_map( function( $topic ) use ( $repo_type, $base_url ) {
+			$skip = ( 'theme' === $repo_type )
+				? array( 'wordpress-theme', 'wordpress-themes', 'wordpress', 'theme', 'wp-theme', 'wp' )
+				: array( 'wordpress-plugin', 'wordpress-plugins', 'wordpress', 'plugin', 'wp-plugin', 'wp' );
 			if ( in_array( strtolower( $topic ), $skip ) ) {
 				return;
 			}
 
 			return array(
 				'name' => $topic,
-				'url' => add_query_arg( 'page', 'h2wp-plugin-browser', admin_url( 'plugins.php' ) ) . '&tag=' . urlencode( $topic ),
+				'url'  => add_query_arg( 'tag', $topic, $base_url ),
 			);
-		}, $topics)));
+		}, $topics ) ) );
 	}
 
 	/**
@@ -316,14 +398,37 @@ class H2WP_Admin_Ajax {
 	}
 
 	/**
+	 * Find the installed stylesheet slug for a theme.
+	 *
+	 * @param array $theme_data Theme data.
+	 * @return string|bool
+	 */
+	private function find_theme_stylesheet( $theme_data ) {
+		if ( ! empty( $theme_data['stylesheet'] ) ) {
+			return $theme_data['stylesheet'];
+		}
+
+		$themes = wp_get_themes();
+		foreach ( $themes as $stylesheet => $theme ) {
+			if ( $theme->get( 'Name' ) === $theme_data['name'] ) {
+				return $stylesheet;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Handle AJAX request to get changelog.
 	 */
 	public function get_changelog() {
 		// Check nonce
 		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
+		$repo_type = $this->get_repo_type_from_request();
+
 		// Check user capabilities
-		if ( ! current_user_can( 'install_plugins' ) ) {
+		if ( ! $this->can_manage_repo_type( $repo_type ) ) {
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 

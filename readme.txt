@@ -3,7 +3,7 @@ Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.8
 Tested up to: 6.9
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -11,12 +11,12 @@ Browse, install, and update WordPress plugins directly from GitHub repositories.
 
 == Description ==
 
-This plugin allows you to discover WordPress plugins hosted on GitHub by searching repositories with the "wordpress-plugin" topic. You can install and update these plugins directly from your WordPress dashboard, just like plugins from the official WordPress plugin repository.
+This plugin allows you to discover WordPress themes and plugins hosted on GitHub by searching repositories with the "wordpress-plugin" topic. You can install and update these plugins directly from your WordPress dashboard, just like plugins from the official WordPress plugin repository.
 
 Features:
-* Search WordPress plugins in GitHub repositories.
-* Browse and install plugins from private GitHub repositories (requires personal access token with "repo" scope).
-* Install plugins with one click.
+* Search WordPress themes and plugins in GitHub repositories.
+* Browse and install extensions from private GitHub repositories (requires personal access token with "repo" scope).
+* Install themes and plugins with one click.
 * Receive update notifications and update with one click.
 * Optionally add a personal GitHub access token to increase API rate limits.
 * Caching to reduce API requests.
@@ -34,6 +34,11 @@ Features:
 No, but you have a higher request limit if you use one.
 
 == Changelog ==
+
+= 1.2.0 =
+* New: Added support for themes in addition to plugins.
+* New: Added filter link for GitHub plugins on the Plugins page.
+* Fix: Use repo name as the plugin or theme slug on installation.
 
 = 1.1.0 =
 * New: Added support for private GitHub repositories.

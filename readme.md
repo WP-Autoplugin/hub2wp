@@ -26,19 +26,19 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
 
 ## How It Works
 
-1. **Plugin and Theme Eligibility**:  
+1. **Plugin and Theme Eligibility**:
    To appear in hub2wp, a repository must have the `wordpress-plugin` or `wordpress-theme` GitHub topic. Plugins also need a `Stable tag:` header in their `readme.txt` or `readme.md`, and themes need a `Version:` header in `style.css`. These version headers are used for update monitoring.
 
-2. **Update Mechanism**:  
+2. **Update Mechanism**:
    Currently, hub2wp checks the `Stable tag:` or `Version:` header in the default branch of the repository to manage updates. In the future, support for GitHub releases will be added, prioritizing them for update monitoring if the repository uses the releases feature.
 
-3. **Installation**:  
+3. **Installation**:
    - Download the latest release from the [Releases](https://github.com/WP-Autoplugin/hub2wp/releases) page.
    - Upload the ZIP file via the 'Plugins' screen in WordPress or extract it to the `/wp-content/plugins/` directory.
    - Activate hub2wp from the 'Plugins' menu.
    - Start exploring GitHub plugins under “Plugins > Add GitHub Plugin”. Themes will be available under “Appearance > Themes > GitHub Themes”.
 
-4. **Configuration (Optional)**:  
+4. **Configuration (Optional)**:
    - Add a personal GitHub token in “Settings > GitHub Plugins” to increase API limits and access private repositories.
    - Adjust caching settings for optimized performance.
    - Set up update monitoring for manually installed plugins and themes.

@@ -212,14 +212,13 @@ class H2WP_Admin_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
-		$buffer_level = ob_get_level();
 		ob_start();
 
 		// Check if plugin is compatible.
 		$api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
 		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type );
 		if ( ! $compatibility['is_compatible'] ) {
-			$this->clean_ajax_buffers( $buffer_level );
+			$this->clean_ajax_buffers( 0 );
 			wp_send_json_error( array( 'message' => $compatibility['reason'] ) );
 		}
 
@@ -233,7 +232,7 @@ class H2WP_Admin_Ajax {
 			? $installer->install_theme( $download_url, H2WP_Settings::get_access_token() )
 			: $installer->install_plugin( $download_url, H2WP_Settings::get_access_token() );
 		if ( is_wp_error( $result ) ) {
-			$this->clean_ajax_buffers( $buffer_level );
+			$this->clean_ajax_buffers( 0 );
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 
@@ -263,7 +262,7 @@ class H2WP_Admin_Ajax {
 				admin_url( 'themes.php' )
 			);
 
-			$this->clean_ajax_buffers( $buffer_level );
+			$this->clean_ajax_buffers( 0 );
 			wp_send_json_success( $theme_data );
 		}
 
@@ -290,7 +289,7 @@ class H2WP_Admin_Ajax {
 			'_wpnonce' => wp_create_nonce( 'activate-plugin_' . $plugin_data['plugin_file'] ),
 		), admin_url( 'plugins.php' ) );
 
-		$this->clean_ajax_buffers( $buffer_level );
+		$this->clean_ajax_buffers( 0 );
 		wp_send_json_success( $plugin_data );
 	}
 

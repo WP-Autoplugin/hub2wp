@@ -253,8 +253,8 @@ class H2WP_Admin_Page {
 			? admin_url( 'themes.php?page=h2wp-theme-browser' )
 			: admin_url( 'plugins.php?page=h2wp-plugin-browser' );
 
-		// Check if we're viewing private repos
-		$is_private_tab = ( 'plugin' === $repo_type ) && isset( $_GET['tab'] ) && 'private' === $_GET['tab']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		// Check if we're viewing private repos.
+		$is_private_tab = isset( $_GET['tab'] ) && 'private' === sanitize_key( wp_unslash( $_GET['tab'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		$query      = 'topic:' . $topic . ( 'theme' === $repo_type ? ' -topic:wordpress-plugin -topic:build-tool' : '' );
 		$user_query = '';
@@ -271,9 +271,9 @@ class H2WP_Admin_Page {
 
 		$page = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
-		// If viewing private repos, fetch them separately
+		// If viewing private repos, fetch them separately.
 		if ( $is_private_tab ) {
-			$results = self::get_private_repos_data( $api );
+			$results = self::get_private_repos_data( $api, $repo_type );
 		} else {
 			$results = $api->search_plugins( $query, $page );
 		}
@@ -320,10 +320,8 @@ class H2WP_Admin_Page {
 			echo '<a href="' . esc_url( add_query_arg( 'tag', $queried_tag, remove_query_arg( array( 'paged', 'tab' ) ) ) ) . '" class="h2wp-tag h2wp-tag-active">' . esc_html( $queried_tag ) . '</a>';
 		}
 
-		// Private repos tab
-		if ( 'plugin' === $repo_type ) {
-			echo '<a href="' . esc_url( add_query_arg( 'tab', 'private', remove_query_arg( array( 'paged', 's', 'tag' ) ) ) ) . '" class="h2wp-tag h2wp-tag-private ' . ( $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'Private', 'hub2wp' ) . '</a>';
-		}
+		// Private repos tab.
+		echo '<a href="' . esc_url( add_query_arg( 'tab', 'private', remove_query_arg( array( 'paged', 's', 'tag' ) ) ) ) . '" class="h2wp-tag h2wp-tag-private ' . ( $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'Private', 'hub2wp' ) . '</a>';
 
 		echo '</div>';
 
@@ -353,11 +351,13 @@ class H2WP_Admin_Page {
 	/**
 	 * Get private repositories data.
 	 *
-	 * @param H2WP_GitHub_API $api GitHub API instance.
+	 * @param H2WP_GitHub_API $api       GitHub API instance.
+	 * @param string          $repo_type Repository type.
 	 * @return array|WP_Error Array of private repo data or error.
 	 */
-	private static function get_private_repos_data( $api ) {
-		$monitored_plugins = get_option( 'h2wp_plugins', array() );
+	private static function get_private_repos_data( $api, $repo_type = 'plugin' ) {
+		$option_name       = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
+		$monitored_plugins = get_option( $option_name, array() );
 		$private_repos = array();
 
 		foreach ( $monitored_plugins as $repo_key => $repo_data ) {
@@ -429,6 +429,8 @@ class H2WP_Admin_Page {
 	 * @param string $repo_type Repository type.
 	 */
 	private static function render_private_repos_section( $results, $repo_type ) {
+		$repo_label_plural = ( 'theme' === $repo_type ) ? __( 'themes', 'hub2wp' ) : __( 'plugins', 'hub2wp' );
+
 		// Display any errors
 		if ( ! empty( $results['errors'] ) ) {
 			echo '<div class="notice notice-warning is-dismissible">';
@@ -440,7 +442,8 @@ class H2WP_Admin_Page {
 			echo '</ul>';
 			echo '<p>' . wp_kses_post( sprintf(
 				/* translators: %s: settings page URL */
-				__( 'You can manage your monitored plugins in the %s.', 'hub2wp' ),
+				__( 'You can manage your monitored %1$s in the %2$s.', 'hub2wp' ),
+				esc_html( $repo_label_plural ),
 				'<a href="' . esc_url( admin_url( 'options-general.php?page=h2wp_settings_page' ) ) . '">' . esc_html__( 'settings', 'hub2wp' ) . '</a>'
 			) ) . '</p>';
 			echo '</div>';

@@ -16,6 +16,7 @@ class H2WP_Plugin_Installer {
 
 	public $plugin_data = array();
 	public $theme_data  = array();
+	private $install_target_folder = '';
 
 	/**
 	 * Install a plugin from a GitHub ZIP URL.
@@ -42,9 +43,14 @@ class H2WP_Plugin_Installer {
 			$package = $download_url;
 		}
 
+		$this->install_target_folder = $this->get_repo_slug_from_download_url( $download_url );
+		add_filter( 'upgrader_source_selection', array( $this, 'normalize_install_source_folder' ), 10, 4 );
+
 		ob_start();
 		$result = $upgrader->install( $package );
 		ob_end_clean();
+		remove_filter( 'upgrader_source_selection', array( $this, 'normalize_install_source_folder' ), 10 );
+		$this->install_target_folder = '';
 
 		// Always clean up the temp file.
 		if ( null !== $local_file && file_exists( $local_file ) ) {
@@ -93,9 +99,14 @@ class H2WP_Plugin_Installer {
 			$package = $download_url;
 		}
 
+		$this->install_target_folder = $this->get_repo_slug_from_download_url( $download_url );
+		add_filter( 'upgrader_source_selection', array( $this, 'normalize_install_source_folder' ), 10, 4 );
+
 		ob_start();
 		$result = $upgrader->install( $package );
 		ob_end_clean();
+		remove_filter( 'upgrader_source_selection', array( $this, 'normalize_install_source_folder' ), 10 );
+		$this->install_target_folder = '';
 
 		// Always clean up the temp file.
 		if ( null !== $local_file && file_exists( $local_file ) ) {
@@ -175,5 +186,64 @@ class H2WP_Plugin_Installer {
 		}
 
 		return $tmpfname;
+	}
+
+	/**
+	 * Parse the repository slug from a GitHub download URL.
+	 *
+	 * @param string $download_url GitHub zipball URL.
+	 * @return string Folder slug.
+	 */
+	private function get_repo_slug_from_download_url( $download_url ) {
+		$path = wp_parse_url( $download_url, PHP_URL_PATH );
+		if ( empty( $path ) ) {
+			return '';
+		}
+
+		if ( preg_match( '#/repos/[^/]+/([^/]+)/zipball#', $path, $matches ) ) {
+			return sanitize_title( $matches[1] );
+		}
+
+		return '';
+	}
+
+	/**
+	 * Rename extracted GitHub archive folder to the repository slug during install.
+	 *
+	 * @param string      $source        Source path.
+	 * @param string      $remote_source Remote source path.
+	 * @param WP_Upgrader $upgrader      Upgrader instance.
+	 * @param array       $hook_extra    Upgrader context.
+	 * @return string|WP_Error
+	 */
+	public function normalize_install_source_folder( $source, $remote_source, $upgrader, $hook_extra = array() ) {
+		global $wp_filesystem;
+
+		if ( empty( $this->install_target_folder ) ) {
+			return $source;
+		}
+
+		$new_source = trailingslashit( $remote_source ) . $this->install_target_folder;
+		if ( trailingslashit( $new_source ) === trailingslashit( $source ) ) {
+			return $source;
+		}
+
+		if ( ! $wp_filesystem || ! method_exists( $wp_filesystem, 'move' ) ) {
+			return $source;
+		}
+
+		if ( ! $wp_filesystem->move( untrailingslashit( $source ), $new_source ) ) {
+			return new WP_Error(
+				'h2wp_rename_error',
+				sprintf(
+					/* translators: 1: extracted folder, 2: expected folder */
+					__( 'Could not rename extracted folder from "%1$s" to "%2$s".', 'hub2wp' ),
+					basename( $source ),
+					$this->install_target_folder
+				)
+			);
+		}
+
+		return trailingslashit( $new_source );
 	}
 }

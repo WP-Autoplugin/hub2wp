@@ -113,6 +113,8 @@ hub2wp is open source and welcomes contributions. If you encounter issues or hav
 
 ### 1.2.0
 - New: Added support for themes in addition to plugins.
+- New: Added 
+- Fix: Use repo name as the plugin or theme slug on installation.
 
 ### 1.1.0
 - New: Added support for private GitHub repositories.

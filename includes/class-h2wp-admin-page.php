@@ -20,6 +20,135 @@ class H2WP_Admin_Page {
 		add_action( 'admin_notices', array( __CLASS__, 'display_rate_limit_notice' ) );
 		add_filter( 'admin_title', array( __CLASS__, 'filter_admin_title' ), 10, 2 );
 		add_filter( 'plugin_action_links_' . H2WP_PLUGIN_BASENAME, array( __CLASS__, 'add_action_links' ) );
+		add_filter( 'views_plugins', array( __CLASS__, 'add_github_plugins_view' ) );
+		add_filter( 'all_plugins', array( __CLASS__, 'filter_all_plugins_for_github_view' ) );
+	}
+
+	/**
+	 * Add a dedicated "GitHub Plugins" filter link on Plugins > Installed Plugins.
+	 *
+	 * @param array $views Existing views.
+	 * @return array
+	 */
+	public static function add_github_plugins_view( $views ) {
+		$count      = self::count_installed_github_plugins();
+		$is_current = self::is_github_plugins_view_active();
+		$url        = add_query_arg(
+			array(
+				'plugin_status' => 'h2wp_github',
+			),
+			admin_url( 'plugins.php' )
+		);
+
+		$label = sprintf(
+			/* translators: %s: number of installed GitHub plugins. */
+			__( 'GitHub Plugins <span class="count">(%s)</span>', 'hub2wp' ),
+			number_format_i18n( $count )
+		);
+
+		$views['h2wp_github'] = sprintf(
+			'<a href="%1$s"%2$s%3$s>%4$s</a>',
+			esc_url( $url ),
+			$is_current ? ' class="current"' : '',
+			$is_current ? ' aria-current="page"' : '',
+			$label
+		);
+
+		return $views;
+	}
+
+	/**
+	 * Filter the plugin list when the GitHub Plugins view is selected.
+	 *
+	 * @param array $plugins Full installed plugins list.
+	 * @return array
+	 */
+	public static function filter_all_plugins_for_github_view( $plugins ) {
+		if ( ! self::is_github_plugins_view_active() ) {
+			return $plugins;
+		}
+
+		$github_plugin_files = self::get_installed_github_plugin_files();
+		if ( empty( $github_plugin_files ) ) {
+			return array();
+		}
+
+		return array_intersect_key( $plugins, array_flip( $github_plugin_files ) );
+	}
+
+	/**
+	 * Determine whether the GitHub Plugins custom view is active.
+	 *
+	 * @return bool
+	 */
+	private static function is_github_plugins_view_active() {
+		global $pagenow;
+
+		if ( 'plugins.php' !== $pagenow ) {
+			return false;
+		}
+
+		$plugin_status = isset( $_GET['plugin_status'] ) ? sanitize_key( wp_unslash( $_GET['plugin_status'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return 'h2wp_github' === $plugin_status;
+	}
+
+	/**
+	 * Count installed plugins tracked by hub2wp.
+	 *
+	 * @return int
+	 */
+	private static function count_installed_github_plugins() {
+		return count( self::get_installed_github_plugin_files() );
+	}
+
+	/**
+	 * Get installed plugin files tracked by hub2wp.
+	 *
+	 * @return string[]
+	 */
+	private static function get_installed_github_plugin_files() {
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$files        = array();
+
+		foreach ( $h2wp_plugins as $plugin ) {
+			if ( empty( $plugin['plugin_file'] ) || ! is_string( $plugin['plugin_file'] ) ) {
+				continue;
+			}
+
+			$plugin_file = self::normalize_plugin_file( $plugin['plugin_file'] );
+			if ( '' === $plugin_file ) {
+				continue;
+			}
+
+			if ( file_exists( WP_PLUGIN_DIR . '/' . $plugin_file ) ) {
+				$files[ $plugin_file ] = true;
+			}
+		}
+
+		return array_keys( $files );
+	}
+
+	/**
+	 * Normalize plugin file path to the canonical plugin basename form.
+	 *
+	 * @param string $plugin_file Plugin file path.
+	 * @return string
+	 */
+	private static function normalize_plugin_file( $plugin_file ) {
+		$plugin_file = trim( $plugin_file );
+
+		if ( '' === $plugin_file ) {
+			return '';
+		}
+
+		$plugin_root = wp_normalize_path( WP_PLUGIN_DIR ) . '/';
+		$normalized  = wp_normalize_path( $plugin_file );
+
+		if ( 0 === strpos( $normalized, $plugin_root ) ) {
+			$normalized = substr( $normalized, strlen( $plugin_root ) );
+		}
+
+		return ltrim( $normalized, '/' );
 	}
 
 	/**

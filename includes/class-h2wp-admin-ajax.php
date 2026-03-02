@@ -40,6 +40,26 @@ class H2WP_Admin_Ajax {
 	}
 
 	/**
+	 * Resolve monitored branch for a repo, if configured.
+	 *
+	 * @param string $owner     Repository owner.
+	 * @param string $repo      Repository name.
+	 * @param string $repo_type Repository type.
+	 * @return string
+	 */
+	private function get_monitored_branch( $owner, $repo, $repo_type = 'plugin' ) {
+		$option_name = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
+		$monitored   = get_option( $option_name, array() );
+		$repo_key    = $owner . '/' . $repo;
+
+		if ( isset( $monitored[ $repo_key ]['branch'] ) ) {
+			return (string) $monitored[ $repo_key ]['branch'];
+		}
+
+		return '';
+	}
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
@@ -75,6 +95,7 @@ class H2WP_Admin_Ajax {
 		// Get access token from settings.
 		$access_token = H2WP_Settings::get_access_token();
 		$api          = new H2WP_GitHub_API( $access_token );
+		$branch       = $this->get_monitored_branch( $owner, $repo, $repo_type );
 
 		// Fetch data.
 		$repo_details = $api->get_repo_details( $owner, $repo );
@@ -82,7 +103,7 @@ class H2WP_Admin_Ajax {
 			wp_send_json_error( array( 'message' => $repo_details->get_error_message() ) );
 		}
 
-		$readme_html = $api->get_readme_html( $owner, $repo );
+		$readme_html = $api->get_readme_html( $owner, $repo, $branch );
 		if ( is_wp_error( $readme_html ) ) {
 			$readme_html = __( 'No README available.', 'hub2wp' );
 		}
@@ -103,9 +124,9 @@ class H2WP_Admin_Ajax {
 			);
 		}
 
-		// Let's try to use the pushed_at date of the default_branch
-		if ( isset( $repo_details['default_branch'] ) ) {
-			$branch_details = $api->get_branch_details( $owner, $repo, $repo_details['default_branch'] );
+		$branch_for_updated_at = ! empty( $branch ) ? $branch : ( isset( $repo_details['default_branch'] ) ? $repo_details['default_branch'] : '' );
+		if ( ! empty( $branch_for_updated_at ) ) {
+			$branch_details = $api->get_branch_details( $owner, $repo, $branch_for_updated_at );
 			if ( ! is_wp_error( $branch_details ) && isset( $branch_details['commit']['commit']['author']['date'] ) ) {
 				$last_updated = sprintf(
 					/* translators: %s: human-readable time difference */
@@ -215,14 +236,15 @@ class H2WP_Admin_Ajax {
 		ob_start();
 
 		// Check if plugin is compatible.
-		$api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
-		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type );
+		$api          = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+		$branch       = $this->get_monitored_branch( $owner, $repo, $repo_type );
+		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type, $branch );
 		if ( ! $compatibility['is_compatible'] ) {
 			$this->clean_ajax_buffers( 0 );
 			wp_send_json_error( array( 'message' => $compatibility['reason'] ) );
 		}
 
-		$download_url = $api->get_download_url( $owner, $repo );
+		$download_url = $api->get_download_url( $owner, $repo, $branch );
 
 		// Install the plugin. Pass the access token so private-repo zips can be
 		// downloaded with an Authorization header (the upgrader's built-in
@@ -319,9 +341,10 @@ class H2WP_Admin_Ajax {
 		// Get access token from settings.
 		$access_token = H2WP_Settings::get_access_token();
 		$api          = new H2WP_GitHub_API( $access_token );
+		$branch       = $this->get_monitored_branch( $owner, $repo, $repo_type );
 
 		// Check compatibility.
-		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type );
+		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type, $branch );
 
 		wp_send_json_success( array( 'is_compatible' => $compatibility['is_compatible'], 'reason' => $compatibility['reason'], 'headers' => ! empty( $compatibility['headers'] ) ? $compatibility['headers'] : array() ) );
 	}

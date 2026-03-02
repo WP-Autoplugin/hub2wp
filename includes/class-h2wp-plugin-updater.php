@@ -67,9 +67,10 @@ class H2WP_Plugin_Updater {
 
 		foreach ( $h2wp_plugins as $plugin_id => &$plugin ) {
 			list( $owner, $repo ) = explode( '/', $plugin_id );
+			$branch = isset( $plugin['branch'] ) ? $plugin['branch'] : '';
 
 			// Get readme headers
-			$headers = $api->get_readme_headers( $owner, $repo );
+			$headers = $api->get_readme_headers( $owner, $repo, $branch );
 			if ( is_wp_error( $headers ) || empty( $headers['stable tag'] ) ) {
 				if ( is_wp_error( $headers ) ) {
 					self::log_debug( sprintf( 'Plugin update check failed for %s: %s', $plugin_id, $headers->get_error_message() ) );
@@ -83,7 +84,6 @@ class H2WP_Plugin_Updater {
 			$plugin['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$plugin['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
 			$plugin['last_checked'] = $now;
-			$branch = isset( $plugin['branch'] ) ? $plugin['branch'] : '';
 			$plugin['download_url'] = $api->get_download_url( $owner, $repo, $branch );
 
 			$plugins_updated = true;
@@ -96,8 +96,9 @@ class H2WP_Plugin_Updater {
 
 		foreach ( $h2wp_themes as $theme_id => &$theme ) {
 			list( $owner, $repo ) = explode( '/', $theme_id );
+			$branch = isset( $theme['branch'] ) ? $theme['branch'] : '';
 
-			$headers = $api->get_theme_headers( $owner, $repo );
+			$headers = $api->get_theme_headers( $owner, $repo, $branch );
 			if ( is_wp_error( $headers ) || empty( $headers['version'] ) ) {
 				if ( is_wp_error( $headers ) ) {
 					self::log_debug( sprintf( 'Theme update check failed for %s: %s', $theme_id, $headers->get_error_message() ) );
@@ -110,7 +111,6 @@ class H2WP_Plugin_Updater {
 			$theme['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$theme['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
 			$theme['last_checked'] = $now;
-			$branch = isset( $theme['branch'] ) ? $theme['branch'] : '';
 			$theme['download_url'] = $api->get_download_url( $owner, $repo, $branch );
 
 			if ( empty( $theme['stylesheet'] ) ) {
@@ -273,10 +273,11 @@ class H2WP_Plugin_Updater {
 
 			if ( $plugin_slug === $args->slug ) {
 				list( $owner, $repo ) = explode( '/', $plugin_id );
+				$branch = isset( $plugin['branch'] ) ? $plugin['branch'] : '';
 
 				$api          = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
 				$repo_details = $api->get_repo_details( $owner, $repo );
-				$readme_html  = $api->get_readme_html( $owner, $repo );
+				$readme_html  = $api->get_readme_html( $owner, $repo, $branch );
 
 				if ( is_wp_error( $repo_details ) || is_wp_error( $readme_html ) ) {
 					return $result;

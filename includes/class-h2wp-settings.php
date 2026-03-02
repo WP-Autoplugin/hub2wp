@@ -223,7 +223,6 @@ class H2WP_Settings {
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
-							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Branch', 'hub2wp' ); ?></th>
 							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
 							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
 						</tr>
@@ -237,14 +236,11 @@ class H2WP_Settings {
 									<small>
 										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
 											<?php echo esc_html( $repo_key ); ?>
-										</a>
+										</a><?php if ( ! empty( $repo_data['branch'] ) ) : ?> (<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
 										<?php if ( ! empty( $repo_data['plugin_file'] ) ) : ?>
 											&rarr; <code><?php echo esc_html( $repo_data['plugin_file'] ); ?></code>
 										<?php endif; ?>
 									</small>
-								</td>
-								<td>
-									<code><?php echo esc_html( ! empty( $repo_data['branch'] ) ? $repo_data['branch'] : 'default' ); ?></code>
 								</td>
 								<td>
 									<?php
@@ -387,7 +383,6 @@ class H2WP_Settings {
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
-							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Branch', 'hub2wp' ); ?></th>
 							<th style="width:100px;max-width:100px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
 							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
 						</tr>
@@ -401,14 +396,11 @@ class H2WP_Settings {
 									<small>
 										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
 											<?php echo esc_html( $repo_key ); ?>
-										</a>
+										</a><?php if ( ! empty( $repo_data['branch'] ) ) : ?> (<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
 										<?php if ( ! empty( $repo_data['stylesheet'] ) ) : ?>
 											&rarr; <code><?php echo esc_html( $repo_data['stylesheet'] ); ?></code>
 										<?php endif; ?>
 									</small>
-								</td>
-								<td>
-									<code><?php echo esc_html( ! empty( $repo_data['branch'] ) ? $repo_data['branch'] : 'default' ); ?></code>
 								</td>
 								<td>
 									<?php

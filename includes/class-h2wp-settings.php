@@ -196,13 +196,21 @@ class H2WP_Settings {
 								name="h2wp_private_repo"
 								value=""
 								placeholder="owner/repo"
-								size="50"
+								size="30"
+							/>
+							<input
+								type="text"
+								id="h2wp_branch_input"
+								name="h2wp_branch"
+								value=""
+								placeholder="main (default)"
+								size="15"
 							/>
 							<button type="submit" class="button button-secondary">
 								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
 							</button>
 							<p class="description">
-								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-plugin)', 'hub2wp' ); ?>
+								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-plugin). Optional: specify a branch (defaults to repository default branch).', 'hub2wp' ); ?>
 							</p>
 						</td>
 					</tr>
@@ -215,6 +223,7 @@ class H2WP_Settings {
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
+							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Branch', 'hub2wp' ); ?></th>
 							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
 							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
 						</tr>
@@ -233,6 +242,9 @@ class H2WP_Settings {
 											&rarr; <code><?php echo esc_html( $repo_data['plugin_file'] ); ?></code>
 										<?php endif; ?>
 									</small>
+								</td>
+								<td>
+									<code><?php echo esc_html( ! empty( $repo_data['branch'] ) ? $repo_data['branch'] : 'default' ); ?></code>
 								</td>
 								<td>
 									<?php
@@ -348,13 +360,21 @@ class H2WP_Settings {
 								name="h2wp_private_theme_repo"
 								value=""
 								placeholder="owner/repo"
-								size="50"
+								size="30"
+							/>
+							<input
+								type="text"
+								id="h2wp_theme_branch_input"
+								name="h2wp_theme_branch"
+								value=""
+								placeholder="main (default)"
+								size="15"
 							/>
 							<button type="submit" class="button button-secondary">
 								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
 							</button>
 							<p class="description">
-								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-theme)', 'hub2wp' ); ?>
+								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-theme). Optional: specify a branch (defaults to repository default branch).', 'hub2wp' ); ?>
 							</p>
 						</td>
 					</tr>
@@ -367,6 +387,7 @@ class H2WP_Settings {
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
+							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Branch', 'hub2wp' ); ?></th>
 							<th style="width:100px;max-width:100px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
 							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
 						</tr>
@@ -385,6 +406,9 @@ class H2WP_Settings {
 											&rarr; <code><?php echo esc_html( $repo_data['stylesheet'] ); ?></code>
 										<?php endif; ?>
 									</small>
+								</td>
+								<td>
+									<code><?php echo esc_html( ! empty( $repo_data['branch'] ) ? $repo_data['branch'] : 'default' ); ?></code>
 								</td>
 								<td>
 									<?php
@@ -547,6 +571,7 @@ class H2WP_Settings {
 		}
 
 		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo'] ) );
+		$branch = isset( $_POST['h2wp_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_branch'] ) ) : '';
 
 		// Validate format: owner/repo
 		if ( ! self::validate_repo_format( $repo_input ) ) {
@@ -602,6 +627,7 @@ class H2WP_Settings {
 			'repo'             => $repo,
 			'name'             => isset( $repo_data['name'] ) ? $repo_data['name'] : $repo,
 			'private'          => isset( $repo_data['private'] ) ? $repo_data['private'] : false,
+			'branch'           => $branch,
 			'added'            => time(),
 			'added_by'         => get_current_user_id(),
 			'last_checked'     => time(),
@@ -720,6 +746,7 @@ class H2WP_Settings {
 		}
 
 		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo'] ) );
+		$branch = isset( $_POST['h2wp_theme_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_theme_branch'] ) ) : '';
 		if ( ! self::validate_repo_format( $repo_input ) ) {
 			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_invalid_format', __( 'Invalid repository format. Please use "owner/repo" format.', 'hub2wp' ), 'error' );
 			return;
@@ -749,6 +776,7 @@ class H2WP_Settings {
 			'repo'         => $repo,
 			'name'         => isset( $repo_data['name'] ) ? $repo_data['name'] : $repo,
 			'private'      => isset( $repo_data['private'] ) ? $repo_data['private'] : false,
+			'branch'       => $branch,
 			'added'        => time(),
 			'added_by'     => get_current_user_id(),
 			'last_checked' => time(),

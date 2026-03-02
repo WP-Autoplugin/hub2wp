@@ -84,15 +84,19 @@ class H2WP_GitHub_API {
 	}
 
 	/**
-	 * Get zipball URL for the main branch of a repository.
+	 * Get zipball URL for a repository.
 	 *
-	 * @param string $owner Owner of the repo.
-	 * @param string $repo  Repo name.
+	 * @param string $owner  Owner of the repo.
+	 * @param string $repo   Repo name.
+	 * @param string $branch Optional branch name.
 	 * @return string Zipball URL.
 	 */
-	public function get_download_url( $owner, $repo ) {
-		$branch_url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/zipball';
-		return $branch_url;
+	public function get_download_url( $owner, $repo, $branch = '' ) {
+		$url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/zipball';
+		if ( ! empty( $branch ) ) {
+			$url .= '/' . $branch;
+		}
+		return $url;
 	}
 
 	/**

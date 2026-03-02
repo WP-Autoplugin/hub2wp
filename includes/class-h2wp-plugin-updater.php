@@ -83,7 +83,8 @@ class H2WP_Plugin_Updater {
 			$plugin['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$plugin['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
 			$plugin['last_checked'] = $now;
-			$plugin['download_url'] = $api->get_download_url( $owner, $repo );
+			$branch = isset( $plugin['branch'] ) ? $plugin['branch'] : '';
+			$plugin['download_url'] = $api->get_download_url( $owner, $repo, $branch );
 
 			$plugins_updated = true;
 		}
@@ -109,7 +110,8 @@ class H2WP_Plugin_Updater {
 			$theme['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$theme['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
 			$theme['last_checked'] = $now;
-			$theme['download_url'] = $api->get_download_url( $owner, $repo );
+			$branch = isset( $theme['branch'] ) ? $theme['branch'] : '';
+			$theme['download_url'] = $api->get_download_url( $owner, $repo, $branch );
 
 			if ( empty( $theme['stylesheet'] ) ) {
 				$theme['stylesheet'] = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );

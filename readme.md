@@ -21,6 +21,7 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
 - **Caching**: Built-in caching minimizes API requests for faster performance and reduced API quota usage.
 - **Manual Update Monitoring**: Set up update monitoring for plugins and themes installed outside hub2wp.
 - **Private Repository Support**: Browse, install, and update plugins and themes from private GitHub repositories.
+- **Custom Branch Tracking**: Track a specific branch for updates instead of the repository's default branch.
 
 ---
 
@@ -30,13 +31,13 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
    To appear in hub2wp, a repository must have the `wordpress-plugin` or `wordpress-theme` GitHub topic. Plugins also need a `Stable tag:` header in their `readme.txt` or `readme.md`, and themes need a `Version:` header in `style.css`. These version headers are used for update monitoring.
 
 2. **Update Mechanism**:
-   Currently, hub2wp checks the `Stable tag:` or `Version:` header in the default branch of the repository to manage updates. In the future, support for GitHub releases will be added, prioritizing them for update monitoring if the repository uses the releases feature.
+   hub2wp checks the `Stable tag:` or `Version:` header in a repository branch to manage updates. By default it uses the repository's default branch, but you can configure a specific branch to track for each plugin or theme. When a new version is detected, you will receive an update notification in your WordPress dashboard, allowing you to update the plugin or theme directly from there.
 
 3. **Installation**:
    - Download the latest release from the [Releases](https://github.com/WP-Autoplugin/hub2wp/releases) page.
    - Upload the ZIP file via the 'Plugins' screen in WordPress or extract it to the `/wp-content/plugins/` directory.
    - Activate hub2wp from the 'Plugins' menu.
-   - Start exploring GitHub plugins under “Plugins > Add GitHub Plugin”. Themes will be available under “Appearance > Themes > GitHub Themes”.
+   - Start exploring GitHub plugins under "Plugins > Add GitHub Plugin". Browse themes by clicking on the "GitHub Themes" button under "Appearance > Themes".
 
 4. **Configuration (Optional)**:
    - Add a personal GitHub token in “Settings > GitHub Plugins” to increase API limits and access private repositories.
@@ -50,7 +51,6 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
 hub2wp will continue to evolve with the following planned features:
 
 - **Release Tracking**: Monitor GitHub releases for updates instead of just the default branch.
-- **Custom Branch Monitoring**: Enable update tracking for specific branches other than the main branch.
 - **Full WP-CLI Integration**: Provide WP-CLI commands for managing GitHub plugins via the command line.
 
 ---
@@ -111,19 +111,4 @@ hub2wp is open source and welcomes contributions. If you encounter issues or hav
 
 ## Changelog
 
-### 1.2.0
-- New: Added support for themes in addition to plugins.
-- New: Added filter link for GitHub plugins on the Plugins page.
-- Fix: Use repo name as the plugin or theme slug on installation.
-
-### 1.1.0
-- New: Added support for private GitHub repositories.
-- New: Private repositories tab in plugin browser.
-- New: Settings page UI for managing repositories / monitored plugins.
-
-### 1.0.1
-- Fix: Update plugin data saved in the activation hook.
-- Fix: Use the last commit date from the default branch as the plugin's last updated date.
-
-### 1.0.0
-- Initial release
+See [readme.txt](readme.txt) for the full changelog.

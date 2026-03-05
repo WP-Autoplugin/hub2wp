@@ -84,15 +84,19 @@ class H2WP_GitHub_API {
 	}
 
 	/**
-	 * Get zipball URL for the main branch of a repository.
+	 * Get zipball URL for a repository.
 	 *
-	 * @param string $owner Owner of the repo.
-	 * @param string $repo  Repo name.
+	 * @param string $owner  Owner of the repo.
+	 * @param string $repo   Repo name.
+	 * @param string $branch Optional branch name.
 	 * @return string Zipball URL.
 	 */
-	public function get_download_url( $owner, $repo ) {
-		$branch_url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/zipball';
-		return $branch_url;
+	public function get_download_url( $owner, $repo, $branch = '' ) {
+		$url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/zipball';
+		if ( ! empty( $branch ) ) {
+			$url .= '/' . $branch;
+		}
+		return $url;
 	}
 
 	/**
@@ -261,16 +265,20 @@ class H2WP_GitHub_API {
 	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
+	 * @param string $branch Optional branch name.
 	 * @return string|WP_Error Rendered README HTML or error.
 	 */
-	public function get_readme_html( $owner, $repo ) {
-		$cache_key = 'readme_html_' . $owner . '_' . $repo;
+	public function get_readme_html( $owner, $repo, $branch = '' ) {
+		$cache_key = 'readme_html_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$url     = $this->base_url . '/repos/' . $owner . '/' . $repo . '/readme';
+		$url = $this->base_url . '/repos/' . $owner . '/' . $repo . '/readme';
+		if ( ! empty( $branch ) ) {
+			$url = add_query_arg( 'ref', $branch, $url );
+		}
 		$args    = array(
 			'headers' => array(
 				'Accept' => 'application/vnd.github.v3.html',
@@ -491,18 +499,19 @@ class H2WP_GitHub_API {
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
 	 * @param string $repo_type Repository type: plugin|theme.
+	 * @param string $branch Optional branch name.
 	 * @return array Compatibility data (is_compatible, reason) or error.
 	 */
-	public function check_compatibility( $owner, $repo, $repo_type = 'plugin' ) {
+	public function check_compatibility( $owner, $repo, $repo_type = 'plugin', $branch = '' ) {
 		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
-		$cache_key = 'compatibility_' . $repo_type . '_' . $owner . '_' . $repo;
+		$cache_key = 'compatibility_' . $repo_type . '_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
 		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
 		if ( 'theme' === $repo_type ) {
-			$style_content = $this->fetch_theme_style_content( $owner, $repo );
+			$style_content = $this->fetch_theme_style_content( $owner, $repo, $branch );
 			if ( is_wp_error( $style_content ) ) {
 				$error_data = array(
 					'is_compatible' => false,
@@ -513,7 +522,7 @@ class H2WP_GitHub_API {
 			}
 			$headers = $this->extract_headers_from_style( $style_content );
 		} else {
-			$readme_content = $this->fetch_readme_content( $owner, $repo );
+			$readme_content = $this->fetch_readme_content( $owner, $repo, $branch );
 			if ( is_wp_error( $readme_content ) ) {
 				$error_data = array(
 					'is_compatible' => false,
@@ -546,13 +555,17 @@ class H2WP_GitHub_API {
 	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
+	 * @param string $branch Optional branch name.
 	 * @return string|WP_Error Readme content or error.
 	 */
-	private function fetch_readme_content( $owner, $repo ) {
+	private function fetch_readme_content( $owner, $repo, $branch = '' ) {
 		$filenames = array( 'readme.txt', 'README.txt' );
 
 		foreach ( $filenames as $filename ) {
 			$url = $this->base_url . "/repos/{$owner}/{$repo}/contents/{$filename}";
+			if ( ! empty( $branch ) ) {
+				$url = add_query_arg( 'ref', $branch, $url );
+			}
 			$response = $this->request( $url );
 
 			if ( ! is_wp_error( $response ) ) {
@@ -570,6 +583,9 @@ class H2WP_GitHub_API {
 
 		// Fall back to the readme endpoint which will find README.md/readme.md/README etc.
 		$url = $this->base_url . "/repos/{$owner}/{$repo}/readme";
+		if ( ! empty( $branch ) ) {
+			$url = add_query_arg( 'ref', $branch, $url );
+		}
 		$response = $this->request( $url );
 
 		if ( ! is_wp_error( $response ) ) {
@@ -588,13 +604,17 @@ class H2WP_GitHub_API {
 	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
+	 * @param string $branch Optional branch name.
 	 * @return string|WP_Error Theme style.css content or error.
 	 */
-	private function fetch_theme_style_content( $owner, $repo ) {
+	private function fetch_theme_style_content( $owner, $repo, $branch = '' ) {
 		$filenames = array( 'style.css', 'STYLE.CSS' );
 
 		foreach ( $filenames as $filename ) {
 			$url      = $this->base_url . "/repos/{$owner}/{$repo}/contents/{$filename}";
+			if ( ! empty( $branch ) ) {
+				$url = add_query_arg( 'ref', $branch, $url );
+			}
 			$response = $this->request( $url );
 
 			if ( ! is_wp_error( $response ) ) {
@@ -722,16 +742,17 @@ class H2WP_GitHub_API {
 	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
+	 * @param string $branch Optional branch name.
 	 * @return array|WP_Error Parsed headers or error.
 	 */
-	public function get_readme_headers( $owner, $repo ) {
-		$cache_key = 'readme_headers_' . $owner . '_' . $repo;
+	public function get_readme_headers( $owner, $repo, $branch = '' ) {
+		$cache_key = 'readme_headers_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
 		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$readme_content = $this->fetch_readme_content( $owner, $repo );
+		$readme_content = $this->fetch_readme_content( $owner, $repo, $branch );
 		if ( is_wp_error( $readme_content ) ) {
 			return $readme_content;
 		}
@@ -746,16 +767,17 @@ class H2WP_GitHub_API {
 	 *
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
+	 * @param string $branch Optional branch name.
 	 * @return array|WP_Error Parsed headers or error.
 	 */
-	public function get_theme_headers( $owner, $repo ) {
-		$cache_key = 'theme_headers_' . $owner . '_' . $repo;
+	public function get_theme_headers( $owner, $repo, $branch = '' ) {
+		$cache_key = 'theme_headers_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$style_content = $this->fetch_theme_style_content( $owner, $repo );
+		$style_content = $this->fetch_theme_style_content( $owner, $repo, $branch );
 		if ( is_wp_error( $style_content ) ) {
 			return $style_content;
 		}
@@ -763,6 +785,20 @@ class H2WP_GitHub_API {
 		$headers = $this->extract_headers_from_style( $style_content );
 		H2WP_Cache::set( $cache_key, $headers );
 		return $headers;
+	}
+
+	/**
+	 * Build a stable cache-key segment for a branch.
+	 *
+	 * @param string $branch Branch name.
+	 * @return string
+	 */
+	private function get_branch_cache_key_segment( $branch ) {
+		if ( empty( $branch ) ) {
+			return 'default';
+		}
+
+		return 'branch_' . md5( $branch );
 	}
 
 	/**

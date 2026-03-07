@@ -48,26 +48,7 @@ class H2WP_Admin_Ajax {
 	 * @return array
 	 */
 	private function get_monitored_tracking_preferences( $owner, $repo, $repo_type = 'plugin' ) {
-		$option_name = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
-		$monitored   = get_option( $option_name, array() );
-		$repo_key    = $owner . '/' . $repo;
-		$branch      = '';
-		$prioritize_releases = true;
-
-		if ( isset( $monitored[ $repo_key ] ) && is_array( $monitored[ $repo_key ] ) ) {
-			if ( isset( $monitored[ $repo_key ]['branch'] ) ) {
-				$branch = (string) $monitored[ $repo_key ]['branch'];
-			}
-
-			if ( array_key_exists( 'prioritize_releases', $monitored[ $repo_key ] ) ) {
-				$prioritize_releases = (bool) $monitored[ $repo_key ]['prioritize_releases'];
-			}
-		}
-
-		return array(
-			'branch'              => $branch,
-			'prioritize_releases' => $prioritize_releases,
-		);
+		return H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type );
 	}
 
 	/**

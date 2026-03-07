@@ -1110,4 +1110,47 @@ class H2WP_Settings {
 		$hours   = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
 		return $hours * HOUR_IN_SECONDS;
 	}
+
+	/**
+	 * Get the effective tracking preferences for a monitored repository.
+	 *
+	 * This allows code to override the stored branch and release-priority
+	 * settings on a per-repository basis.
+	 *
+	 * @param string $owner     Repository owner.
+	 * @param string $repo      Repository name.
+	 * @param string $repo_type Repository type: plugin|theme.
+	 * @return array
+	 */
+	public static function get_repo_tracking_preferences( $owner, $repo, $repo_type = 'plugin' ) {
+		$repo_type   = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$option_name = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
+		$monitored   = get_option( $option_name, array() );
+		$repo_key    = $owner . '/' . $repo;
+		$repo_data   = isset( $monitored[ $repo_key ] ) && is_array( $monitored[ $repo_key ] ) ? $monitored[ $repo_key ] : array();
+
+		$preferences = array(
+			'branch'              => isset( $repo_data['branch'] ) ? (string) $repo_data['branch'] : '',
+			'prioritize_releases' => ! array_key_exists( 'prioritize_releases', $repo_data ) || ! empty( $repo_data['prioritize_releases'] ),
+		);
+
+		/**
+		 * Filter tracking preferences for a specific monitored repository.
+		 *
+		 * Return an array with `branch` and/or `prioritize_releases` keys to
+		 * override the stored settings for this repo.
+		 *
+		 * @param array  $preferences Current tracking preferences.
+		 * @param string $owner       Repository owner.
+		 * @param string $repo        Repository name.
+		 * @param string $repo_type   Repository type: plugin|theme.
+		 * @param array  $repo_data   Stored repository data.
+		 */
+		$preferences = apply_filters( 'hub2wp_repo_tracking_preferences', $preferences, $owner, $repo, $repo_type, $repo_data );
+
+		return array(
+			'branch'              => isset( $preferences['branch'] ) ? (string) $preferences['branch'] : '',
+			'prioritize_releases' => ! empty( $preferences['prioritize_releases'] ),
+		);
+	}
 }

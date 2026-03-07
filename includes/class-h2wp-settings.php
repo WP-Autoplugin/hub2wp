@@ -206,12 +206,22 @@ class H2WP_Settings {
 								placeholder="main (default)"
 								size="15"
 							/>
+							<label for="h2wp_prioritize_releases" style="margin-right:8px;display:inline-flex;align-items:center;gap:2px;">
+								<input type="checkbox" id="h2wp_prioritize_releases" name="h2wp_prioritize_releases" value="1" checked="checked" />
+								<?php esc_html_e( 'Prioritize releases', 'hub2wp' ); ?>
+							</label>
 							<button type="submit" class="button button-secondary">
 								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
 							</button>
 							<p class="description">
 								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-plugin). Optional: specify a branch (defaults to repository default branch).', 'hub2wp' ); ?>
 							</p>
+							<details style="margin-top:6px;">
+								<summary><?php esc_html_e( 'What does "Prioritize releases" mean?', 'hub2wp' ); ?></summary>
+								<p class="description" style="margin:6px 0 0;">
+									<?php esc_html_e( 'When enabled, update/version checks use the latest GitHub release files (tag) when releases exist. When disabled, checks only use the selected branch or the default branch.', 'hub2wp' ); ?>
+								</p>
+							</details>
 						</td>
 					</tr>
 				</table>
@@ -237,6 +247,9 @@ class H2WP_Settings {
 										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
 											<?php echo esc_html( $repo_key ); ?>
 										</a><?php if ( ! empty( $repo_data['branch'] ) ) : ?> (<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
+										<?php if ( array_key_exists( 'prioritize_releases', $repo_data ) && empty( $repo_data['prioritize_releases'] ) ) : ?>
+											&mdash; <?php esc_html_e( 'branch only', 'hub2wp' ); ?>
+										<?php endif; ?>
 										<?php if ( ! empty( $repo_data['plugin_file'] ) ) : ?>
 											&rarr; <code><?php echo esc_html( $repo_data['plugin_file'] ); ?></code>
 										<?php endif; ?>
@@ -366,12 +379,22 @@ class H2WP_Settings {
 								placeholder="main (default)"
 								size="15"
 							/>
+							<label for="h2wp_theme_prioritize_releases" style="margin-right:8px;display:inline-flex;align-items:center;gap:2px;">
+								<input type="checkbox" id="h2wp_theme_prioritize_releases" name="h2wp_theme_prioritize_releases" value="1" checked="checked" />
+								<?php esc_html_e( 'Prioritize releases', 'hub2wp' ); ?>
+							</label>
 							<button type="submit" class="button button-secondary">
 								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
 							</button>
 							<p class="description">
 								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-theme). Optional: specify a branch (defaults to repository default branch).', 'hub2wp' ); ?>
 							</p>
+							<details style="margin-top:6px;">
+								<summary><?php esc_html_e( 'What does "Prioritize releases" mean?', 'hub2wp' ); ?></summary>
+								<p class="description" style="margin:6px 0 0;">
+									<?php esc_html_e( 'When enabled, update/version checks use the latest GitHub release files (tag) when releases exist. When disabled, checks only use the selected branch or the default branch.', 'hub2wp' ); ?>
+								</p>
+							</details>
 						</td>
 					</tr>
 				</table>
@@ -397,6 +420,9 @@ class H2WP_Settings {
 										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
 											<?php echo esc_html( $repo_key ); ?>
 										</a><?php if ( ! empty( $repo_data['branch'] ) ) : ?> (<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
+										<?php if ( array_key_exists( 'prioritize_releases', $repo_data ) && empty( $repo_data['prioritize_releases'] ) ) : ?>
+											&mdash; <?php esc_html_e( 'branch only', 'hub2wp' ); ?>
+										<?php endif; ?>
 										<?php if ( ! empty( $repo_data['stylesheet'] ) ) : ?>
 											&rarr; <code><?php echo esc_html( $repo_data['stylesheet'] ); ?></code>
 										<?php endif; ?>
@@ -564,6 +590,7 @@ class H2WP_Settings {
 
 		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo'] ) );
 		$branch = isset( $_POST['h2wp_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_branch'] ) ) : '';
+		$prioritize_releases = isset( $_POST['h2wp_prioritize_releases'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['h2wp_prioritize_releases'] ) );
 
 		// Validate format: owner/repo
 		if ( ! self::validate_repo_format( $repo_input ) ) {
@@ -620,6 +647,7 @@ class H2WP_Settings {
 			'name'             => isset( $repo_data['name'] ) ? $repo_data['name'] : $repo,
 			'private'          => isset( $repo_data['private'] ) ? $repo_data['private'] : false,
 			'branch'           => $branch,
+			'prioritize_releases' => $prioritize_releases,
 			'added'            => time(),
 			'added_by'         => get_current_user_id(),
 			'last_checked'     => time(),
@@ -739,6 +767,7 @@ class H2WP_Settings {
 
 		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo'] ) );
 		$branch = isset( $_POST['h2wp_theme_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_theme_branch'] ) ) : '';
+		$prioritize_releases = isset( $_POST['h2wp_theme_prioritize_releases'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['h2wp_theme_prioritize_releases'] ) );
 		if ( ! self::validate_repo_format( $repo_input ) ) {
 			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_invalid_format', __( 'Invalid repository format. Please use "owner/repo" format.', 'hub2wp' ), 'error' );
 			return;
@@ -769,6 +798,7 @@ class H2WP_Settings {
 			'name'         => isset( $repo_data['name'] ) ? $repo_data['name'] : $repo,
 			'private'      => isset( $repo_data['private'] ) ? $repo_data['private'] : false,
 			'branch'       => $branch,
+			'prioritize_releases' => $prioritize_releases,
 			'added'        => time(),
 			'added_by'     => get_current_user_id(),
 			'last_checked' => time(),
@@ -1079,5 +1109,48 @@ class H2WP_Settings {
 		$options = get_option( self::OPTION_NAME, array() );
 		$hours   = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
 		return $hours * HOUR_IN_SECONDS;
+	}
+
+	/**
+	 * Get the effective tracking preferences for a monitored repository.
+	 *
+	 * This allows code to override the stored branch and release-priority
+	 * settings on a per-repository basis.
+	 *
+	 * @param string $owner     Repository owner.
+	 * @param string $repo      Repository name.
+	 * @param string $repo_type Repository type: plugin|theme.
+	 * @return array
+	 */
+	public static function get_repo_tracking_preferences( $owner, $repo, $repo_type = 'plugin' ) {
+		$repo_type   = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$option_name = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
+		$monitored   = get_option( $option_name, array() );
+		$repo_key    = $owner . '/' . $repo;
+		$repo_data   = isset( $monitored[ $repo_key ] ) && is_array( $monitored[ $repo_key ] ) ? $monitored[ $repo_key ] : array();
+
+		$preferences = array(
+			'branch'              => isset( $repo_data['branch'] ) ? (string) $repo_data['branch'] : '',
+			'prioritize_releases' => ! array_key_exists( 'prioritize_releases', $repo_data ) || ! empty( $repo_data['prioritize_releases'] ),
+		);
+
+		/**
+		 * Filter tracking preferences for a specific monitored repository.
+		 *
+		 * Return an array with `branch` and/or `prioritize_releases` keys to
+		 * override the stored settings for this repo.
+		 *
+		 * @param array  $preferences Current tracking preferences.
+		 * @param string $owner       Repository owner.
+		 * @param string $repo        Repository name.
+		 * @param string $repo_type   Repository type: plugin|theme.
+		 * @param array  $repo_data   Stored repository data.
+		 */
+		$preferences = apply_filters( 'hub2wp_repo_tracking_preferences', $preferences, $owner, $repo, $repo_type, $repo_data );
+
+		return array(
+			'branch'              => isset( $preferences['branch'] ) ? (string) $preferences['branch'] : '',
+			'prioritize_releases' => ! empty( $preferences['prioritize_releases'] ),
+		);
 	}
 }

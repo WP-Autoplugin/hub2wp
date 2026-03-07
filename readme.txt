@@ -2,8 +2,8 @@
 Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.8
-Tested up to: 6.9
-Stable tag: 1.3.0
+Tested up to: 7.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -34,6 +34,9 @@ Features:
 No, but you have a higher request limit if you use one.
 
 == Changelog ==
+
+= 1.4.0 =
+* New: Use latest release files to check for updates if available, otherwise fall back to the selected branch.
 
 = 1.3.0 =
 * New: Added support for monitoring a specified branch for updates in addition to the default branch.

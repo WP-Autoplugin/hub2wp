@@ -100,6 +100,125 @@ class H2WP_GitHub_API {
 	}
 
 	/**
+	 * Get details for the latest release.
+	 *
+	 * @param string $owner Owner of the repo.
+	 * @param string $repo  Repo name.
+	 * @return array|WP_Error
+	 */
+	public function get_latest_release_details( $owner, $repo ) {
+		$cache_key = 'latest_release_' . $owner . '_' . $repo;
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$url      = $this->base_url . '/repos/' . $owner . '/' . $repo . '/releases/latest';
+		$response = $this->request( $url );
+
+		if ( is_wp_error( $response ) ) {
+			if ( 'h2wp_api_error_404' === $response->get_error_code() ) {
+				$no_release = array(
+					'uses_releases' => false,
+					'tag_name'      => '',
+					'zipball_url'   => '',
+					'published_at'  => '',
+				);
+				H2WP_Cache::set( $cache_key, $no_release );
+				return $no_release;
+			}
+
+			return $response;
+		}
+
+		$data = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'h2wp_api_error', __( 'Invalid release data from GitHub API.', 'hub2wp' ) );
+		}
+
+		$latest_release = array(
+			'uses_releases' => ! empty( $data['tag_name'] ),
+			'tag_name'      => isset( $data['tag_name'] ) ? sanitize_text_field( $data['tag_name'] ) : '',
+			'zipball_url'   => isset( $data['zipball_url'] ) ? esc_url_raw( $data['zipball_url'] ) : '',
+			'published_at'  => isset( $data['published_at'] ) ? sanitize_text_field( $data['published_at'] ) : '',
+		);
+
+		H2WP_Cache::set( $cache_key, $latest_release );
+		return $latest_release;
+	}
+
+	/**
+	 * Resolve whether branch files or latest release files should be used for version tracking.
+	 *
+	 * @param string $owner               Owner of the repo.
+	 * @param string $repo                Repo name.
+	 * @param string $branch              Optional branch name.
+	 * @param bool   $prioritize_releases Whether release files should be preferred.
+	 * @return array
+	 */
+	public function resolve_version_source( $owner, $repo, $branch = '', $prioritize_releases = true ) {
+		$context = array(
+			'prioritize_releases' => (bool) $prioritize_releases,
+			'uses_releases'       => false,
+			'source'              => 'branch',
+			'ref'                 => $branch,
+			'release_tag'         => '',
+			'release_published_at' => '',
+			'download_url'        => $this->get_download_url( $owner, $repo, $branch ),
+		);
+
+		if ( ! $prioritize_releases ) {
+			return $this->filter_install_source_context( $context, $owner, $repo );
+		}
+
+		$release_details = $this->get_latest_release_details( $owner, $repo );
+		if ( is_wp_error( $release_details ) || empty( $release_details['uses_releases'] ) || empty( $release_details['tag_name'] ) ) {
+			return $this->filter_install_source_context( $context, $owner, $repo );
+		}
+
+		$context['uses_releases']        = true;
+		$context['source']               = 'release';
+		$context['ref']                  = $release_details['tag_name'];
+		$context['release_tag']          = $release_details['tag_name'];
+		$context['release_published_at'] = $release_details['published_at'];
+		$context['download_url']         = ! empty( $release_details['zipball_url'] )
+			? $release_details['zipball_url']
+			: $this->get_download_url( $owner, $repo, $release_details['tag_name'] );
+
+		return $this->filter_install_source_context( $context, $owner, $repo );
+	}
+
+	/**
+	 * Filter the resolved source context used for installs and version checks.
+	 *
+	 * @param array  $context Resolved source context.
+	 * @param string $owner   Owner of the repo.
+	 * @param string $repo    Repo name.
+	 * @return array
+	 */
+	private function filter_install_source_context( $context, $owner, $repo ) {
+		/**
+		 * Filter the resolved install/version source context for a repository.
+		 *
+		 * @param array           $context Source context including ref, source, and download_url.
+		 * @param string          $owner   Repository owner.
+		 * @param string          $repo    Repository name.
+		 * @param H2WP_GitHub_API $this    GitHub API client instance.
+		 */
+		$context = apply_filters( 'hub2wp_install_source_context', $context, $owner, $repo, $this );
+
+		return array(
+			'prioritize_releases'  => ! empty( $context['prioritize_releases'] ),
+			'uses_releases'        => ! empty( $context['uses_releases'] ),
+			'source'               => isset( $context['source'] ) ? (string) $context['source'] : 'branch',
+			'ref'                  => isset( $context['ref'] ) ? (string) $context['ref'] : '',
+			'release_tag'          => isset( $context['release_tag'] ) ? (string) $context['release_tag'] : '',
+			'release_published_at' => isset( $context['release_published_at'] ) ? (string) $context['release_published_at'] : '',
+			'download_url'         => isset( $context['download_url'] ) ? esc_url_raw( $context['download_url'] ) : '',
+		);
+	}
+
+	/**
 	 * Get repository details.
 	 *
 	 * This method works for both public and private repositories
@@ -502,16 +621,18 @@ class H2WP_GitHub_API {
 	 * @param string $branch Optional branch name.
 	 * @return array Compatibility data (is_compatible, reason) or error.
 	 */
-	public function check_compatibility( $owner, $repo, $repo_type = 'plugin', $branch = '' ) {
+	public function check_compatibility( $owner, $repo, $repo_type = 'plugin', $branch = '', $prioritize_releases = true, $source_context = null ) {
 		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
-		$cache_key = 'compatibility_' . $repo_type . '_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
+		$source_context = is_array( $source_context ) ? $source_context : $this->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
+		$ref            = isset( $source_context['ref'] ) ? (string) $source_context['ref'] : $branch;
+		$cache_key      = 'compatibility_' . $repo_type . '_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $ref ) . '_' . ( ! empty( $source_context['source'] ) ? $source_context['source'] : 'branch' );
 		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
 		if ( 'theme' === $repo_type ) {
-			$style_content = $this->fetch_theme_style_content( $owner, $repo, $branch );
+			$style_content = $this->fetch_theme_style_content( $owner, $repo, $ref );
 			if ( is_wp_error( $style_content ) ) {
 				$error_data = array(
 					'is_compatible' => false,
@@ -522,7 +643,7 @@ class H2WP_GitHub_API {
 			}
 			$headers = $this->extract_headers_from_style( $style_content );
 		} else {
-			$readme_content = $this->fetch_readme_content( $owner, $repo, $branch );
+			$readme_content = $this->fetch_readme_content( $owner, $repo, $ref );
 			if ( is_wp_error( $readme_content ) ) {
 				$error_data = array(
 					'is_compatible' => false,
@@ -546,6 +667,19 @@ class H2WP_GitHub_API {
 
 		$compatibility = $this->evaluate_compatibility( $headers, $repo_type );
 		$compatibility['headers'] = $headers;
+		$compatibility['source_context'] = $source_context;
+		/**
+		 * Filter the resolved compatibility result for a repository.
+		 *
+		 * @param array           $compatibility Compatibility payload.
+		 * @param array           $headers       Parsed plugin/theme headers.
+		 * @param string          $owner         Repository owner.
+		 * @param string          $repo          Repository name.
+		 * @param string          $repo_type     Repository type: plugin|theme.
+		 * @param array           $source_context Resolved source context.
+		 * @param H2WP_GitHub_API $this          GitHub API client instance.
+		 */
+		$compatibility = apply_filters( 'hub2wp_compatibility_result', $compatibility, $headers, $owner, $repo, $repo_type, $source_context, $this );
 		H2WP_Cache::set( $cache_key, $compatibility );
 		return $compatibility;
 	}
@@ -745,14 +879,16 @@ class H2WP_GitHub_API {
 	 * @param string $branch Optional branch name.
 	 * @return array|WP_Error Parsed headers or error.
 	 */
-	public function get_readme_headers( $owner, $repo, $branch = '' ) {
-		$cache_key = 'readme_headers_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
+	public function get_readme_headers( $owner, $repo, $branch = '', $prioritize_releases = true, $source_context = null ) {
+		$source_context = is_array( $source_context ) ? $source_context : $this->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
+		$ref            = isset( $source_context['ref'] ) ? (string) $source_context['ref'] : $branch;
+		$cache_key      = 'readme_headers_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $ref ) . '_' . ( ! empty( $source_context['source'] ) ? $source_context['source'] : 'branch' );
 		$cached = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$readme_content = $this->fetch_readme_content( $owner, $repo, $branch );
+		$readme_content = $this->fetch_readme_content( $owner, $repo, $ref );
 		if ( is_wp_error( $readme_content ) ) {
 			return $readme_content;
 		}
@@ -770,14 +906,16 @@ class H2WP_GitHub_API {
 	 * @param string $branch Optional branch name.
 	 * @return array|WP_Error Parsed headers or error.
 	 */
-	public function get_theme_headers( $owner, $repo, $branch = '' ) {
-		$cache_key = 'theme_headers_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
+	public function get_theme_headers( $owner, $repo, $branch = '', $prioritize_releases = true, $source_context = null ) {
+		$source_context = is_array( $source_context ) ? $source_context : $this->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
+		$ref            = isset( $source_context['ref'] ) ? (string) $source_context['ref'] : $branch;
+		$cache_key      = 'theme_headers_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $ref ) . '_' . ( ! empty( $source_context['source'] ) ? $source_context['source'] : 'branch' );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
 		}
 
-		$style_content = $this->fetch_theme_style_content( $owner, $repo, $branch );
+		$style_content = $this->fetch_theme_style_content( $owner, $repo, $ref );
 		if ( is_wp_error( $style_content ) ) {
 			return $style_content;
 		}
@@ -825,6 +963,14 @@ class H2WP_GitHub_API {
 		}
 
 		$args     = wp_parse_args( $args, $default_args );
+		/**
+		 * Filter GitHub API request arguments before the request is sent.
+		 *
+		 * @param array           $args Request arguments for wp_remote_get().
+		 * @param string          $url  Request URL.
+		 * @param H2WP_GitHub_API $this GitHub API client instance.
+		 */
+		$args     = apply_filters( 'hub2wp_github_request_args', $args, $url, $this );
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {

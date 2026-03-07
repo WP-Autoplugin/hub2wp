@@ -921,6 +921,14 @@ class H2WP_GitHub_API {
 		}
 
 		$args     = wp_parse_args( $args, $default_args );
+		/**
+		 * Filter GitHub API request arguments before the request is sent.
+		 *
+		 * @param array           $args Request arguments for wp_remote_get().
+		 * @param string          $url  Request URL.
+		 * @param H2WP_GitHub_API $this GitHub API client instance.
+		 */
+		$args     = apply_filters( 'hub2wp_github_request_args', $args, $url, $this );
 		$response = wp_remote_get( $url, $args );
 
 		if ( is_wp_error( $response ) ) {

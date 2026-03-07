@@ -168,12 +168,12 @@ class H2WP_GitHub_API {
 		);
 
 		if ( ! $prioritize_releases ) {
-			return $context;
+			return $this->filter_install_source_context( $context, $owner, $repo );
 		}
 
 		$release_details = $this->get_latest_release_details( $owner, $repo );
 		if ( is_wp_error( $release_details ) || empty( $release_details['uses_releases'] ) || empty( $release_details['tag_name'] ) ) {
-			return $context;
+			return $this->filter_install_source_context( $context, $owner, $repo );
 		}
 
 		$context['uses_releases']        = true;
@@ -185,7 +185,37 @@ class H2WP_GitHub_API {
 			? $release_details['zipball_url']
 			: $this->get_download_url( $owner, $repo, $release_details['tag_name'] );
 
-		return $context;
+		return $this->filter_install_source_context( $context, $owner, $repo );
+	}
+
+	/**
+	 * Filter the resolved source context used for installs and version checks.
+	 *
+	 * @param array  $context Resolved source context.
+	 * @param string $owner   Owner of the repo.
+	 * @param string $repo    Repo name.
+	 * @return array
+	 */
+	private function filter_install_source_context( $context, $owner, $repo ) {
+		/**
+		 * Filter the resolved install/version source context for a repository.
+		 *
+		 * @param array           $context Source context including ref, source, and download_url.
+		 * @param string          $owner   Repository owner.
+		 * @param string          $repo    Repository name.
+		 * @param H2WP_GitHub_API $this    GitHub API client instance.
+		 */
+		$context = apply_filters( 'hub2wp_install_source_context', $context, $owner, $repo, $this );
+
+		return array(
+			'prioritize_releases'  => ! empty( $context['prioritize_releases'] ),
+			'uses_releases'        => ! empty( $context['uses_releases'] ),
+			'source'               => isset( $context['source'] ) ? (string) $context['source'] : 'branch',
+			'ref'                  => isset( $context['ref'] ) ? (string) $context['ref'] : '',
+			'release_tag'          => isset( $context['release_tag'] ) ? (string) $context['release_tag'] : '',
+			'release_published_at' => isset( $context['release_published_at'] ) ? (string) $context['release_published_at'] : '',
+			'download_url'         => isset( $context['download_url'] ) ? esc_url_raw( $context['download_url'] ) : '',
+		);
 	}
 
 	/**

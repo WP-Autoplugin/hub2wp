@@ -668,6 +668,18 @@ class H2WP_GitHub_API {
 		$compatibility = $this->evaluate_compatibility( $headers, $repo_type );
 		$compatibility['headers'] = $headers;
 		$compatibility['source_context'] = $source_context;
+		/**
+		 * Filter the resolved compatibility result for a repository.
+		 *
+		 * @param array           $compatibility Compatibility payload.
+		 * @param array           $headers       Parsed plugin/theme headers.
+		 * @param string          $owner         Repository owner.
+		 * @param string          $repo          Repository name.
+		 * @param string          $repo_type     Repository type: plugin|theme.
+		 * @param array           $source_context Resolved source context.
+		 * @param H2WP_GitHub_API $this          GitHub API client instance.
+		 */
+		$compatibility = apply_filters( 'hub2wp_compatibility_result', $compatibility, $headers, $owner, $repo, $repo_type, $source_context, $this );
 		H2WP_Cache::set( $cache_key, $compatibility );
 		return $compatibility;
 	}

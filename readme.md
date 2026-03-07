@@ -95,6 +95,57 @@ Yes, you can add private repositories to hub2wp by providing a GitHub token with
 
 ---
 
+## Developer-Friendly
+
+hub2wp is designed to be useful for site builders and developers, not just end users. It already supports private repositories, custom tracked branches, and release-priority update checking, and it also exposes filters so projects can adapt hub2wp to their own workflow without forking the plugin.
+
+Current custom filters:
+
+- **`hub2wp_repo_tracking_preferences`**: Override the effective tracked branch and `prioritize_releases` setting for one repository.
+- **`hub2wp_github_request_args`**: Adjust request arguments before a GitHub API request is sent. Useful for timeouts, custom headers, or enterprise/proxy integrations.
+- **`hub2wp_install_source_context`**: Override the resolved source context after hub2wp decides between branch-based and release-based tracking.
+- **`hub2wp_compatibility_result`**: Adjust the final compatibility result after plugin/theme headers have been parsed.
+
+Example:
+
+```php
+add_filter( 'hub2wp_repo_tracking_preferences', function( $preferences, $owner, $repo, $repo_type, $repo_data ) {
+	if ( 'acme' === $owner && 'my-plugin' === $repo ) {
+		$preferences['branch'] = 'develop';
+		$preferences['prioritize_releases'] = false;
+	}
+
+	return $preferences;
+}, 10, 5 );
+
+add_filter( 'hub2wp_github_request_args', function( $args, $url, $github_api ) {
+	$args['timeout'] = 20;
+	return $args;
+}, 10, 3 );
+
+add_filter( 'hub2wp_install_source_context', function( $context, $owner, $repo, $github_api ) {
+	if ( 'acme' === $owner && 'my-plugin' === $repo ) {
+		$context['source'] = 'branch';
+		$context['uses_releases'] = false;
+		$context['ref'] = 'develop';
+		$context['download_url'] = $github_api->get_download_url( $owner, $repo, 'develop' );
+	}
+
+	return $context;
+}, 10, 4 );
+
+add_filter( 'hub2wp_compatibility_result', function( $compatibility, $headers, $owner, $repo, $repo_type, $source_context, $github_api ) {
+	if ( 'acme' === $owner && 'legacy-plugin' === $repo ) {
+		$compatibility['is_compatible'] = true;
+		$compatibility['reason'] = '';
+	}
+
+	return $compatibility;
+}, 10, 7 );
+```
+
+---
+
 ## Contribution
 
 hub2wp is open source and welcomes contributions. If you encounter issues or have suggestions, please create an issue or pull request in the [GitHub repository](https://github.com/WP-Autoplugin/hub2wp).

@@ -35,6 +35,9 @@ No, but you have a higher request limit if you use one.
 
 == Changelog ==
 
+= 1.4.0 =
+* New: Use latest release files to check for updates if available, otherwise fall back to the selected branch.
+
 = 1.3.0 =
 * New: Added support for monitoring a specified branch for updates in addition to the default branch.
 

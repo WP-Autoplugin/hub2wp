@@ -40,23 +40,34 @@ class H2WP_Admin_Ajax {
 	}
 
 	/**
-	 * Resolve monitored branch for a repo, if configured.
+	 * Resolve monitored tracking preferences for a repo, if configured.
 	 *
 	 * @param string $owner     Repository owner.
 	 * @param string $repo      Repository name.
 	 * @param string $repo_type Repository type.
-	 * @return string
+	 * @return array
 	 */
-	private function get_monitored_branch( $owner, $repo, $repo_type = 'plugin' ) {
+	private function get_monitored_tracking_preferences( $owner, $repo, $repo_type = 'plugin' ) {
 		$option_name = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
 		$monitored   = get_option( $option_name, array() );
 		$repo_key    = $owner . '/' . $repo;
+		$branch      = '';
+		$prioritize_releases = true;
 
-		if ( isset( $monitored[ $repo_key ]['branch'] ) ) {
-			return (string) $monitored[ $repo_key ]['branch'];
+		if ( isset( $monitored[ $repo_key ] ) && is_array( $monitored[ $repo_key ] ) ) {
+			if ( isset( $monitored[ $repo_key ]['branch'] ) ) {
+				$branch = (string) $monitored[ $repo_key ]['branch'];
+			}
+
+			if ( array_key_exists( 'prioritize_releases', $monitored[ $repo_key ] ) ) {
+				$prioritize_releases = (bool) $monitored[ $repo_key ]['prioritize_releases'];
+			}
 		}
 
-		return '';
+		return array(
+			'branch'              => $branch,
+			'prioritize_releases' => $prioritize_releases,
+		);
 	}
 
 	/**
@@ -95,7 +106,8 @@ class H2WP_Admin_Ajax {
 		// Get access token from settings.
 		$access_token = H2WP_Settings::get_access_token();
 		$api          = new H2WP_GitHub_API( $access_token );
-		$branch       = $this->get_monitored_branch( $owner, $repo, $repo_type );
+		$tracking     = $this->get_monitored_tracking_preferences( $owner, $repo, $repo_type );
+		$source_context = $api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'] );
 
 		// Fetch data.
 		$repo_details = $api->get_repo_details( $owner, $repo );
@@ -103,7 +115,7 @@ class H2WP_Admin_Ajax {
 			wp_send_json_error( array( 'message' => $repo_details->get_error_message() ) );
 		}
 
-		$readme_html = $api->get_readme_html( $owner, $repo, $branch );
+		$readme_html = $api->get_readme_html( $owner, $repo, $source_context['ref'] );
 		if ( is_wp_error( $readme_html ) ) {
 			$readme_html = __( 'No README available.', 'hub2wp' );
 		}
@@ -124,10 +136,30 @@ class H2WP_Admin_Ajax {
 			);
 		}
 
-		$branch_for_updated_at = ! empty( $branch ) ? $branch : ( isset( $repo_details['default_branch'] ) ? $repo_details['default_branch'] : '' );
-		if ( ! empty( $branch_for_updated_at ) ) {
-			$branch_details = $api->get_branch_details( $owner, $repo, $branch_for_updated_at );
-			if ( ! is_wp_error( $branch_details ) && isset( $branch_details['commit']['commit']['author']['date'] ) ) {
+		if ( ! empty( $source_context['uses_releases'] ) && ! empty( $source_context['release_published_at'] ) ) {
+			$last_updated = sprintf(
+				/* translators: %s: human-readable time difference */
+				__( '%s ago', 'hub2wp' ),
+				human_time_diff( strtotime( $source_context['release_published_at'] ) )
+			);
+		} else {
+			$branch_for_updated_at = ! empty( $tracking['branch'] ) ? $tracking['branch'] : ( isset( $repo_details['default_branch'] ) ? $repo_details['default_branch'] : '' );
+			if ( ! empty( $branch_for_updated_at ) ) {
+				$branch_details = $api->get_branch_details( $owner, $repo, $branch_for_updated_at );
+				if ( ! is_wp_error( $branch_details ) && isset( $branch_details['commit']['commit']['author']['date'] ) ) {
+					$last_updated = sprintf(
+						/* translators: %s: human-readable time difference */
+						__( '%s ago', 'hub2wp' ),
+						human_time_diff( strtotime( $branch_details['commit']['commit']['author']['date'] ) )
+					);
+				}
+			}
+		}
+
+		$effective_ref = ! empty( $source_context['ref'] ) ? $source_context['ref'] : ( isset( $repo_details['default_branch'] ) ? $repo_details['default_branch'] : '' );
+		if ( empty( $source_context['uses_releases'] ) && ! empty( $effective_ref ) ) {
+			$branch_details = $api->get_branch_details( $owner, $repo, $effective_ref );
+			if ( ! is_wp_error( $branch_details ) && isset( $branch_details['commit']['commit']['author']['date'] ) && empty( $last_updated ) ) {
 				$last_updated = sprintf(
 					/* translators: %s: human-readable time difference */
 					__( '%s ago', 'hub2wp' ),
@@ -158,6 +190,9 @@ class H2WP_Admin_Ajax {
 			'topics'           => isset( $repo_details['topics'] ) ? $this->extract_topics( $repo_details['topics'], $repo_type ) : array(),
 			'is_installed'     => H2WP_Admin_Page::is_repo_installed( $owner, $repo, $repo_type ),
 			'repo_type'        => $repo_type,
+			'prioritize_releases' => ! empty( $tracking['prioritize_releases'] ),
+			'uses_releases'    => ! empty( $source_context['uses_releases'] ),
+			'version_source'   => isset( $source_context['source'] ) ? $source_context['source'] : 'branch',
 		);
 
 		wp_send_json_success( $data );
@@ -236,15 +271,16 @@ class H2WP_Admin_Ajax {
 		ob_start();
 
 		// Check if plugin is compatible.
-		$api          = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
-		$branch       = $this->get_monitored_branch( $owner, $repo, $repo_type );
-		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type, $branch );
+		$api           = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+		$tracking      = $this->get_monitored_tracking_preferences( $owner, $repo, $repo_type );
+		$source_context = $api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'] );
+		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type, $tracking['branch'], $tracking['prioritize_releases'], $source_context );
 		if ( ! $compatibility['is_compatible'] ) {
 			$this->clean_ajax_buffers( 0 );
 			wp_send_json_error( array( 'message' => $compatibility['reason'] ) );
 		}
 
-		$download_url = $api->get_download_url( $owner, $repo, $branch );
+		$download_url = $source_context['download_url'];
 
 		// Install the plugin. Pass the access token so private-repo zips can be
 		// downloaded with an Authorization header (the upgrader's built-in
@@ -265,13 +301,16 @@ class H2WP_Admin_Ajax {
 			$theme_data['repo_type'] = 'theme';
 			$theme_data['stylesheet'] = $this->find_theme_stylesheet( $theme_data );
 
-			$h2wp_themes = get_option( 'h2wp_themes', array() );
-			$repo_key    = $owner . '/' . $repo;
-			$existing    = isset( $h2wp_themes[ $repo_key ] ) ? $h2wp_themes[ $repo_key ] : array();
-			$h2wp_themes[ $repo_key ]                 = array_merge( $existing, $theme_data );
-			$h2wp_themes[ $repo_key ]['last_checked'] = time();
-			$h2wp_themes[ $repo_key ]['last_updated'] = time();
-			update_option( 'h2wp_themes', $h2wp_themes, false );
+				$h2wp_themes = get_option( 'h2wp_themes', array() );
+				$repo_key    = $owner . '/' . $repo;
+				$existing    = isset( $h2wp_themes[ $repo_key ] ) ? $h2wp_themes[ $repo_key ] : array();
+				$h2wp_themes[ $repo_key ]                         = array_merge( $existing, $theme_data );
+				$h2wp_themes[ $repo_key ]['last_checked']        = time();
+				$h2wp_themes[ $repo_key ]['last_updated']        = time();
+				$h2wp_themes[ $repo_key ]['prioritize_releases'] = isset( $existing['prioritize_releases'] ) ? (bool) $existing['prioritize_releases'] : true;
+				$h2wp_themes[ $repo_key ]['uses_releases']       = ! empty( $source_context['uses_releases'] );
+				$h2wp_themes[ $repo_key ]['version_source']      = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
+				update_option( 'h2wp_themes', $h2wp_themes, false );
 
 			$template = ! empty( $theme_data['template'] ) ? $theme_data['template'] : $theme_data['stylesheet'];
 			$theme_data['activate_url'] = add_query_arg(
@@ -303,6 +342,9 @@ class H2WP_Admin_Ajax {
 		$h2wp_plugins[ $repo_key ] = array_merge( $existing, $plugin_data );
 		$h2wp_plugins[ $repo_key ]['last_checked'] = time();
 		$h2wp_plugins[ $repo_key ]['last_updated'] = time();
+		$h2wp_plugins[ $repo_key ]['prioritize_releases'] = isset( $existing['prioritize_releases'] ) ? (bool) $existing['prioritize_releases'] : true;
+		$h2wp_plugins[ $repo_key ]['uses_releases']       = ! empty( $source_context['uses_releases'] );
+		$h2wp_plugins[ $repo_key ]['version_source']      = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
 		update_option( 'h2wp_plugins', $h2wp_plugins, false );
 
 		$plugin_data['activate_url'] = add_query_arg( array(
@@ -341,12 +383,21 @@ class H2WP_Admin_Ajax {
 		// Get access token from settings.
 		$access_token = H2WP_Settings::get_access_token();
 		$api          = new H2WP_GitHub_API( $access_token );
-		$branch       = $this->get_monitored_branch( $owner, $repo, $repo_type );
+		$tracking     = $this->get_monitored_tracking_preferences( $owner, $repo, $repo_type );
+		$source_context = $api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'] );
 
 		// Check compatibility.
-		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type, $branch );
+		$compatibility = $api->check_compatibility( $owner, $repo, $repo_type, $tracking['branch'], $tracking['prioritize_releases'], $source_context );
 
-		wp_send_json_success( array( 'is_compatible' => $compatibility['is_compatible'], 'reason' => $compatibility['reason'], 'headers' => ! empty( $compatibility['headers'] ) ? $compatibility['headers'] : array() ) );
+		wp_send_json_success(
+			array(
+				'is_compatible' => $compatibility['is_compatible'],
+				'reason'        => $compatibility['reason'],
+				'headers'       => ! empty( $compatibility['headers'] ) ? $compatibility['headers'] : array(),
+				'version_source'=> isset( $source_context['source'] ) ? $source_context['source'] : 'branch',
+				'uses_releases' => ! empty( $source_context['uses_releases'] ),
+			)
+		);
 	}
 
 	/**

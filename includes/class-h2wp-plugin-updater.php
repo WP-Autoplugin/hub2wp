@@ -68,9 +68,11 @@ class H2WP_Plugin_Updater {
 		foreach ( $h2wp_plugins as $plugin_id => &$plugin ) {
 			list( $owner, $repo ) = explode( '/', $plugin_id );
 			$branch = isset( $plugin['branch'] ) ? $plugin['branch'] : '';
+			$prioritize_releases = ! array_key_exists( 'prioritize_releases', $plugin ) || ! empty( $plugin['prioritize_releases'] );
+			$source_context      = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
 
 			// Get readme headers
-			$headers = $api->get_readme_headers( $owner, $repo, $branch );
+			$headers = $api->get_readme_headers( $owner, $repo, $branch, $prioritize_releases, $source_context );
 			if ( is_wp_error( $headers ) || empty( $headers['stable tag'] ) ) {
 				if ( is_wp_error( $headers ) ) {
 					self::log_debug( sprintf( 'Plugin update check failed for %s: %s', $plugin_id, $headers->get_error_message() ) );
@@ -84,7 +86,10 @@ class H2WP_Plugin_Updater {
 			$plugin['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$plugin['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
 			$plugin['last_checked'] = $now;
-			$plugin['download_url'] = $api->get_download_url( $owner, $repo, $branch );
+			$plugin['download_url'] = $source_context['download_url'];
+			$plugin['uses_releases'] = ! empty( $source_context['uses_releases'] );
+			$plugin['version_source'] = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
+			$plugin['prioritize_releases'] = $prioritize_releases;
 
 			$plugins_updated = true;
 		}
@@ -97,8 +102,10 @@ class H2WP_Plugin_Updater {
 		foreach ( $h2wp_themes as $theme_id => &$theme ) {
 			list( $owner, $repo ) = explode( '/', $theme_id );
 			$branch = isset( $theme['branch'] ) ? $theme['branch'] : '';
+			$prioritize_releases = ! array_key_exists( 'prioritize_releases', $theme ) || ! empty( $theme['prioritize_releases'] );
+			$source_context      = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
 
-			$headers = $api->get_theme_headers( $owner, $repo, $branch );
+			$headers = $api->get_theme_headers( $owner, $repo, $branch, $prioritize_releases, $source_context );
 			if ( is_wp_error( $headers ) || empty( $headers['version'] ) ) {
 				if ( is_wp_error( $headers ) ) {
 					self::log_debug( sprintf( 'Theme update check failed for %s: %s', $theme_id, $headers->get_error_message() ) );
@@ -111,7 +118,10 @@ class H2WP_Plugin_Updater {
 			$theme['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$theme['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
 			$theme['last_checked'] = $now;
-			$theme['download_url'] = $api->get_download_url( $owner, $repo, $branch );
+			$theme['download_url'] = $source_context['download_url'];
+			$theme['uses_releases'] = ! empty( $source_context['uses_releases'] );
+			$theme['version_source'] = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
+			$theme['prioritize_releases'] = $prioritize_releases;
 
 			if ( empty( $theme['stylesheet'] ) ) {
 				$theme['stylesheet'] = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );
@@ -274,10 +284,12 @@ class H2WP_Plugin_Updater {
 			if ( $plugin_slug === $args->slug ) {
 				list( $owner, $repo ) = explode( '/', $plugin_id );
 				$branch = isset( $plugin['branch'] ) ? $plugin['branch'] : '';
+				$prioritize_releases = ! array_key_exists( 'prioritize_releases', $plugin ) || ! empty( $plugin['prioritize_releases'] );
 
 				$api          = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+				$source_context = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
 				$repo_details = $api->get_repo_details( $owner, $repo );
-				$readme_html  = $api->get_readme_html( $owner, $repo, $branch );
+				$readme_html  = $api->get_readme_html( $owner, $repo, $source_context['ref'] );
 
 				if ( is_wp_error( $repo_details ) || is_wp_error( $readme_html ) ) {
 					return $result;

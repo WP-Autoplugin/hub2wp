@@ -262,80 +262,51 @@ class H2WP_Admin_Ajax {
 		}
 
 		$download_url = $source_context['download_url'];
+		if ( empty( $download_url ) ) {
+			$this->clean_ajax_buffers( 0 );
+			wp_send_json_error( array( 'message' => __( 'Could not determine a download URL for this repository.', 'hub2wp' ) ) );
+		}
 
-		// Install the plugin. Pass the access token so private-repo zips can be
-		// downloaded with an Authorization header (the upgrader's built-in
-		// download_url() never sends auth headers).
-		$installer = new H2WP_Plugin_Installer();
-		$result    = ( 'theme' === $repo_type )
-			? $installer->install_theme( $download_url, H2WP_Settings::get_access_token() )
-			: $installer->install_plugin( $download_url, H2WP_Settings::get_access_token() );
+		$result = H2WP_Repo_Manager::install_repository(
+			$owner,
+			$repo,
+			array(
+				'repo_type'           => $repo_type,
+				'branch'              => $tracking['branch'],
+				'prioritize_releases' => $tracking['prioritize_releases'],
+				'access_token'        => H2WP_Settings::get_access_token(),
+			)
+		);
+
 		if ( is_wp_error( $result ) ) {
 			$this->clean_ajax_buffers( 0 );
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 
 		if ( 'theme' === $repo_type ) {
-			$theme_data             = $installer->theme_data;
-			$theme_data['owner']    = $owner;
-			$theme_data['repo']     = $repo;
-			$theme_data['repo_type'] = 'theme';
-			$theme_data['stylesheet'] = $this->find_theme_stylesheet( $theme_data );
-
-				$h2wp_themes = get_option( 'h2wp_themes', array() );
-				$repo_key    = $owner . '/' . $repo;
-				$existing    = isset( $h2wp_themes[ $repo_key ] ) ? $h2wp_themes[ $repo_key ] : array();
-				$h2wp_themes[ $repo_key ]                         = array_merge( $existing, $theme_data );
-				$h2wp_themes[ $repo_key ]['last_checked']        = time();
-				$h2wp_themes[ $repo_key ]['last_updated']        = time();
-				$h2wp_themes[ $repo_key ]['prioritize_releases'] = isset( $existing['prioritize_releases'] ) ? (bool) $existing['prioritize_releases'] : true;
-				$h2wp_themes[ $repo_key ]['uses_releases']       = ! empty( $source_context['uses_releases'] );
-				$h2wp_themes[ $repo_key ]['version_source']      = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
-				update_option( 'h2wp_themes', $h2wp_themes, false );
-
-			$template = ! empty( $theme_data['template'] ) ? $theme_data['template'] : $theme_data['stylesheet'];
-			$theme_data['activate_url'] = add_query_arg(
+			$template               = ! empty( $result['template'] ) ? $result['template'] : $result['stylesheet'];
+			$result['activate_url'] = add_query_arg(
 				array(
 					'action'     => 'activate',
-					'stylesheet' => $theme_data['stylesheet'],
+					'stylesheet' => $result['stylesheet'],
 					'template'   => $template,
-					'_wpnonce'   => wp_create_nonce( 'switch-theme_' . $theme_data['stylesheet'] ),
+					'_wpnonce'   => wp_create_nonce( 'switch-theme_' . $result['stylesheet'] ),
 				),
 				admin_url( 'themes.php' )
 			);
 
 			$this->clean_ajax_buffers( 0 );
-			wp_send_json_success( $theme_data );
+			wp_send_json_success( $result );
 		}
 
-		$plugin_data          = $installer->plugin_data;
-		$plugin_data['owner'] = $owner;
-		$plugin_data['repo']  = $repo;
-		$plugin_data['repo_type'] = 'plugin';
-
-		$plugin_data['plugin_file'] = $this->find_plugin_file( $plugin_data );
-
-		// Store plugin data in the h2wp_plugins option.
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-		$repo_key = $owner . '/' . $repo;
-		// Preserve existing fields (e.g. 'private' flag set when manually monitoring the repo).
-		$existing = isset( $h2wp_plugins[ $repo_key ] ) ? $h2wp_plugins[ $repo_key ] : array();
-		$h2wp_plugins[ $repo_key ] = array_merge( $existing, $plugin_data );
-		$h2wp_plugins[ $repo_key ]['last_checked'] = time();
-		$h2wp_plugins[ $repo_key ]['last_updated'] = time();
-		$h2wp_plugins[ $repo_key ]['prioritize_releases'] = isset( $existing['prioritize_releases'] ) ? (bool) $existing['prioritize_releases'] : true;
-		$h2wp_plugins[ $repo_key ]['uses_releases']       = ! empty( $source_context['uses_releases'] );
-		$h2wp_plugins[ $repo_key ]['version_source']      = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
-		update_option( 'h2wp_plugins', $h2wp_plugins, false );
-
-		$plugin_data['activate_url'] = add_query_arg( array(
+		$result['activate_url'] = add_query_arg( array(
 			'action' => 'activate',
-			'plugin' => $plugin_data['plugin_file'],
-			'_wpnonce' => wp_create_nonce( 'activate-plugin_' . $plugin_data['plugin_file'] ),
+			'plugin' => $result['plugin_file'],
+			'_wpnonce' => wp_create_nonce( 'activate-plugin_' . $result['plugin_file'] ),
 		), admin_url( 'plugins.php' ) );
 
 		$this->clean_ajax_buffers( 0 );
-		wp_send_json_success( $plugin_data );
+		wp_send_json_success( $result );
 	}
 
 	/**
@@ -430,47 +401,6 @@ class H2WP_Admin_Ajax {
 				'url'  => add_query_arg( 'tag', $topic, $base_url ),
 			);
 		}, $topics ) ) );
-	}
-
-	/**
-	 * Find the plugin file in the plugin directory.
-	 *
-	 * @param array $plugin_data Plugin data.
-	 * @return string|bool Plugin file path or false if not found.
-	 */
-	private function find_plugin_file( $plugin_data ) {
-		$plugin_file = false;
-
-		$plugins = get_plugins();
-		foreach ( $plugins as $file => $data ) {
-			if ( $data['Name'] === $plugin_data['name'] && $data['Author'] === $plugin_data['author'] ) {
-				$plugin_file = $file;
-				break;
-			}
-		}
-
-		return $plugin_file;
-	}
-
-	/**
-	 * Find the installed stylesheet slug for a theme.
-	 *
-	 * @param array $theme_data Theme data.
-	 * @return string|bool
-	 */
-	private function find_theme_stylesheet( $theme_data ) {
-		if ( ! empty( $theme_data['stylesheet'] ) ) {
-			return $theme_data['stylesheet'];
-		}
-
-		$themes = wp_get_themes();
-		foreach ( $themes as $stylesheet => $theme ) {
-			if ( $theme->get( 'Name' ) === $theme_data['name'] ) {
-				return $stylesheet;
-			}
-		}
-
-		return false;
 	}
 
 	/**

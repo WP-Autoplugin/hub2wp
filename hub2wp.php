@@ -24,6 +24,8 @@ define( 'H2WP_RESULTS_PER_PAGE', 12 );
 
 // Include autoload.
 require_once H2WP_PLUGIN_DIR . 'vendor/autoload.php';
+require_once H2WP_PLUGIN_DIR . 'includes/class-h2wp-repo-manager.php';
+require_once H2WP_PLUGIN_DIR . 'includes/class-h2wp-cli-command.php';
 
 // Activation hook.
 register_activation_hook( __FILE__, array( 'H2WP_Plugin_Updater', 'activate' ) );
@@ -42,3 +44,6 @@ H2WP_Plugin_Updater::init();
 
 // Initialize AJAX handler.
 new H2WP_Admin_Ajax();
+
+// Register WP-CLI commands.
+H2WP_CLI_Command::init();

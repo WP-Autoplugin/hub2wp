@@ -35,8 +35,13 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
    hub2wp checks for updates using a two-step priority system. First, if the repository has GitHub releases, it uses the **latest release tag** to determine the current version and downloads the release archive. If no releases exist — or if release-based checking is disabled in "Settings > GitHub Plugins" — it falls back to reading the `Stable tag:` or `Version:` header from the tracked branch (the repository's default branch, or a custom branch you configure). When a new version is detected, you will receive an update notification in your WordPress dashboard, allowing you to update the plugin or theme directly from there.
 
 3. **Installation**:
-   - Download the latest release from the [Releases](https://github.com/WP-Autoplugin/hub2wp/releases) page.
-   - Upload the ZIP file via the 'Plugins' screen in WordPress or extract it to the `/wp-content/plugins/` directory.
+   - Install the latest GitHub release with WP-CLI:
+
+     ```bash
+     wp plugin install "https://github.com/WP-Autoplugin/hub2wp/archive/refs/tags/$(curl -fsSL https://api.github.com/repos/WP-Autoplugin/hub2wp/releases/latest | php -r '$release = json_decode(stream_get_contents(STDIN), true); echo $release[\"tag_name\"];').zip" --activate
+     ```
+
+   - Or download the latest release from the [Releases](https://github.com/WP-Autoplugin/hub2wp/releases) page and upload the ZIP file via the 'Plugins' screen in WordPress or extract it to the `/wp-content/plugins/` directory.
    - Activate hub2wp from the 'Plugins' menu.
    - Start exploring GitHub plugins under "Plugins > Add GitHub Plugin". Browse themes by clicking on the "GitHub Themes" button under "Appearance > Themes".
 
@@ -98,6 +103,22 @@ Yes, you can add private repositories to hub2wp by providing a GitHub token with
 ## Developer-Friendly
 
 hub2wp is designed to be useful for site builders and developers, not just end users. It already supports private repositories, custom tracked branches, and release-priority update checking, and it also exposes filters so projects can adapt hub2wp to their own workflow without forking the plugin.
+
+### WP-CLI
+
+hub2wp now ships with a tracked GitHub install command for plugins:
+
+```bash
+wp hub2wp plugin install owner/repo --activate
+```
+
+Useful flags:
+
+- `--branch=<branch>` to track a specific branch.
+- `--no-release-priority` to force branch-based tracking even if releases exist.
+- `--token=<token>` to install from a private repository or override the stored hub2wp token for this run.
+
+This command installs the plugin from GitHub and immediately registers it in hub2wp's monitored plugins list so update checks behave the same as installs started from "Plugins > Add GitHub Plugin".
 
 Current custom filters:
 

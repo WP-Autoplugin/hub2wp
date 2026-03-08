@@ -44,6 +44,12 @@ Optional flags:
 * `--no-release-priority` to force branch-based tracking even if releases exist.
 * `--token=<token>` to install from a private repository or override the stored hub2wp token for that command.
 
+Manage hub2wp settings with WP-CLI too:
+* `wp hub2wp settings set access_token ghp_xxx`
+* `wp hub2wp settings set cache_duration 6`
+* `wp hub2wp settings get access_token`
+* `wp hub2wp settings list`
+
 == Frequently Asked Questions ==
 
 = Do I need a GitHub token? =

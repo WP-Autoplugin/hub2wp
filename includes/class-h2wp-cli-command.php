@@ -18,6 +18,7 @@ class H2WP_CLI_Command {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			WP_CLI::add_command( 'hub2wp plugin', 'H2WP_CLI_Plugin_Command' );
 			WP_CLI::add_command( 'hub2wp theme', 'H2WP_CLI_Theme_Command' );
+			WP_CLI::add_command( 'hub2wp settings', 'H2WP_CLI_Settings_Command' );
 		}
 	}
 }
@@ -192,5 +193,215 @@ class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
 		}
 
 		WP_CLI::success( sprintf( __( 'Installed and tracked theme %s from %s/%s.', 'hub2wp' ), $result['stylesheet'], $owner, $repo ) );
+	}
+}
+
+/**
+ * WP-CLI settings commands.
+ */
+class H2WP_CLI_Settings_Command {
+
+	/**
+	 * List hub2wp settings.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--show-secrets]
+	 * : Show secret values such as the GitHub access token without masking.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp hub2wp settings list
+	 *     wp hub2wp settings list --show-secrets
+	 *
+	 * @subcommand list
+	 *
+	 * @param array $args Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @return void
+	 */
+	public function list_( $args, $assoc_args ) {
+		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
+		$rows     = array(
+			array(
+				'field' => 'access_token',
+				'value' => $this->format_setting_value(
+					'access_token',
+					isset( $settings['access_token'] ) ? $settings['access_token'] : '',
+					\WP_CLI\Utils\get_flag_value( $assoc_args, 'show-secrets', false )
+				),
+			),
+			array(
+				'field' => 'cache_duration',
+				'value' => isset( $settings['cache_duration'] ) ? (string) absint( $settings['cache_duration'] ) : '12',
+			),
+		);
+
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'field', 'value' ) );
+	}
+
+	/**
+	 * Get a hub2wp setting value.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <field>
+	 * : Setting field. Supported: access_token, cache_duration.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp hub2wp settings get access_token
+	 *     wp hub2wp settings get cache_duration
+	 *
+	 * @subcommand get
+	 *
+	 * @param array $args Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @return void
+	 */
+	public function get( $args, $assoc_args ) {
+		$field    = $this->normalize_field_name( $args[0] );
+		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
+
+		if ( ! $this->is_supported_field( $field ) ) {
+			WP_CLI::error( __( 'Unsupported setting. Supported fields: access_token, cache_duration.', 'hub2wp' ) );
+		}
+
+		$value = isset( $settings[ $field ] ) ? $settings[ $field ] : $this->get_default_setting_value( $field );
+		WP_CLI::line( (string) $value );
+	}
+
+	/**
+	 * Update a hub2wp setting value.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <field>
+	 * : Setting field. Supported: access_token, cache_duration.
+	 *
+	 * <value>
+	 * : New value for the setting.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp hub2wp settings set access_token ghp_xxx
+	 *     wp hub2wp settings set cache_duration 6
+	 *
+	 * @subcommand set
+	 *
+	 * @param array $args Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @return void
+	 */
+	public function set( $args, $assoc_args ) {
+		$field    = $this->normalize_field_name( $args[0] );
+		$value    = isset( $args[1] ) ? $args[1] : '';
+		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
+
+		if ( ! $this->is_supported_field( $field ) ) {
+			WP_CLI::error( __( 'Unsupported setting. Supported fields: access_token, cache_duration.', 'hub2wp' ) );
+		}
+
+		$settings[ $field ] = $value;
+		$settings           = H2WP_Settings::sanitize_settings( $settings );
+
+		if ( 'cache_duration' === $field && empty( $settings['cache_duration'] ) ) {
+			WP_CLI::error( __( 'cache_duration must be a positive integer number of hours.', 'hub2wp' ) );
+		}
+
+		update_option( H2WP_Settings::OPTION_NAME, $settings, false );
+
+		WP_CLI::success( sprintf( __( 'Updated hub2wp setting "%s".', 'hub2wp' ), $field ) );
+	}
+
+	/**
+	 * Delete a hub2wp setting value so the default applies again.
+	 *
+	 * ## OPTIONS
+	 *
+	 * <field>
+	 * : Setting field. Supported: access_token, cache_duration.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp hub2wp settings delete access_token
+	 *
+	 * @subcommand delete
+	 *
+	 * @param array $args Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @return void
+	 */
+	public function delete( $args, $assoc_args ) {
+		$field    = $this->normalize_field_name( $args[0] );
+		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
+
+		if ( ! $this->is_supported_field( $field ) ) {
+			WP_CLI::error( __( 'Unsupported setting. Supported fields: access_token, cache_duration.', 'hub2wp' ) );
+		}
+
+		unset( $settings[ $field ] );
+		update_option( H2WP_Settings::OPTION_NAME, H2WP_Settings::sanitize_settings( $settings ), false );
+
+		WP_CLI::success( sprintf( __( 'Deleted hub2wp setting "%s".', 'hub2wp' ), $field ) );
+	}
+
+	/**
+	 * Normalize a requested field name.
+	 *
+	 * @param string $field Setting field.
+	 * @return string
+	 */
+	private function normalize_field_name( $field ) {
+		return sanitize_key( (string) $field );
+	}
+
+	/**
+	 * Check whether a field is supported.
+	 *
+	 * @param string $field Setting field.
+	 * @return bool
+	 */
+	private function is_supported_field( $field ) {
+		return in_array( $field, array( 'access_token', 'cache_duration' ), true );
+	}
+
+	/**
+	 * Get the default value for a supported setting.
+	 *
+	 * @param string $field Setting field.
+	 * @return string
+	 */
+	private function get_default_setting_value( $field ) {
+		if ( 'cache_duration' === $field ) {
+			return '12';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Format a setting value for table output.
+	 *
+	 * @param string $field Setting field.
+	 * @param string $value Setting value.
+	 * @param bool   $show_secrets Whether secrets should be shown unmasked.
+	 * @return string
+	 */
+	private function format_setting_value( $field, $value, $show_secrets ) {
+		if ( 'access_token' === $field && ! $show_secrets ) {
+			if ( '' === $value ) {
+				return '';
+			}
+
+			$length = strlen( $value );
+			if ( $length <= 8 ) {
+				return str_repeat( '*', $length );
+			}
+
+			return substr( $value, 0, 4 ) . str_repeat( '*', $length - 8 ) . substr( $value, -4 );
+		}
+
+		return (string) $value;
 	}
 }

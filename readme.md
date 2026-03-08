@@ -121,6 +121,15 @@ Useful flags:
 
 These commands install the extension from GitHub and immediately register it in hub2wp's monitored plugins or monitored themes list so update checks behave the same as installs started from the hub2wp UI.
 
+You can also manage hub2wp settings from WP-CLI:
+
+```bash
+wp hub2wp settings set access_token ghp_xxx
+wp hub2wp settings set cache_duration 6
+wp hub2wp settings get access_token
+wp hub2wp settings list
+```
+
 ### Filters
 
 Current custom filters:

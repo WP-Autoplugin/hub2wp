@@ -106,10 +106,11 @@ hub2wp is designed to be useful for site builders and developers, not just end u
 
 ### WP-CLI
 
-hub2wp now ships with a tracked GitHub install command for plugins:
+hub2wp now ships with tracked GitHub install commands for plugins and themes:
 
 ```bash
 wp hub2wp plugin install owner/repo --activate
+wp hub2wp theme install owner/repo --activate
 ```
 
 Useful flags:
@@ -118,7 +119,7 @@ Useful flags:
 - `--no-release-priority` to force branch-based tracking even if releases exist.
 - `--token=<token>` to install from a private repository or override the stored hub2wp token for this run.
 
-This command installs the plugin from GitHub and immediately registers it in hub2wp's monitored plugins list so update checks behave the same as installs started from "Plugins > Add GitHub Plugin".
+These commands install the extension from GitHub and immediately register it in hub2wp's monitored plugins or monitored themes list so update checks behave the same as installs started from the hub2wp UI.
 
 ### Filters
 

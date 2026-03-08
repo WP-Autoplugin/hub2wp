@@ -110,7 +110,9 @@ hub2wp now ships with tracked GitHub install commands for plugins and themes:
 
 ```bash
 wp hub2wp plugin install owner/repo --activate
+wp hub2wp plugin list
 wp hub2wp theme install owner/repo --activate
+wp hub2wp theme list
 ```
 
 Useful flags:
@@ -120,6 +122,7 @@ Useful flags:
 - `--token=<token>` to install from a private repository or override the stored hub2wp token for this run.
 
 These commands install the extension from GitHub and immediately register it in hub2wp's monitored plugins or monitored themes list so update checks behave the same as installs started from the hub2wp UI.
+The `list` commands show the tracked plugin or theme name, GitHub repository, and local directory/slug.
 
 You can also manage hub2wp settings from WP-CLI:
 

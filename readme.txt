@@ -35,9 +35,13 @@ Features:
 
 Install and track a GitHub plugin so hub2wp can monitor updates for it:
 `wp hub2wp plugin install owner/repo --activate`
+List tracked plugins:
+`wp hub2wp plugin list`
 
 Install and track a GitHub theme too:
 `wp hub2wp theme install owner/repo --activate`
+List tracked themes:
+`wp hub2wp theme list`
 
 Optional flags:
 * `--branch=<branch>` to track a specific branch.

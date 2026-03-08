@@ -47,12 +47,76 @@ class H2WP_CLI_Repo_Command {
 
 		return array( '', '' );
 	}
+
+	/**
+	 * Get the local directory/slug displayed for a tracked item.
+	 *
+	 * @param array  $item Tracked item data.
+	 * @param string $repo_type Repository type.
+	 * @return string
+	 */
+	protected function get_local_directory_name( $item, $repo_type ) {
+		if ( 'theme' === $repo_type ) {
+			if ( ! empty( $item['stylesheet'] ) ) {
+				return (string) $item['stylesheet'];
+			}
+
+			if ( ! empty( $item['directory'] ) ) {
+				return (string) $item['directory'];
+			}
+
+			return '';
+		}
+
+		if ( ! empty( $item['plugin_file'] ) ) {
+			return dirname( (string) $item['plugin_file'] );
+		}
+
+		if ( ! empty( $item['directory'] ) ) {
+			return (string) $item['directory'];
+		}
+
+		return '';
+	}
 }
 
 /**
  * WP-CLI plugin commands.
  */
 class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
+
+	/**
+	 * List plugins tracked by hub2wp.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp hub2wp plugin list
+	 *
+	 * @subcommand list
+	 *
+	 * @param array $args Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @return void
+	 */
+	public function list_( $args, $assoc_args ) {
+		$tracked = get_option( 'h2wp_plugins', array() );
+		$rows    = array();
+
+		foreach ( $tracked as $repo_key => $plugin ) {
+			$rows[] = array(
+				'name'      => isset( $plugin['name'] ) ? (string) $plugin['name'] : $repo_key,
+				'repo'      => $repo_key,
+				'directory' => $this->get_local_directory_name( $plugin, 'plugin' ),
+			);
+		}
+
+		if ( empty( $rows ) ) {
+			WP_CLI::success( __( 'No plugins are currently tracked by hub2wp.', 'hub2wp' ) );
+			return;
+		}
+
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'name', 'repo', 'directory' ) );
+	}
 
 	/**
 	 * Install a GitHub-hosted plugin and register it for hub2wp updates.
@@ -126,6 +190,39 @@ class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
  * WP-CLI theme commands.
  */
 class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
+
+	/**
+	 * List themes tracked by hub2wp.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp hub2wp theme list
+	 *
+	 * @subcommand list
+	 *
+	 * @param array $args Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @return void
+	 */
+	public function list_( $args, $assoc_args ) {
+		$tracked = get_option( 'h2wp_themes', array() );
+		$rows    = array();
+
+		foreach ( $tracked as $repo_key => $theme ) {
+			$rows[] = array(
+				'name'      => isset( $theme['name'] ) ? (string) $theme['name'] : $repo_key,
+				'repo'      => $repo_key,
+				'directory' => $this->get_local_directory_name( $theme, 'theme' ),
+			);
+		}
+
+		if ( empty( $rows ) ) {
+			WP_CLI::success( __( 'No themes are currently tracked by hub2wp.', 'hub2wp' ) );
+			return;
+		}
+
+		WP_CLI\Utils\format_items( 'table', $rows, array( 'name', 'repo', 'directory' ) );
+	}
 
 	/**
 	 * Install a GitHub-hosted theme and register it for hub2wp updates.

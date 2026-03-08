@@ -23,9 +23,10 @@ Features:
 
 == Installation ==
 
-1. Install the latest GitHub release with WP-CLI:
+1. Install the latest GitHub release:
+    a. With WP-CLI:
 `wp plugin install "https://github.com/WP-Autoplugin/hub2wp/archive/refs/tags/$(curl -fsSL https://api.github.com/repos/WP-Autoplugin/hub2wp/releases/latest | php -r '$release = json_decode(stream_get_contents(STDIN), true); echo $release["tag_name"];').zip" --activate`
-2. Or upload the `hub2wp` folder to the `/wp-content/plugins/` directory.
+    b. Or download the latest release from GitHub and upload it to your WordPress plugins directory.
 3. Activate the plugin through the 'Plugins' menu in WordPress.
 4. Navigate to "Plugins > Add GitHub Plugin" to browse plugins.
 5. Go to "Settings > GitHub Plugins" to add an optional personal access token and configure caching.

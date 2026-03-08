@@ -120,6 +120,8 @@ Useful flags:
 
 This command installs the plugin from GitHub and immediately registers it in hub2wp's monitored plugins list so update checks behave the same as installs started from "Plugins > Add GitHub Plugin".
 
+### Filters
+
 Current custom filters:
 
 - **`hub2wp_repo_tracking_preferences`**: Override the effective tracked branch and `prioritize_releases` setting for one repository.

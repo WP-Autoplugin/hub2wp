@@ -7,12 +7,22 @@ $baseDir = dirname($vendorDir);
 
 return array(
     'Composer\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',
+    'H2WP_Abilities' => $baseDir . '/includes/class-h2wp-abilities.php',
     'H2WP_Admin_Ajax' => $baseDir . '/includes/class-h2wp-admin-ajax.php',
     'H2WP_Admin_Page' => $baseDir . '/includes/class-h2wp-admin-page.php',
+    'H2WP_CLI_Command' => $baseDir . '/includes/class-h2wp-cli-command.php',
+    'H2WP_CLI_Plugin_Command' => $baseDir . '/includes/class-h2wp-cli-command.php',
+    'H2WP_CLI_Repo_Command' => $baseDir . '/includes/class-h2wp-cli-command.php',
+    'H2WP_CLI_Settings_Command' => $baseDir . '/includes/class-h2wp-cli-command.php',
+    'H2WP_CLI_Theme_Command' => $baseDir . '/includes/class-h2wp-cli-command.php',
     'H2WP_Cache' => $baseDir . '/includes/class-h2wp-cache.php',
     'H2WP_GitHub_API' => $baseDir . '/includes/class-h2wp-github-api.php',
     'H2WP_Plugin_Installer' => $baseDir . '/includes/class-h2wp-plugin-installer.php',
     'H2WP_Plugin_Updater' => $baseDir . '/includes/class-h2wp-plugin-updater.php',
+    'H2WP_Repo_Manager' => $baseDir . '/includes/class-h2wp-repo-manager.php',
+    'H2WP_Repository_Query_Service' => $baseDir . '/includes/class-h2wp-repository-query-service.php',
     'H2WP_Settings' => $baseDir . '/includes/class-h2wp-settings.php',
     'H2WP_Silent_Installer_Skin' => $baseDir . '/includes/class-h2wp-silent-installer-skin.php',
+    'H2WP_System_Action_Service' => $baseDir . '/includes/class-h2wp-system-action-service.php',
+    'H2WP_Tracked_Repo_Service' => $baseDir . '/includes/class-h2wp-tracked-repo-service.php',
 );

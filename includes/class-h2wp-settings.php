@@ -156,7 +156,8 @@ class H2WP_Settings {
 	 * Render the monitored plugins section.
 	 */
 	public static function render_monitored_plugins_section() {
-		$monitored_plugins = get_option( 'h2wp_plugins', array() );
+		$tracked_service   = new H2WP_Tracked_Repo_Service();
+		$monitored_plugins = $tracked_service->get_tracked_plugins();
 		$count             = count( $monitored_plugins );
 		// Auto-expand if there are form submission notices so feedback is visible.
 		$expanded          = ! empty( get_settings_errors( 'h2wp_private_repos' ) );
@@ -238,14 +239,15 @@ class H2WP_Settings {
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $monitored_plugins as $repo_key => $repo_data ) : ?>
+						<?php foreach ( $monitored_plugins as $repo_data ) : ?>
+							<?php $repo_key = isset( $repo_data['repo'] ) ? $repo_data['repo'] : ''; ?>
 							<tr>
 								<td>
 									<strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
 									<br />
 									<small>
 										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
-											<?php echo esc_html( $repo_key ); ?>
+										<?php echo esc_html( $repo_key ); ?>
 										</a><?php if ( ! empty( $repo_data['branch'] ) ) : ?> (<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
 										<?php if ( array_key_exists( 'prioritize_releases', $repo_data ) && empty( $repo_data['prioritize_releases'] ) ) : ?>
 											&mdash; <?php esc_html_e( 'branch only', 'hub2wp' ); ?>
@@ -257,7 +259,7 @@ class H2WP_Settings {
 								</td>
 								<td>
 									<?php
-									if ( ! empty( $repo_data['plugin_file'] ) ) {
+									if ( ! empty( $repo_data['installed'] ) ) {
 										esc_html_e( 'Installed', 'hub2wp' );
 									} else {
 										esc_html_e( 'Not Installed', 'hub2wp' );
@@ -330,7 +332,8 @@ class H2WP_Settings {
 	 * Render the monitored themes section.
 	 */
 	public static function render_monitored_themes_section() {
-		$monitored_themes = get_option( 'h2wp_themes', array() );
+		$tracked_service  = new H2WP_Tracked_Repo_Service();
+		$monitored_themes = $tracked_service->get_tracked_themes();
 		$count            = count( $monitored_themes );
 		$expanded         = ! empty( get_settings_errors( 'h2wp_theme_repos' ) );
 		?>
@@ -411,7 +414,8 @@ class H2WP_Settings {
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $monitored_themes as $repo_key => $repo_data ) : ?>
+						<?php foreach ( $monitored_themes as $repo_data ) : ?>
+							<?php $repo_key = isset( $repo_data['repo'] ) ? $repo_data['repo'] : ''; ?>
 							<tr>
 								<td>
 									<strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
@@ -430,7 +434,7 @@ class H2WP_Settings {
 								</td>
 								<td>
 									<?php
-									if ( ! empty( $repo_data['stylesheet'] ) ) {
+									if ( ! empty( $repo_data['installed'] ) ) {
 										esc_html_e( 'Installed', 'hub2wp' );
 									} else {
 										esc_html_e( 'Not Installed', 'hub2wp' );
@@ -536,10 +540,8 @@ class H2WP_Settings {
 
 		check_admin_referer( 'h2wp_run_update_check' );
 
-		delete_transient( 'h2wp_last_update_check' );
-		H2WP_Plugin_Updater::check_for_updates();
-		wp_update_plugins();
-		wp_update_themes();
+		$service = new H2WP_System_Action_Service();
+		$service->run_update_check();
 
 		wp_safe_redirect(
 			add_query_arg(
@@ -862,7 +864,8 @@ class H2WP_Settings {
 
 		check_admin_referer( 'h2wp_clear_cache', 'h2wp_clear_cache_nonce' );
 
-		H2WP_Cache::clear_all();
+		$service = new H2WP_System_Action_Service();
+		$service->clear_cache();
 
 		wp_safe_redirect(
 			add_query_arg(
@@ -889,9 +892,8 @@ class H2WP_Settings {
 			wp_send_json_error( array( 'message' => __( 'You do not have permission to do this.', 'hub2wp' ) ) );
 		}
 
-		H2WP_Cache::clear_all();
-
-		wp_send_json_success( array( 'message' => __( 'Cache cleared successfully.', 'hub2wp' ) ) );
+		$service = new H2WP_System_Action_Service();
+		wp_send_json_success( $service->clear_cache() );
 	}
 
 	/**

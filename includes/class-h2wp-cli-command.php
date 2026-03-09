@@ -99,14 +99,15 @@ class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
 	 * @return void
 	 */
 	public function list_( $args, $assoc_args ) {
-		$tracked = get_option( 'h2wp_plugins', array() );
+		$service = new H2WP_Tracked_Repo_Service();
+		$tracked = $service->get_tracked_plugins();
 		$rows    = array();
 
-		foreach ( $tracked as $repo_key => $plugin ) {
+		foreach ( $tracked as $plugin ) {
 			$rows[] = array(
-				'name'      => isset( $plugin['name'] ) ? (string) $plugin['name'] : $repo_key,
-				'repo'      => $repo_key,
-				'directory' => $this->get_local_directory_name( $plugin, 'plugin' ),
+				'name'      => isset( $plugin['name'] ) ? (string) $plugin['name'] : ( isset( $plugin['repo'] ) ? (string) $plugin['repo'] : '' ),
+				'repo'      => isset( $plugin['repo'] ) ? (string) $plugin['repo'] : '',
+				'directory' => isset( $plugin['directory'] ) ? (string) $plugin['directory'] : '',
 			);
 		}
 
@@ -205,14 +206,15 @@ class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
 	 * @return void
 	 */
 	public function list_( $args, $assoc_args ) {
-		$tracked = get_option( 'h2wp_themes', array() );
+		$service = new H2WP_Tracked_Repo_Service();
+		$tracked = $service->get_tracked_themes();
 		$rows    = array();
 
-		foreach ( $tracked as $repo_key => $theme ) {
+		foreach ( $tracked as $theme ) {
 			$rows[] = array(
-				'name'      => isset( $theme['name'] ) ? (string) $theme['name'] : $repo_key,
-				'repo'      => $repo_key,
-				'directory' => $this->get_local_directory_name( $theme, 'theme' ),
+				'name'      => isset( $theme['name'] ) ? (string) $theme['name'] : ( isset( $theme['repo'] ) ? (string) $theme['repo'] : '' ),
+				'repo'      => isset( $theme['repo'] ) ? (string) $theme['repo'] : '',
+				'directory' => isset( $theme['directory'] ) ? (string) $theme['directory'] : '',
 			);
 		}
 

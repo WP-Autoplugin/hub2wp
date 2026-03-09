@@ -1,0 +1,4 @@
+interface:
+  display_name: "hub2wp"
+  short_description: "Operate hub2wp on WordPress sites"
+  default_prompt: "Use $hub2wp to manage GitHub-hosted WordPress plugins and themes through the hub2wp plugin."

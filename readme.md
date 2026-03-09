@@ -182,6 +182,70 @@ add_filter( 'hub2wp_compatibility_result', function( $compatibility, $headers, $
 
 ---
 
+## Agentic Workflows
+
+hub2wp is designed to be fully operable by AI agents and automated systems without any manual UI interaction. It exposes three complementary interfaces that agents can use to install, inspect, and maintain GitHub-hosted WordPress plugins and themes.
+
+The preferred interface order is:
+1. **WP-CLI** for routine local administration.
+2. **Abilities API** for structured PHP or REST execution on WordPress 6.9+.
+3. **Admin UI** for interactive browsing or dashboard-specific tasks only.
+
+### WP-CLI
+
+Every hub2wp operation is available as a WP-CLI command, making the plugin fully scriptable. See the [WP-CLI](#wp-cli) commands in the Developer-Friendly section above for the complete command reference. Agents should prefer hub2wp's own install commands over raw `wp plugin install` or `wp theme install` so that update tracking is set up automatically alongside the installation.
+
+### Abilities API
+
+On WordPress 6.9 and later, hub2wp registers structured abilities through the WordPress Abilities API. Abilities provide typed input/output schemas that make hub2wp's functionality easy to call from PHP code, other plugins, or the REST API.
+
+Two categories are registered:
+
+- **`hub2wp-discovery`** – Read-only abilities for inspecting repositories and tracked items. These are also exposed via the REST API under `/wp-json/wp-abilities/v1`.
+- **`hub2wp-management`** – Mutating abilities for installing extensions, clearing the cache, and running update checks. Available in PHP only.
+
+| Ability | Category | REST |
+|---|---|---|
+| `hub2wp/list-tracked-plugins` | discovery | ✓ |
+| `hub2wp/list-tracked-themes` | discovery | ✓ |
+| `hub2wp/get-repository-details` | discovery | ✓ |
+| `hub2wp/check-repository-compatibility` | discovery | ✓ |
+| `hub2wp/install-plugin-from-github` | management | – |
+| `hub2wp/install-theme-from-github` | management | – |
+| `hub2wp/clear-cache` | management | – |
+| `hub2wp/run-update-check` | management | – |
+
+Check whether an ability is available before using it (abilities require WordPress 6.9+):
+
+```bash
+wp eval 'var_export( wp_has_ability( "hub2wp/list-tracked-plugins" ) );'
+```
+
+Execute a read-only ability from PHP:
+
+```bash
+wp eval '$ability = wp_get_ability( "hub2wp/list-tracked-plugins" ); var_export( $ability ? $ability->execute() : null );'
+wp eval '$ability = wp_get_ability( "hub2wp/get-repository-details" ); var_export( $ability ? $ability->execute( array( "owner" => "acme", "repo" => "my-plugin", "repo_type" => "plugin" ) ) : null );'
+```
+
+Read-only abilities are also callable over the REST API:
+
+```
+GET /wp-json/wp-abilities/v1/hub2wp/get-repository-details/run?input={"owner":"acme","repo":"my-plugin","repo_type":"plugin"}
+```
+
+### Skill for AI Agents
+
+hub2wp ships with a structured **skill** at `skills/hub2wp/` that AI coding assistants and autonomous agents can load to understand how to operate the plugin correctly. Any agent that loads this skill will know to prefer hub2wp's own commands over raw WordPress installs, preserve update-tracking semantics, and avoid exposing GitHub tokens in outputs.
+
+The skill includes:
+
+- **`SKILL.md`** – A concise instruction file describing the preferred interface order, environment verification steps, and guardrails for handling secrets and troubleshooting.
+- **`references/operations.md`** – A complete command-and-ability reference with copy-paste examples for every WP-CLI command, PHP ability invocation, and REST endpoint.
+- **`agents/openai.yaml`** – An OpenAI-compatible agent definition for structured tool-use integrations.
+
+---
+
 ## Contribution
 
 hub2wp is open source and welcomes contributions. If you encounter issues or have suggestions, please create an issue or pull request in the [GitHub repository](https://github.com/WP-Autoplugin/hub2wp).

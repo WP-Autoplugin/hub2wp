@@ -3,7 +3,7 @@ Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.8
 Tested up to: 7.0
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,11 @@ Manage hub2wp settings with WP-CLI too:
 No, but you have a higher request limit if you use one.
 
 == Changelog ==
+
+= 1.5.0 =
+* New: Added WP-CLI support - commands for installing, listing, and managing tracked plugins and themes, as well as hub2wp settings.
+* New: Added integration with the Abilities API for WordPress 6.9+ to allow AI agents and automation tools to interact with hub2wp features and manage GitHub-hosted plugins and themes.
+* New: Added a structured "skill" for AI coding assistants and autonomous agents to understand how to operate the plugin correctly.
 
 = 1.4.0 =
 * New: Use latest release files to check for updates if available, otherwise fall back to the selected branch.

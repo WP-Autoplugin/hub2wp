@@ -165,7 +165,7 @@ class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
 				'branch'              => isset( $assoc_args['branch'] ) ? sanitize_text_field( $assoc_args['branch'] ) : '',
 				'prioritize_releases' => ! \WP_CLI\Utils\get_flag_value( $assoc_args, 'no-release-priority', false ),
 				'access_token'        => isset( $assoc_args['token'] ) ? sanitize_text_field( $assoc_args['token'] ) : '',
-				'private'             => isset( $assoc_args['token'] ) ? true : null,
+				'private'             => null,
 			)
 		);
 
@@ -272,7 +272,7 @@ class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
 				'branch'              => isset( $assoc_args['branch'] ) ? sanitize_text_field( $assoc_args['branch'] ) : '',
 				'prioritize_releases' => ! \WP_CLI\Utils\get_flag_value( $assoc_args, 'no-release-priority', false ),
 				'access_token'        => isset( $assoc_args['token'] ) ? sanitize_text_field( $assoc_args['token'] ) : '',
-				'private'             => isset( $assoc_args['token'] ) ? true : null,
+				'private'             => null,
 			)
 		);
 

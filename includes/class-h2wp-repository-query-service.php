@@ -63,7 +63,7 @@ class H2WP_Repository_Query_Service {
 			'owner'               => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'repo'                => isset( $repo_details['name'] ) ? sanitize_text_field( $repo_details['name'] ) : '',
 			'repo_type'           => $repo_type,
-			'description'         => isset( $repo_details['description'] ) ? $repo_details['description'] : '',
+			'description'         => isset( $repo_details['description'] ) ? esc_html( $repo_details['description'] ) : '',
 			'readme'              => $readme_html,
 			'stargazers'          => isset( $repo_details['stargazers_count'] ) ? number_format_i18n( $repo_details['stargazers_count'] ) : '0',
 			'forks'               => isset( $repo_details['forks_count'] ) ? number_format_i18n( $repo_details['forks_count'] ) : '0',
@@ -129,7 +129,7 @@ class H2WP_Repository_Query_Service {
 			$changelog_html .= '<li>';
 			$changelog_html .= '<h4>' . esc_html( $release['version'] ) . ( ! empty( $release['title'] ) ? ' (' . esc_html( $release['title'] ) . ')' : '' ) . '</h4>';
 			$changelog_html .= '<p><strong>' . __( 'Released:', 'hub2wp' ) . '</strong> ' . date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), strtotime( $release['date'] ) ) . '</p>';
-			$changelog_html .= '<p>' . nl2br( $release['description'] ) . '</p>';
+			$changelog_html .= '<p>' . nl2br( esc_html( $release['description'] ) ) . '</p>';
 			$changelog_html .= '<p><a href="' . esc_url( $release['url'] ) . '" target="_blank">' . __( 'View on GitHub', 'hub2wp' ) . '</a></p>';
 			$changelog_html .= '</li>';
 		}

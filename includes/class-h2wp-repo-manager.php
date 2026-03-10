@@ -29,6 +29,8 @@ class H2WP_Repo_Manager {
 			)
 		);
 
+		list( $owner, $repo ) = self::normalize_repository_identifier( $owner, $repo );
+
 		$repo_type = in_array( $args['repo_type'], array( 'plugin', 'theme' ), true ) ? $args['repo_type'] : 'plugin';
 		$branch    = is_string( $args['branch'] ) ? trim( $args['branch'] ) : '';
 		$token     = is_string( $args['access_token'] ) ? $args['access_token'] : '';
@@ -82,6 +84,8 @@ class H2WP_Repo_Manager {
 	 * @return array|WP_Error
 	 */
 	private static function register_installed_plugin( $owner, $repo, $plugin_data, $source_context, $compatibility, $args ) {
+		list( $owner, $repo ) = self::normalize_repository_identifier( $owner, $repo );
+
 		$plugin_file = self::find_plugin_file( $plugin_data );
 		if ( empty( $plugin_file ) ) {
 			return new WP_Error( 'h2wp_plugin_file_not_found', __( 'The plugin was installed, but hub2wp could not determine its main plugin file for update tracking.', 'hub2wp' ) );
@@ -131,6 +135,8 @@ class H2WP_Repo_Manager {
 	 * @return array|WP_Error
 	 */
 	private static function register_installed_theme( $owner, $repo, $theme_data, $source_context, $compatibility, $args ) {
+		list( $owner, $repo ) = self::normalize_repository_identifier( $owner, $repo );
+
 		$stylesheet = self::find_theme_stylesheet( $theme_data );
 		if ( empty( $stylesheet ) ) {
 			return new WP_Error( 'h2wp_theme_stylesheet_not_found', __( 'The theme was installed, but hub2wp could not determine its stylesheet for update tracking.', 'hub2wp' ) );
@@ -192,6 +198,20 @@ class H2WP_Repo_Manager {
 		}
 
 		return $repo_data;
+	}
+
+	/**
+	 * Normalize a repository identifier to hub2wp's canonical lowercase owner/repo format.
+	 *
+	 * @param string $owner Repository owner.
+	 * @param string $repo Repository name.
+	 * @return array{0:string,1:string}
+	 */
+	private static function normalize_repository_identifier( $owner, $repo ) {
+		return array(
+			strtolower( trim( (string) $owner ) ),
+			strtolower( trim( (string) $repo ) ),
+		);
 	}
 
 	/**

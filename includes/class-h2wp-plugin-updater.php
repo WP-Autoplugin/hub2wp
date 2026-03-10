@@ -672,34 +672,16 @@ class H2WP_Plugin_Updater {
 			return $reply;
 		}
 
-		// Only intercept packages that belong to one of our tracked private repos.
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-		$h2wp_themes  = get_option( 'h2wp_themes', array() );
-		$is_private   = false;
-		foreach ( $h2wp_plugins as $plugin ) {
-			if (
-				isset( $plugin['download_url'] ) &&
-				$plugin['download_url'] === $package &&
-				! empty( $plugin['private'] )
-			) {
-				$is_private = true;
-				break;
-			}
-		}
-		if ( ! $is_private ) {
-			foreach ( $h2wp_themes as $theme ) {
-				if (
-					isset( $theme['download_url'] ) &&
-					$theme['download_url'] === $package &&
-					! empty( $theme['private'] )
-				) {
-					$is_private = true;
-					break;
-				}
-			}
+		// Only intercept packages that belong to one of our tracked GitHub repos.
+		$package_repo_key = self::get_repo_key_from_package_url( $package );
+		if ( empty( $package_repo_key ) ) {
+			return $reply;
 		}
 
-		if ( ! $is_private ) {
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$h2wp_themes  = get_option( 'h2wp_themes', array() );
+		$is_tracked = isset( $h2wp_plugins[ $package_repo_key ] ) || isset( $h2wp_themes[ $package_repo_key ] );
+		if ( ! $is_tracked ) {
 			return $reply;
 		}
 
@@ -741,6 +723,25 @@ class H2WP_Plugin_Updater {
 		}
 
 		return $tmpfname;
+	}
+
+	/**
+	 * Parse a tracked repository key from a GitHub package URL.
+	 *
+	 * @param string $package Package URL.
+	 * @return string
+	 */
+	private static function get_repo_key_from_package_url( $package ) {
+		$path = wp_parse_url( $package, PHP_URL_PATH );
+		if ( empty( $path ) ) {
+			return '';
+		}
+
+		if ( preg_match( '#/repos/([^/]+)/([^/]+)/zipball(?:/.*)?$#', $path, $matches ) ) {
+			return strtolower( $matches[1] . '/' . $matches[2] );
+		}
+
+		return '';
 	}
 
 	/**

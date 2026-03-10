@@ -125,8 +125,7 @@ class H2WP_Tracked_Repo_Service {
 				return false;
 			}
 
-			$themes = wp_get_themes();
-			return isset( $themes[ $stylesheet ] );
+			return wp_get_theme( $stylesheet )->exists();
 		}
 
 		$plugin_file = isset( $repo_data['plugin_file'] ) ? (string) $repo_data['plugin_file'] : '';

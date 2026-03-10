@@ -276,7 +276,7 @@ class H2WP_Admin_Page {
 
 		foreach ( $themes as $stylesheet => $theme ) {
 			$theme_name = strtolower( $theme->get( 'Name' ) );
-			if ( $repo === strtolower( $stylesheet ) || $repo === sanitize_title( $theme_name ) ) {
+			if ( $repo === $stylesheet || $repo === sanitize_title( $theme_name ) ) {
 				return $stylesheet;
 			}
 		}

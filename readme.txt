@@ -27,9 +27,9 @@ Features:
     a. With WP-CLI:
 `wp plugin install "https://github.com/WP-Autoplugin/hub2wp/archive/refs/tags/$(curl -fsSL https://api.github.com/repos/WP-Autoplugin/hub2wp/releases/latest | php -r '$release = json_decode(stream_get_contents(STDIN), true); echo $release["tag_name"];').zip" --activate`
     b. Or download the latest release from GitHub and upload it to your WordPress plugins directory.
-3. Activate the plugin through the 'Plugins' menu in WordPress.
-4. Navigate to "Plugins > Add GitHub Plugin" to browse plugins.
-5. Go to "Settings > GitHub Plugins" to add an optional personal access token and configure caching.
+2. Activate the plugin through the 'Plugins' menu in WordPress.
+3. Navigate to "Plugins > Add GitHub Plugin" to browse plugins.
+4. Go to "Settings > GitHub Plugins" to add an optional personal access token and configure caching.
 
 == WP-CLI ==
 

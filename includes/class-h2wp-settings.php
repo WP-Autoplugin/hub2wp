@@ -1048,7 +1048,7 @@ class H2WP_Settings {
 		$options      = get_option( self::OPTION_NAME, array() );
 		$access_token = isset( $options['access_token'] ) ? $options['access_token'] : '';
 		?>
-		<input type="text" name="h2wp_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
+		<input type="password" name="h2wp_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
 		<p class="description">
 			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'hub2wp' ); ?>
 			<?php printf(

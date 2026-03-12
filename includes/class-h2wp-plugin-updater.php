@@ -672,39 +672,24 @@ class H2WP_Plugin_Updater {
 			return $reply;
 		}
 
-		// Only intercept packages that belong to one of our tracked private repos.
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-		$h2wp_themes  = get_option( 'h2wp_themes', array() );
-		$is_private   = false;
-		foreach ( $h2wp_plugins as $plugin ) {
-			if (
-				isset( $plugin['download_url'] ) &&
-				$plugin['download_url'] === $package &&
-				! empty( $plugin['private'] )
-			) {
-				$is_private = true;
-				break;
-			}
-		}
-		if ( ! $is_private ) {
-			foreach ( $h2wp_themes as $theme ) {
-				if (
-					isset( $theme['download_url'] ) &&
-					$theme['download_url'] === $package &&
-					! empty( $theme['private'] )
-				) {
-					$is_private = true;
-					break;
-				}
-			}
+		// Only intercept packages that belong to one of our tracked GitHub repos.
+		$package_repo_key = self::get_repo_key_from_package_url( $package );
+		if ( empty( $package_repo_key ) ) {
+			return $reply;
 		}
 
-		if ( ! $is_private ) {
+		if ( ! self::is_tracked_package_for_upgrade( $package_repo_key, $upgrader ) ) {
 			return $reply;
 		}
 
 		// Stream the zip to a temp file with the Authorization header.
 		$tmpfname = wp_tempnam( $package );
+		if ( empty( $tmpfname ) || ! is_string( $tmpfname ) ) {
+			return new WP_Error(
+				'h2wp_temp_file_error',
+				__( 'Could not create a temporary file for the update download.', 'hub2wp' )
+			);
+		}
 
 		$response = wp_remote_get(
 			$package,
@@ -741,6 +726,80 @@ class H2WP_Plugin_Updater {
 		}
 
 		return $tmpfname;
+	}
+
+	/**
+	 * Check whether a package URL belongs to the plugin or theme currently being upgraded.
+	 *
+	 * @param string      $package_repo_key Repository key parsed from the package URL.
+	 * @param WP_Upgrader $upgrader         The upgrader instance.
+	 * @return bool
+	 */
+	private static function is_tracked_package_for_upgrade( $package_repo_key, $upgrader ) {
+		$upgrade_repo_key = self::get_repo_key_from_upgrader( $upgrader );
+		if ( '' !== $upgrade_repo_key ) {
+			return $package_repo_key === $upgrade_repo_key;
+		}
+
+		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$h2wp_themes  = get_option( 'h2wp_themes', array() );
+
+		return isset( $h2wp_plugins[ $package_repo_key ] ) || isset( $h2wp_themes[ $package_repo_key ] );
+	}
+
+	/**
+	 * Resolve the tracked repository key for the current upgrader context.
+	 *
+	 * @param WP_Upgrader $upgrader The upgrader instance.
+	 * @return string
+	 */
+	private static function get_repo_key_from_upgrader( $upgrader ) {
+		if ( ! isset( $upgrader->skin ) || ! isset( $upgrader->skin->options ) || ! is_array( $upgrader->skin->options ) ) {
+			return '';
+		}
+
+		$hook_extra = isset( $upgrader->skin->options['hook_extra'] ) && is_array( $upgrader->skin->options['hook_extra'] )
+			? $upgrader->skin->options['hook_extra']
+			: array();
+
+		if ( ! empty( $hook_extra['plugin'] ) ) {
+			$plugin_file = (string) $hook_extra['plugin'];
+			foreach ( get_option( 'h2wp_plugins', array() ) as $repo_key => $plugin ) {
+				if ( isset( $plugin['plugin_file'] ) && $plugin['plugin_file'] === $plugin_file ) {
+					return strtolower( (string) $repo_key );
+				}
+			}
+		}
+
+		if ( ! empty( $hook_extra['theme'] ) ) {
+			$stylesheet = (string) $hook_extra['theme'];
+			foreach ( get_option( 'h2wp_themes', array() ) as $repo_key => $theme ) {
+				if ( isset( $theme['stylesheet'] ) && $theme['stylesheet'] === $stylesheet ) {
+					return strtolower( (string) $repo_key );
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Parse a tracked repository key from a GitHub package URL.
+	 *
+	 * @param string $package Package URL.
+	 * @return string
+	 */
+	private static function get_repo_key_from_package_url( $package ) {
+		$path = wp_parse_url( $package, PHP_URL_PATH );
+		if ( empty( $path ) ) {
+			return '';
+		}
+
+		if ( preg_match( '#/repos/([^/]+)/([^/]+)/zipball(?:/.*)?$#', $path, $matches ) ) {
+			return strtolower( $matches[1] . '/' . $matches[2] );
+		}
+
+		return '';
 	}
 
 	/**

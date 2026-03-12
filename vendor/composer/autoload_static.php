@@ -8,14 +8,24 @@ class ComposerStaticInit8990a86ca42b9adcd0f265283d0c5bd2
 {
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'H2WP_Abilities' => __DIR__ . '/../..' . '/includes/class-h2wp-abilities.php',
         'H2WP_Admin_Ajax' => __DIR__ . '/../..' . '/includes/class-h2wp-admin-ajax.php',
         'H2WP_Admin_Page' => __DIR__ . '/../..' . '/includes/class-h2wp-admin-page.php',
+        'H2WP_CLI_Command' => __DIR__ . '/../..' . '/includes/class-h2wp-cli-command.php',
+        'H2WP_CLI_Plugin_Command' => __DIR__ . '/../..' . '/includes/class-h2wp-cli-command.php',
+        'H2WP_CLI_Repo_Command' => __DIR__ . '/../..' . '/includes/class-h2wp-cli-command.php',
+        'H2WP_CLI_Settings_Command' => __DIR__ . '/../..' . '/includes/class-h2wp-cli-command.php',
+        'H2WP_CLI_Theme_Command' => __DIR__ . '/../..' . '/includes/class-h2wp-cli-command.php',
         'H2WP_Cache' => __DIR__ . '/../..' . '/includes/class-h2wp-cache.php',
         'H2WP_GitHub_API' => __DIR__ . '/../..' . '/includes/class-h2wp-github-api.php',
         'H2WP_Plugin_Installer' => __DIR__ . '/../..' . '/includes/class-h2wp-plugin-installer.php',
         'H2WP_Plugin_Updater' => __DIR__ . '/../..' . '/includes/class-h2wp-plugin-updater.php',
+        'H2WP_Repo_Manager' => __DIR__ . '/../..' . '/includes/class-h2wp-repo-manager.php',
+        'H2WP_Repository_Query_Service' => __DIR__ . '/../..' . '/includes/class-h2wp-repository-query-service.php',
         'H2WP_Settings' => __DIR__ . '/../..' . '/includes/class-h2wp-settings.php',
         'H2WP_Silent_Installer_Skin' => __DIR__ . '/../..' . '/includes/class-h2wp-silent-installer-skin.php',
+        'H2WP_System_Action_Service' => __DIR__ . '/../..' . '/includes/class-h2wp-system-action-service.php',
+        'H2WP_Tracked_Repo_Service' => __DIR__ . '/../..' . '/includes/class-h2wp-tracked-repo-service.php',
     );
 
     public static function getInitializer(ClassLoader $loader)

@@ -102,7 +102,7 @@ Yes, you can add private repositories to hub2wp by providing a GitHub token with
 
 ## Developer-Friendly
 
-hub2wp is designed to be useful for site builders and developers, not just end users. It already supports private repositories, custom tracked branches, and release-priority update checking, and it also exposes filters so projects can adapt hub2wp to their own workflow without forking the plugin.
+hub2wp is designed to be useful for site builders and developers, not just end users. It supports private repositories, custom tracked branches, and release-priority update checking. It also exposes filters so projects can adapt hub2wp to their own workflow without forking the plugin.
 
 ### WP-CLI
 
@@ -215,28 +215,9 @@ Two categories are registered:
 | `hub2wp/clear-cache` | management | – |
 | `hub2wp/run-update-check` | management | – |
 
-Check whether an ability is available before using it (abilities require WordPress 6.9+):
-
-```bash
-wp eval 'var_export( wp_has_ability( "hub2wp/list-tracked-plugins" ) );'
-```
-
-Execute a read-only ability from PHP:
-
-```bash
-wp eval '$ability = wp_get_ability( "hub2wp/list-tracked-plugins" ); var_export( $ability ? $ability->execute() : null );'
-wp eval '$ability = wp_get_ability( "hub2wp/get-repository-details" ); var_export( $ability ? $ability->execute( array( "owner" => "acme", "repo" => "my-plugin", "repo_type" => "plugin" ) ) : null );'
-```
-
-Read-only abilities are also callable over the REST API:
-
-```
-GET /wp-json/wp-abilities/v1/hub2wp/get-repository-details/run?input={"owner":"acme","repo":"my-plugin","repo_type":"plugin"}
-```
-
 ### Skill for AI Agents
 
-hub2wp ships with a structured **skill** at `skills/hub2wp/` that AI coding assistants and autonomous agents can load to understand how to operate the plugin correctly. Any agent that loads this skill will know to prefer hub2wp's own commands over raw WordPress installs, preserve update-tracking semantics, and avoid exposing GitHub tokens in outputs.
+hub2wp ships with a structured **skill** at `skills/hub2wp/` that AI coding assistants and autonomous agents can load to understand how to operate the plugin correctly. Any agent that loads this skill will know to prefer hub2wp's own commands for GitHub packages over raw WordPress installs, preserve update-tracking semantics, and avoid exposing GitHub tokens in outputs.
 
 The skill includes:
 

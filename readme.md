@@ -29,7 +29,7 @@ Also check out the [hub2wp Plugin Repository](https://hub2wp.com/) a public webs
 ## How It Works
 
 1. **Plugin and Theme Eligibility**:
-   To appear in hub2wp, a repository must have the `wordpress-plugin` or `wordpress-theme` GitHub topic. Plugins also need a `Stable tag:` header in their `readme.txt` or `readme.md`, and themes need a `Version:` header in `style.css`. These version headers are used for update monitoring.
+   To appear in hub2wp as an installable package, a repository must have the `wordpress-plugin` or `wordpress-theme` GitHub topic. Plugins also need a `Stable tag:` header in their `readme.txt` or `readme.md`, and themes need a `Version:` header in `style.css`. These version headers are used for update monitoring.
 
 2. **Update Mechanism**:
    hub2wp checks for updates using a two-step priority system. First, if the repository has GitHub releases, it uses the **latest release tag** to determine the current version and downloads the release archive. If no releases exist — or if release-based checking is disabled in "Settings > GitHub Plugins" — it falls back to reading the `Stable tag:` or `Version:` header from the tracked branch (the repository's default branch, or a custom branch you configure). When a new version is detected, you will receive an update notification in your WordPress dashboard, allowing you to update the plugin or theme directly from there.

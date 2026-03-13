@@ -1,4 +1,79 @@
 jQuery(document).ready(function($) {
+    function getDetailsUrl(owner, repo, repoType) {
+        var url = new URL(window.location.href);
+
+        url.searchParams.set('h2wp_modal', 'details');
+        url.searchParams.set('h2wp_modal_owner', owner);
+        url.searchParams.set('h2wp_modal_repo', repo);
+        url.searchParams.set('repo_type', repoType || h2wp_ajax_object.repo_type || 'plugin');
+
+        return url.toString();
+    }
+
+    function clearDetailsUrl() {
+        var url = new URL(window.location.href);
+
+        url.searchParams.delete('h2wp_modal');
+        url.searchParams.delete('h2wp_modal_owner');
+        url.searchParams.delete('h2wp_modal_repo');
+        url.searchParams.delete('repo_type');
+
+        window.history.replaceState({}, document.title, url.toString());
+    }
+
+    function maybeUpdateDetailsUrl(owner, repo, repoType) {
+        var nextUrl = getDetailsUrl(owner, repo, repoType);
+
+        if (nextUrl !== window.location.href) {
+            window.history.replaceState({}, document.title, nextUrl);
+        }
+    }
+
+    function openRepositoryDetails(owner, repo, repoType, shouldUpdateUrl) {
+        if (!owner || !repo) {
+            return;
+        }
+
+        repoType = repoType || h2wp_ajax_object.repo_type || 'plugin';
+
+        if (shouldUpdateUrl !== false) {
+            maybeUpdateDetailsUrl(owner, repo, repoType);
+        }
+
+        // Make AJAX request to get plugin details.
+        $.ajax({
+            url: h2wp_ajax_object.ajax_url,
+            method: 'POST',
+            data: {
+                action: 'h2wp_get_plugin_details',
+                nonce: h2wp_ajax_object.nonce,
+                owner: owner,
+                repo: repo,
+                repo_type: repoType
+            },
+            beforeSend: function() {
+                $('#h2wp-plugin-modal').addClass('h2wp-modal-loading').fadeIn();
+            },
+            success: function(response) {
+                if (response.success) {
+                    loadGpbModal(response.data);
+                } else {
+                    clearDetailsUrl();
+                    $('#h2wp-plugin-modal').hide();
+                    alert(response.data.message);
+                }
+            },
+            error: function() {
+                clearDetailsUrl();
+                $('#h2wp-plugin-modal').hide();
+                alert(h2wp_ajax_object.error_message || 'An error occurred.');
+            },
+            complete: function() {
+                $('#h2wp-plugin-modal').removeClass('h2wp-modal-loading');
+            }
+        });
+    }
+
     // Function to open modal with plugin details.
     function loadGpbModal(data) {
         var modal = $('#h2wp-plugin-modal');
@@ -121,49 +196,23 @@ jQuery(document).ready(function($) {
 
     // Function to close modal.
     function closeGpbModal() {
+        clearDetailsUrl();
         $('#h2wp-plugin-modal').fadeOut();
     }
 
     // Click event for "More Details" links.
     $('.h2wp-more-details-link, .h2wp-plugin-name, .h2wp-plugin-thumbnail').on('click', function(e) {
-        e.preventDefault();
+        var isModifiedAnchorClick = e.currentTarget.tagName === 'A' && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1);
         var owner = $(this).data('owner');
         var repo = $(this).data('repo');
         var repoType = $(this).data('type') || h2wp_ajax_object.repo_type || 'plugin';
 
-        if (!owner || !repo) {
+        if (!owner || !repo || isModifiedAnchorClick) {
             return;
         }
 
-        // Make AJAX request to get plugin details.
-        $.ajax({
-            url: h2wp_ajax_object.ajax_url,
-            method: 'POST',
-            data: {
-                action: 'h2wp_get_plugin_details',
-                nonce: h2wp_ajax_object.nonce,
-                owner: owner,
-                repo: repo,
-                repo_type: repoType
-            },
-            beforeSend: function() {
-                $('#h2wp-plugin-modal').addClass('h2wp-modal-loading').fadeIn();
-            },
-            success: function(response) {
-                if (response.success) {
-                    loadGpbModal(response.data);
-                } else {
-                    alert(response.data.message);
-                }
-            },
-            error: function() {
-                $('#h2wp-plugin-modal').hide();
-                alert(h2wp_ajax_object.error_message || 'An error occurred.');
-            },
-            complete: function() {
-                $('#h2wp-plugin-modal').removeClass('h2wp-modal-loading');
-            }
-        });
+        e.preventDefault();
+        openRepositoryDetails(owner, repo, repoType, true);
     });
 
     // Click event to close the modal.
@@ -280,4 +329,19 @@ jQuery(document).ready(function($) {
             }
         });
     });
+
+    (function openRequestedDetailsFromUrl() {
+        var params = new URL(window.location.href).searchParams;
+        var modalType = params.get('h2wp_modal');
+        var owner = params.get('h2wp_modal_owner');
+        var repo = params.get('h2wp_modal_repo');
+        var repoType = params.get('repo_type') || h2wp_ajax_object.repo_type || 'plugin';
+        repoType = ('plugin' === repoType || 'theme' === repoType) ? repoType : 'plugin';
+
+        if ('details' !== modalType || !owner || !repo) {
+            return;
+        }
+
+        openRepositoryDetails(owner, repo, repoType, false);
+    }());
 });

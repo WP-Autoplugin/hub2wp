@@ -295,6 +295,94 @@ class H2WP_Admin_Page {
 	}
 
 	/**
+	 * Build the base admin URL and collect sanitized filter query args from the current request.
+	 *
+	 * Each key is sanitized according to how it is used elsewhere in the page:
+	 * - tab   → sanitize_key()
+	 * - paged → absint()
+	 * - s, tag → sanitize_text_field()
+	 *
+	 * @param string $repo_type Repository type (plugin|theme).
+	 * @return array { 0: string $repo_type, 1: string $base_url, 2: array $query_args }
+	 */
+	private static function get_base_url_and_filter_args( $repo_type ) {
+		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$base_url  = ( 'theme' === $repo_type )
+			? admin_url( 'themes.php?page=h2wp-theme-browser' )
+			: admin_url( 'plugins.php?page=h2wp-plugin-browser' );
+
+		$sanitizers = array(
+			'tab'   => 'sanitize_key',
+			's'     => 'sanitize_text_field',
+			'tag'   => 'sanitize_text_field',
+			'paged' => 'absint',
+		);
+
+		$query_args = array();
+
+		foreach ( $sanitizers as $key => $sanitizer ) {
+			if ( ! isset( $_GET[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				continue;
+			}
+
+			$value = wp_unslash( $_GET[ $key ] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( '' === $value ) {
+				continue;
+			}
+
+			$query_args[ $key ] = call_user_func( $sanitizer, $value );
+		}
+
+		return array( $repo_type, $base_url, $query_args );
+	}
+
+	/**
+	 * Build a shareable browser URL that opens the repository details modal.
+	 *
+	 * @param string $owner     Repository owner.
+	 * @param string $repo      Repository name.
+	 * @param string $repo_type Repository type.
+	 * @return string
+	 */
+	private static function get_repo_details_url( $owner, $repo, $repo_type ) {
+		list( $repo_type, $base_url, $query_args ) = self::get_base_url_and_filter_args( $repo_type );
+
+		$query_args['h2wp_modal']       = 'details';
+		$query_args['h2wp_modal_owner'] = sanitize_text_field( $owner );
+		$query_args['h2wp_modal_repo']  = sanitize_text_field( $repo );
+		$query_args['repo_type']        = $repo_type;
+
+		return add_query_arg( $query_args, $base_url );
+	}
+
+	/**
+	 * Build a browser navigation URL without modal state.
+	 *
+	 * @param string $repo_type Repository type.
+	 * @param array  $add_args  Query args to add.
+	 * @param array  $remove    Query args to remove in addition to modal state.
+	 * @return string
+	 */
+	private static function get_browser_navigation_url( $repo_type, $add_args = array(), $remove = array() ) {
+		list( , $base_url, $query_args ) = self::get_base_url_and_filter_args( $repo_type );
+
+		foreach ( $remove as $key ) {
+			unset( $query_args[ $key ] );
+		}
+
+		foreach ( $add_args as $key => $value ) {
+			if ( null === $value || '' === $value ) {
+				unset( $query_args[ $key ] );
+				continue;
+			}
+
+			$query_args[ $key ] = sanitize_text_field( $value );
+		}
+
+		return add_query_arg( $query_args, $base_url );
+	}
+
+	/**
 	 * Get UI labels for the current repository type.
 	 *
 	 * @param string $repo_type Repository type.
@@ -442,15 +530,15 @@ class H2WP_Admin_Page {
 			);
 
 		foreach ( $popular_tags as $tag => $label ) {
-			echo '<a href="' . esc_url( add_query_arg( 'tag', strtolower( $tag ), remove_query_arg( array( 'paged', 's', 'tab' ) ) ) ) . '" class="h2wp-tag ' . ( ( ! $is_private_tab && isset( $_GET['tag'] ) && strtolower( $tag ) === $_GET['tag'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html( $label ) . '</a>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			echo '<a href="' . esc_url( self::get_browser_navigation_url( $repo_type, array( 'tag' => strtolower( $tag ) ), array( 'paged', 's', 'tab' ) ) ) . '" class="h2wp-tag ' . ( ( ! $is_private_tab && isset( $_GET['tag'] ) && strtolower( $tag ) === $_GET['tag'] ) ? 'h2wp-tag-active' : '' ) . '">' . esc_html( $label ) . '</a>'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		}
 
 		if ( ! empty( $queried_tag ) && ! in_array( $queried_tag, array_map( 'strtolower', array_keys( $popular_tags ) ) ) ) {
-			echo '<a href="' . esc_url( add_query_arg( 'tag', $queried_tag, remove_query_arg( array( 'paged', 'tab' ) ) ) ) . '" class="h2wp-tag h2wp-tag-active">' . esc_html( $queried_tag ) . '</a>';
+			echo '<a href="' . esc_url( self::get_browser_navigation_url( $repo_type, array( 'tag' => $queried_tag ), array( 'paged', 'tab' ) ) ) . '" class="h2wp-tag h2wp-tag-active">' . esc_html( $queried_tag ) . '</a>';
 		}
 
 		// Private repos tab.
-		echo '<a href="' . esc_url( add_query_arg( 'tab', 'private', remove_query_arg( array( 'paged', 's', 'tag' ) ) ) ) . '" class="h2wp-tag h2wp-tag-private ' . ( $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'Private', 'hub2wp' ) . '</a>';
+		echo '<a href="' . esc_url( self::get_browser_navigation_url( $repo_type, array( 'tab' => 'private' ), array( 'paged', 's', 'tag' ) ) ) . '" class="h2wp-tag h2wp-tag-private ' . ( $is_private_tab ? 'h2wp-tag-active' : '' ) . '">' . esc_html__( 'Private', 'hub2wp' ) . '</a>';
 
 		echo '</div>';
 
@@ -653,7 +741,7 @@ class H2WP_Admin_Page {
 				echo '<div class="tablenav bottom">';
 				echo '<div class="tablenav-pages h2wp-pagination">';
 				echo wp_kses_post( paginate_links( array(
-					'base'      => add_query_arg( 'paged', '%#%' ),
+					'base'      => add_query_arg( 'paged', '%#%', self::get_browser_navigation_url( $repo_type ) ),
 					'format'    => '',
 					'prev_text' => '«',
 					'next_text' => '»',
@@ -723,7 +811,7 @@ class H2WP_Admin_Page {
 			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-install-plugin" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html__( 'Install Now', 'hub2wp' ) . '</a>';
 			echo '<a href="#" class="h2wp-button h2wp-button-secondary h2wp-activate-plugin h2wp-hidden" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html__( 'Activate', 'hub2wp' ) . '</a>';
 		}
-		echo '<a href="#" class="h2wp-more-details-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html__( 'More Details', 'hub2wp' ) . '</a>';
+		echo '<a href="' . esc_url( self::get_repo_details_url( $owner, $name, 'theme' ) ) . '" class="h2wp-more-details-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html__( 'More Details', 'hub2wp' ) . '</a>';
 		if ( $is_private ) {
 			echo '<span class="h2wp-private-badge">' . esc_html__( 'Private', 'hub2wp' ) . '</span>';
 		}
@@ -792,7 +880,7 @@ class H2WP_Admin_Page {
 		}
 
 		// Add data attributes for "More Details" link.
-		echo '<a href="javascript:void(0);" class="h2wp-more-details-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '">' . esc_html__( 'More Details', 'hub2wp' ) . '</a>';
+		echo '<a href="' . esc_url( self::get_repo_details_url( $owner, $name, $repo_type ) ) . '" class="h2wp-more-details-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="' . esc_attr( $repo_type ) . '">' . esc_html__( 'More Details', 'hub2wp' ) . '</a>';
 		echo '</div>';
 
 		echo '<div class="h2wp-plugin-meta">';

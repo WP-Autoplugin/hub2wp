@@ -295,23 +295,32 @@ class H2WP_Admin_Page {
 	}
 
 	/**
-	 * Build a shareable browser URL that opens the repository details modal.
+	 * Build the base admin URL and collect sanitized filter query args from the current request.
 	 *
-	 * @param string $owner     Repository owner.
-	 * @param string $repo      Repository name.
-	 * @param string $repo_type Repository type.
-	 * @return string
+	 * Each key is sanitized according to how it is used elsewhere in the page:
+	 * - tab   → sanitize_key()
+	 * - paged → absint()
+	 * - s, tag → sanitize_text_field()
+	 *
+	 * @param string $repo_type Repository type (plugin|theme).
+	 * @return array { 0: string $repo_type, 1: string $base_url, 2: array $query_args }
 	 */
-	private static function get_repo_details_url( $owner, $repo, $repo_type ) {
+	private static function get_base_url_and_filter_args( $repo_type ) {
 		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
 		$base_url  = ( 'theme' === $repo_type )
 			? admin_url( 'themes.php?page=h2wp-theme-browser' )
 			: admin_url( 'plugins.php?page=h2wp-plugin-browser' );
 
-		$query_keys = array( 'tab', 's', 'tag', 'paged' );
+		$sanitizers = array(
+			'tab'   => 'sanitize_key',
+			's'     => 'sanitize_text_field',
+			'tag'   => 'sanitize_text_field',
+			'paged' => 'absint',
+		);
+
 		$query_args = array();
 
-		foreach ( $query_keys as $key ) {
+		foreach ( $sanitizers as $key => $sanitizer ) {
 			if ( ! isset( $_GET[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 				continue;
 			}
@@ -321,10 +330,24 @@ class H2WP_Admin_Page {
 				continue;
 			}
 
-			$query_args[ $key ] = sanitize_text_field( $value );
+			$query_args[ $key ] = call_user_func( $sanitizer, $value );
 		}
 
-		$query_args['h2wp_modal']     = 'details';
+		return array( $repo_type, $base_url, $query_args );
+	}
+
+	/**
+	 * Build a shareable browser URL that opens the repository details modal.
+	 *
+	 * @param string $owner     Repository owner.
+	 * @param string $repo      Repository name.
+	 * @param string $repo_type Repository type.
+	 * @return string
+	 */
+	private static function get_repo_details_url( $owner, $repo, $repo_type ) {
+		list( $repo_type, $base_url, $query_args ) = self::get_base_url_and_filter_args( $repo_type );
+
+		$query_args['h2wp_modal']       = 'details';
 		$query_args['h2wp_modal_owner'] = sanitize_text_field( $owner );
 		$query_args['h2wp_modal_repo']  = sanitize_text_field( $repo );
 		$query_args['repo_type']        = $repo_type;
@@ -341,26 +364,7 @@ class H2WP_Admin_Page {
 	 * @return string
 	 */
 	private static function get_browser_navigation_url( $repo_type, $add_args = array(), $remove = array() ) {
-		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
-		$base_url  = ( 'theme' === $repo_type )
-			? admin_url( 'themes.php?page=h2wp-theme-browser' )
-			: admin_url( 'plugins.php?page=h2wp-plugin-browser' );
-
-		$query_keys = array( 'tab', 's', 'tag', 'paged' );
-		$query_args = array();
-
-		foreach ( $query_keys as $key ) {
-			if ( ! isset( $_GET[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				continue;
-			}
-
-			$value = wp_unslash( $_GET[ $key ] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			if ( '' === $value ) {
-				continue;
-			}
-
-			$query_args[ $key ] = sanitize_text_field( $value );
-		}
+		list( , $base_url, $query_args ) = self::get_base_url_and_filter_args( $repo_type );
 
 		foreach ( $remove as $key ) {
 			unset( $query_args[ $key ] );

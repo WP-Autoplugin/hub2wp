@@ -336,6 +336,7 @@ jQuery(document).ready(function($) {
         var owner = params.get('h2wp_modal_owner');
         var repo = params.get('h2wp_modal_repo');
         var repoType = params.get('repo_type') || h2wp_ajax_object.repo_type || 'plugin';
+        repoType = ('plugin' === repoType || 'theme' === repoType) ? repoType : 'plugin';
 
         if ('details' !== modalType || !owner || !repo) {
             return;

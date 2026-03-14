@@ -8,6 +8,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class H2WP_Admin_Ajax {
 	/**
+	 * Tracks whether the async translation upgrader hook was removed for this request.
+	 *
+	 * @var bool
+	 */
+	private $async_translation_hook_removed = false;
+
+	/**
 	 * Clean any buffered output started after the given level.
 	 *
 	 * @param int $buffer_level Buffer level to return to.
@@ -16,6 +23,30 @@ class H2WP_Admin_Ajax {
 	private function clean_ajax_buffers( $buffer_level ) {
 		while ( ob_get_level() > $buffer_level ) {
 			ob_end_clean();
+		}
+	}
+
+	/**
+	 * Temporarily disable the async translation upgrade pass that echoes HTML during installs.
+	 *
+	 * @return void
+	 */
+	private function suspend_async_translation_updates() {
+		if ( has_action( 'upgrader_process_complete', array( 'Language_Pack_Upgrader', 'async_upgrade' ) ) ) {
+			remove_action( 'upgrader_process_complete', array( 'Language_Pack_Upgrader', 'async_upgrade' ), 20 );
+			$this->async_translation_hook_removed = true;
+		}
+	}
+
+	/**
+	 * Restore the async translation upgrade hook if this request removed it.
+	 *
+	 * @return void
+	 */
+	private function resume_async_translation_updates() {
+		if ( $this->async_translation_hook_removed ) {
+			add_action( 'upgrader_process_complete', array( 'Language_Pack_Upgrader', 'async_upgrade' ), 20 );
+			$this->async_translation_hook_removed = false;
 		}
 	}
 	/**
@@ -116,7 +147,9 @@ class H2WP_Admin_Ajax {
 			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
+		$buffer_level = ob_get_level();
 		ob_start();
+		$this->suspend_async_translation_updates();
 
 		$tracking = $this->get_monitored_tracking_preferences( $owner, $repo, $repo_type );
 
@@ -131,8 +164,10 @@ class H2WP_Admin_Ajax {
 			)
 		);
 
+		$this->resume_async_translation_updates();
+
 		if ( is_wp_error( $result ) ) {
-			$this->clean_ajax_buffers( 0 );
+			$this->clean_ajax_buffers( $buffer_level );
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 
@@ -148,7 +183,7 @@ class H2WP_Admin_Ajax {
 				admin_url( 'themes.php' )
 			);
 
-			$this->clean_ajax_buffers( 0 );
+			$this->clean_ajax_buffers( $buffer_level );
 			wp_send_json_success( $result );
 		}
 
@@ -158,7 +193,7 @@ class H2WP_Admin_Ajax {
 			'_wpnonce' => wp_create_nonce( 'activate-plugin_' . $result['plugin_file'] ),
 		), admin_url( 'plugins.php' ) );
 
-		$this->clean_ajax_buffers( 0 );
+		$this->clean_ajax_buffers( $buffer_level );
 		wp_send_json_success( $result );
 	}
 

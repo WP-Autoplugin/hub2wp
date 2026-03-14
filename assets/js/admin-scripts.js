@@ -229,6 +229,13 @@ jQuery(document).ready(function($) {
         }
     });
 
+    // Close the visible modal when pressing Escape.
+    $(document).on('keydown', function(event) {
+        if ('Escape' === event.key && $('#h2wp-plugin-modal').is(':visible')) {
+            closeGpbModal();
+        }
+    });
+
     // Click on ".h2wp-install-plugin": AJAX request to h2wp_install_plugin.
     $('.h2wp-install-plugin').on('click', function(e) {
         e.preventDefault();

@@ -62,6 +62,7 @@ No, but you have a higher request limit if you use one.
 == Changelog ==
 
 = 1.5.1 =
+* Fix: non-blocking error when trying to install a theme from inside the plugin details modal.
 * UI/UX improvements.
 
 = 1.5.0 =

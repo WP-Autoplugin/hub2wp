@@ -782,6 +782,7 @@ class H2WP_Admin_Page {
 		$description  = isset( $item['description'] ) ? $item['description'] : '';
 		$owner        = isset( $item['owner']['login'] ) ? $item['owner']['login'] : '';
 		$avatar       = isset( $item['owner']['avatar_url'] ) ? $item['owner']['avatar_url'] : '';
+		$hue          = self::generate_hue_from_string( $name );
 		$stars        = isset( $item['stargazers_count'] ) ? number_format( $item['stargazers_count'] ) : 0;
 		$forks        = isset( $item['forks_count'] ) ? number_format( $item['forks_count'] ) : 0;
 		$updated      = isset( $item['updated_at'] ) ? human_time_diff( strtotime( $item['updated_at'] ) ) . ' ago' : '';
@@ -789,7 +790,7 @@ class H2WP_Admin_Page {
 		echo '<div class="h2wp-theme-card">';
 		echo '<div class="h2wp-theme-screenshot">';
 		if ( $avatar ) {
-			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-theme-hero-image h2wp-plugin-thumbnail" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme" style="cursor:pointer;" />';
+			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-theme-hero-image h2wp-plugin-thumbnail" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme" style="--hue:' . esc_attr( $hue ) . 'deg;" />';
 		} else {
 			echo '<div class="h2wp-plugin-icon-placeholder"></div>';
 		}
@@ -826,6 +827,16 @@ class H2WP_Admin_Page {
 		echo '<path fill-rule="evenodd" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm8.5-4a.5.5 0 00-1 0v4a.5.5 0 00.146.354l2.5 2.5a.5.5 0 00.708-.708L8.5 7.793V4z"></path></svg><span>' . esc_html( $updated ) . '</span></span>';
 		echo '</div>';
 		echo '</div>';
+	}
+
+	/**
+	 * Generate a hue value based on a string.
+	 *
+	 * @param string $string Input string.
+	 * @return int Hue value (0-360).
+	 */
+	private static function generate_hue_from_string( $string ) {
+		return abs( crc32( $string ) ) % 360;
 	}
 
 	/**

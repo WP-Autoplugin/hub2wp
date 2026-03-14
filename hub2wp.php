@@ -2,7 +2,7 @@
 /**
  * Plugin Name: hub2wp
  * Description: Browse, install, and update WordPress plugins directly from GitHub repositories.
- * Version: 1.5.0
+ * Version: 1.5.1
  * Author: Balázs Piller
  * Text Domain: hub2wp
  * Domain Path: /languages

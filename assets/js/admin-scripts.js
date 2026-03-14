@@ -201,7 +201,7 @@ jQuery(document).ready(function($) {
     }
 
     // Click event for "More Details" links.
-    $('.h2wp-more-details-link, .h2wp-plugin-name, .h2wp-plugin-thumbnail').on('click', function(e) {
+    $('.h2wp-more-details-link, .h2wp-plugin-name, .h2wp-plugin-thumbnail, .h2wp-theme-name-link').on('click', function(e) {
         var isModifiedAnchorClick = e.currentTarget.tagName === 'A' && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1);
         var owner = $(this).data('owner');
         var repo = $(this).data('repo');

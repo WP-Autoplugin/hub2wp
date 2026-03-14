@@ -797,7 +797,7 @@ class H2WP_Admin_Page {
 		echo '</div>';
 
 		echo '<div class="h2wp-theme-header">';
-		echo '<h3 class="h2wp-theme-name">' . esc_html( $display_name ) . '</h3>';
+		echo '<h3 class="h2wp-theme-name"><a href="' . esc_url( self::get_repo_details_url( $owner, $name, 'theme' ) ) . '" class="h2wp-theme-name-link" data-owner="' . esc_attr( $owner ) . '" data-repo="' . esc_attr( $name ) . '" data-type="theme">' . esc_html( $display_name ) . '</a></h3>';
 		echo '<span class="h2wp-theme-author-text">' . esc_html__( 'By', 'hub2wp' ) . ' <a href="https://github.com/' . esc_attr( $owner ) . '">' . esc_html( $owner ) . '</a></span>';
 		if ( $avatar ) {
 			echo '<img src="' . esc_url( $avatar ) . '" alt="" class="h2wp-theme-author-avatar" />';

@@ -303,6 +303,17 @@
     font-weight: 600;
 }
 
+.h2wp-theme-card .h2wp-theme-name-link {
+    color: inherit;
+    text-decoration: none;
+}
+
+.h2wp-theme-card .h2wp-theme-name-link:hover,
+.h2wp-theme-card .h2wp-theme-name-link:focus {
+    color: #135e96;
+    text-decoration: underline;
+}
+
 .h2wp-theme-card .h2wp-theme-description {
     padding: 0 12px 12px;
     margin: 0;

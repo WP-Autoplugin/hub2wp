@@ -13,6 +13,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 class H2WP_GitHub_API {
 
 	/**
+	 * Repositories that should never appear in public search results.
+	 *
+	 * These repos may use WordPress-related topics but are not installable plugins/themes.
+	 *
+	 * @var string[]
+	 */
+	private $excluded_search_repositories = array(
+		'lukecav/awesome-woocommerce',
+	);
+
+	/**
 	 * The personal access token.
 	 *
 	 * @var string
@@ -47,6 +58,8 @@ class H2WP_GitHub_API {
 	 */
 	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
 
+		$query = $this->append_excluded_repository_qualifiers( $query );
+
 		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
@@ -79,8 +92,57 @@ class H2WP_GitHub_API {
 			return new WP_Error( 'h2wp_api_error', __( 'Invalid response from GitHub API.', 'hub2wp' ) );
 		}
 
+		if ( is_array( $data['items'] ) ) {
+			$data['items'] = array_values(
+				array_filter(
+					$data['items'],
+					array( $this, 'is_search_result_allowed' )
+				)
+			);
+		}
+
 		H2WP_Cache::set( $cache_key, $data );
 		return $data;
+	}
+
+	/**
+	 * Add hardcoded excluded repositories to a GitHub search query.
+	 *
+	 * @param string $query Search query.
+	 * @return string
+	 */
+	private function append_excluded_repository_qualifiers( $query ) {
+		$normalized_query = strtolower( $query );
+
+		foreach ( $this->excluded_search_repositories as $repository ) {
+			$repository = strtolower( trim( (string) $repository ) );
+			if ( '' === $repository ) {
+				continue;
+			}
+
+			if ( false !== strpos( $normalized_query, 'repo:' . $repository ) ) {
+				continue;
+			}
+
+			$query           .= ' -repo:' . $repository;
+			$normalized_query = strtolower( $query );
+		}
+
+		return trim( $query );
+	}
+
+	/**
+	 * Check whether a GitHub search result should be kept.
+	 *
+	 * @param array<string, mixed> $item Search result item.
+	 * @return bool
+	 */
+	private function is_search_result_allowed( $item ) {
+		if ( ! is_array( $item ) || empty( $item['full_name'] ) ) {
+			return true;
+		}
+
+		return ! in_array( strtolower( (string) $item['full_name'] ), $this->excluded_search_repositories, true );
 	}
 
 	/**

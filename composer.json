@@ -1,6 +1,6 @@
 {
     "name": "wp-autoplugin/hub2wp",
-    "version": "1.5.1",
+    "version": "1.5.2",
     "description": "Browse, install, and update WordPress themes and plugins from GitHub, as if they were in the .org repo.",
     "type": "wordpress-plugin",
     "autoload": {

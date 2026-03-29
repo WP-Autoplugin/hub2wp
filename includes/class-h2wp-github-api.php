@@ -13,18 +13,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 class H2WP_GitHub_API {
 
 	/**
-	 * Repositories that should not appear when browsing or searching for plugins/themes.
+	 * Plugin repositories that should not appear when browsing or searching for plugins.
 	 *
-	 * These repos may use WordPress-related topics but are not installable plugins/themes.
-	 * We checked the top 200 search results for "topic:wordpress-plugin" and "topic:wordpress-theme" and added known incompatible repositories to this list.
-	 * By incompatible we mean repositories that cannot be installed through hub2wp, either because they are not actually plugins/themes, or because they lack the necessary headers.
-	 * The list can be updated over time. If your repository is on this list and you want it to be discoverable through hub2wp, please make sure it has the appropriate WordPress plugin/theme headers (see "Plugin and Theme Eligibility" section in README.md), and open an issue or a PR to remove it from this list.
+	 * These repos may use WordPress-related topics but are not installable plugins.
+	 * We checked the top 200 search results for "topic:wordpress-plugin" and added known incompatible repositories to this list.
+	 * By incompatible we mean repositories that cannot be installed through hub2wp, either because they are not actually plugins, or because they lack the necessary headers.
+	 * The list can be updated over time. If your repository is on this list and you want it to be discoverable through hub2wp, please make sure it has the appropriate WordPress plugin headers (see "Plugin and Theme Eligibility" section in README.md), and open an issue or a PR to remove it from this list.
+	 *
+	 * Use the {@see 'hub2wp_excluded_plugin_repositories'} filter to modify this list.
 	 *
 	 * @var string[]
 	 */
-	private $excluded_search_repositories = array(
-
-		// Plugins.
+	private $excluded_plugin_repositories = array(
 		'lukecav/awesome-woocommerce',
 		'wp-graphql/wp-graphql',
 		'humanmade/s3-uploads',
@@ -98,8 +98,21 @@ class H2WP_GitHub_API {
 		'westonruter/syntax-highlighting-code-block',
 		'enlighterjs/plugin.wordpress',
 		'nlemoine/acf-country',
+	);
 
-		// Themes.
+	/**
+	 * Theme repositories that should not appear when browsing or searching for themes.
+	 *
+	 * These repos may use WordPress-related topics but are not installable themes.
+	 * We checked the top 200 search results for "topic:wordpress-theme" and added known incompatible repositories to this list.
+	 * By incompatible we mean repositories that cannot be installed through hub2wp, either because they are not actually themes, or because they lack the necessary headers.
+	 * The list can be updated over time. If your repository is on this list and you want it to be discoverable through hub2wp, please make sure it has the appropriate WordPress theme headers (see "Plugin and Theme Eligibility" section in README.md), and open an issue or a PR to remove it from this list.
+	 *
+	 * Use the {@see 'hub2wp_excluded_theme_repositories'} filter to modify this list.
+	 *
+	 * @var string[]
+	 */
+	private $excluded_theme_repositories = array(
 		'wp-bootstrap/wp-bootstrap-navwalker',
 		'woocommerce/storefront',
 		'timber/starter-theme',
@@ -213,7 +226,8 @@ class H2WP_GitHub_API {
 	 */
 	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
 
-		$query = $this->append_excluded_repository_qualifiers( $query );
+		$type  = ( false !== strpos( strtolower( $query ), 'topic:wordpress-theme' ) ) ? 'theme' : 'plugin';
+		$query = $this->append_excluded_repository_qualifiers( $query, $type );
 
 		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
 		$cached    = H2WP_Cache::get( $cache_key );
@@ -248,10 +262,16 @@ class H2WP_GitHub_API {
 		}
 
 		if ( is_array( $data['items'] ) ) {
+			$excluded        = $this->get_excluded_repositories( $type );
 			$data['items'] = array_values(
 				array_filter(
 					$data['items'],
-					array( $this, 'is_search_result_allowed' )
+					function( $item ) use ( $excluded ) {
+						if ( ! is_array( $item ) || empty( $item['full_name'] ) ) {
+							return true;
+						}
+						return ! in_array( strtolower( (string) $item['full_name'] ), $excluded, true );
+					}
 				)
 			);
 		}
@@ -261,15 +281,44 @@ class H2WP_GitHub_API {
 	}
 
 	/**
+	 * Return the excluded-repository list for the given type, after applying filters.
+	 *
+	 * @param string $type Repository type: plugin|theme.
+	 * @return string[]
+	 */
+	private function get_excluded_repositories( $type = 'plugin' ) {
+		if ( 'theme' === $type ) {
+			/**
+			 * Filter the list of theme repositories excluded from search results.
+			 *
+			 * Each entry must be a lowercase "owner/repo" string.
+			 *
+			 * @param string[] $excluded Default list of excluded theme repositories.
+			 */
+			return apply_filters( 'hub2wp_excluded_theme_repositories', $this->excluded_theme_repositories );
+		}
+
+		/**
+		 * Filter the list of plugin repositories excluded from search results.
+		 *
+		 * Each entry must be a lowercase "owner/repo" string.
+		 *
+		 * @param string[] $excluded Default list of excluded plugin repositories.
+		 */
+		return apply_filters( 'hub2wp_excluded_plugin_repositories', $this->excluded_plugin_repositories );
+	}
+
+	/**
 	 * Add hardcoded excluded repositories to a GitHub search query.
 	 *
 	 * @param string $query Search query.
+	 * @param string $type  Repository type: plugin|theme.
 	 * @return string
 	 */
-	private function append_excluded_repository_qualifiers( $query ) {
+	private function append_excluded_repository_qualifiers( $query, $type = 'plugin' ) {
 		$normalized_query = strtolower( $query );
 
-		foreach ( $this->excluded_search_repositories as $repository ) {
+		foreach ( $this->get_excluded_repositories( $type ) as $repository ) {
 			$repository = strtolower( trim( (string) $repository ) );
 			if ( '' === $repository ) {
 				continue;
@@ -284,20 +333,6 @@ class H2WP_GitHub_API {
 		}
 
 		return trim( $query );
-	}
-
-	/**
-	 * Check whether a GitHub search result should be kept.
-	 *
-	 * @param array<string, mixed> $item Search result item.
-	 * @return bool
-	 */
-	private function is_search_result_allowed( $item ) {
-		if ( ! is_array( $item ) || empty( $item['full_name'] ) ) {
-			return true;
-		}
-
-		return ! in_array( strtolower( (string) $item['full_name'] ), $this->excluded_search_repositories, true );
 	}
 
 	/**

@@ -63,6 +63,7 @@ No, but you have a higher request limit if you use one.
 
 = 1.5.2 =
 * Added list of known-incompatible plugins and themes, to exclude them from search results.
+* Fix: refresh update transient when clearing cache from settings page.
 
 = 1.5.1 =
 * Fix: non-blocking error when trying to install a theme from inside the plugin details modal.

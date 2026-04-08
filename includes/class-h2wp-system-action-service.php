@@ -17,6 +17,8 @@ class H2WP_System_Action_Service {
 	public function clear_cache() {
 		H2WP_Cache::clear_all();
 		delete_transient( 'h2wp_last_update_check' );
+		wp_update_plugins();
+		wp_update_themes();
 
 		return array(
 			'message'    => __( 'Cache cleared successfully.', 'hub2wp' ),

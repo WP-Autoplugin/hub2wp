@@ -3,7 +3,7 @@ Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.8
 Tested up to: 7.0
-Stable tag: 1.5.1
+Stable tag: 1.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -60,6 +60,10 @@ Manage hub2wp settings with WP-CLI too:
 No, but you have a higher request limit if you use one.
 
 == Changelog ==
+
+= 1.5.2 =
+* Added list of known-incompatible plugins and themes, to exclude them from search results.
+* Fix: refresh update transient when clearing cache from settings page.
 
 = 1.5.1 =
 * Fix: non-blocking error when trying to install a theme from inside the plugin details modal.

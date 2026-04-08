@@ -13,6 +13,185 @@ if ( ! defined( 'ABSPATH' ) ) {
 class H2WP_GitHub_API {
 
 	/**
+	 * Plugin repositories that should not appear when browsing or searching for plugins.
+	 *
+	 * These repos may use WordPress-related topics but are not installable plugins.
+	 * We checked the top 200 search results for "topic:wordpress-plugin" and added known incompatible repositories to this list.
+	 * By incompatible we mean repositories that cannot be installed through hub2wp, either because they are not actually plugins, or because they lack the necessary headers.
+	 * The list can be updated over time. If your repository is on this list and you want it to be discoverable through hub2wp, please make sure it has the appropriate WordPress plugin headers (see "Plugin and Theme Eligibility" section in README.md), and open an issue or a PR to remove it from this list.
+	 *
+	 * Use the {@see 'hub2wp_excluded_plugin_repositories'} filter to modify this list.
+	 *
+	 * @var string[]
+	 */
+	private $excluded_plugin_repositories = array(
+		'lukecav/awesome-woocommerce',
+		'wp-graphql/wp-graphql',
+		'humanmade/s3-uploads',
+		'ampproject/amp-wp',
+		'automattic/jetpack',
+		'ahmadawais/wpgulp',
+		'roots/acorn',
+		'wp-media/wp-rocket',
+		'wp-graphql/wp-graphql-woocommerce',
+		'lukecav/awesome-wp-speed-up',
+		'wenpai-org/wp-china-yes',
+		'maadhattah/wordpress-github-sync',
+		'zhuige-com/jiangqie_kafei',
+		'lukecav/awesome-wp-developer-tools',
+		'rarst/laps',
+		'alleyinteractive/wordpress-fieldmanager',
+		'humanmade/cavalcade',
+		'xiaofaye/woocommerce.net',
+		'gatographql/gatographql',
+		'roots/wp-stage-switcher',
+		'automattic/edit-flow',
+		'wp-graphql/wp-graphql-jwt-authentication',
+		'humanmade/wordpress-importer',
+		'codesnippetspro/code-snippets',
+		'lukecav/awesome-elementor',
+		'lukecav/awesome-gravity-forms',
+		'automattic/co-authors-plus',
+		'pristas-peter/wp-graphql-gutenberg',
+		'codestar/codestar-framework',
+		'tareq1988/vue-wp-starter',
+		'garyjones/gamajo-template-loader',
+		'webdevstudios/generator-plugin-wp',
+		'moeplayer/hermit-x',
+		'shovoalways/plugin-development',
+		'kasparsd/minit',
+		'yeswework/fabrica-dev-kit',
+		'wp-papi/papi',
+		'buddypress/buddypress',
+		'ajaxloadmore/ajax-load-more',
+		'bueltge/multisite-global-media',
+		'youknowriad/wp-js-plugin-starter',
+		'serpwings/static-wordpress',
+		'gocodebox/lifterlms',
+		'wordpress/wp-feature-notifications',
+		'automattic/custom-metadata',
+		'presslabs/gitium',
+		'torounit/custom-post-type-permalinks',
+		'auth0/wordpress',
+		'pluginkollektiv/antispam-bee',
+		'wpbones/wpbones',
+		'webdevstudios/wp-search-with-algolia',
+		'hasinhayder/themeforest-wp-theme-approval-checklist',
+		'lesterchan/wp-sweep',
+		'tainacan/tainacan',
+		'cedaro/gravity-forms-iframe',
+		'mailpoet/mailpoet',
+		'trewknowledge/gdpr',
+		'wponion/wponion',
+		'valu-digital/wp-graphql-polylang',
+		'stevegrunwell/wp-cache-remember',
+		'rarst/fragment-cache',
+		'lesterchan/wp-pagenavi',
+		'webdevstudios/wds-blocks',
+		'cedaro/woocommerce-coupon-links',
+		'svandragt/htmxpress',
+		'automattic/rewrite-rules-inspector',
+		'devgeniem/acf-codifier',
+		'rarst/wps',
+		'lesterchan/wp-postratings',
+		'lukecav/awesome-blocks',
+		'westonruter/syntax-highlighting-code-block',
+		'enlighterjs/plugin.wordpress',
+		'nlemoine/acf-country',
+	);
+
+	/**
+	 * Theme repositories that should not appear when browsing or searching for themes.
+	 *
+	 * These repos may use WordPress-related topics but are not installable themes.
+	 * We checked the top 200 search results for "topic:wordpress-theme" and added known incompatible repositories to this list.
+	 * By incompatible we mean repositories that cannot be installed through hub2wp, either because they are not actually themes, or because they lack the necessary headers.
+	 * The list can be updated over time. If your repository is on this list and you want it to be discoverable through hub2wp, please make sure it has the appropriate WordPress theme headers (see "Plugin and Theme Eligibility" section in README.md), and open an issue or a PR to remove it from this list.
+	 *
+	 * Use the {@see 'hub2wp_excluded_theme_repositories'} filter to modify this list.
+	 *
+	 * @var string[]
+	 */
+	private $excluded_theme_repositories = array(
+		'wp-bootstrap/wp-bootstrap-navwalker',
+		'woocommerce/storefront',
+		'timber/starter-theme',
+		'tokinx/adams',
+		'bstavroulakis/vue-wordpress-pwa',
+		'tokinx/wing',
+		'weipxiu/art_blog',
+		'braginteractive/materialwp',
+		'devloco/create-react-wptheme',
+		'imranhsayed/gatsby-wordpress-themes',
+		'godaddy-wordpress/go',
+		'd-xuanmo/nuxtjs-wordpress',
+		'alexweblab/bootstrap-5-wordpress-navbar-walker',
+		'zackha/nuxtcommerce',
+		'wptt/wpthemereview',
+		'cjkoepke/wp-tailwind',
+		'billerickson/be-starter',
+		'pfefferle/sempress',
+		'webredone/theme-redone',
+		'terrylinooo/mynote',
+		'shovoalways/wordpress-theme-development',
+		'cearls/timberland',
+		'lyzs90/vuewp',
+		'mwdelaney/sage-advanced-custom-fields',
+		'livecanvas-team/picostrap5',
+		'pfefferle/autonomie',
+		'onixaz/nextjs-woocommerce-storefront',
+		'infinum/eightshift-docs',
+		'devinwalker/wp-rollback',
+		'greenpeace/planet4-master-theme',
+		'makeitworkpress/wp-custom-fields',
+		'aduth/dones',
+		'imranhsayed/react-wordpress-theme',
+		'x3p0-dev/x3p0-ideas',
+		'bueltge/wordpress-basis-theme',
+		'8bit-echo/sage-vite',
+		'alwaysblank/blade-generate',
+		'andersnoren/bjork',
+		'denoland/fresh-wordpress-themes',
+		'scottsweb/v1.scott.ee',
+		'digitalcube/iemoto',
+		'amnestywebsite/humanity-theme',
+		'rvsanches/bs4-wp',
+		'asuh/html5boilerplate-starkers-wordpress-theme',
+		'beats0/mygalgame',
+		'italystrap/italystrap',
+		'secretpizzaparty/huh',
+		'twistedandy/wp-theme',
+		'thundernet8/tint-pro',
+		'kevinlearynet/basic-wp',
+		'cipherdevgroup/alpha',
+		'samikeijonen/uuups',
+		'inc2734/mimizuku',
+		'wplemon/gridd',
+		'michaelsoriano/barebones',
+		'michealpearce/wp-svelte-theme-boilerplate',
+		'aminbenselim/wp-react-redux',
+		'troy-yang/hexo-theme-twentyfifteen-wordpress',
+		'd-xuanmo/xm-vue-wordpress-theme',
+		'huangguorui/smile_blog',
+		'mindkomm/theme-lib-mix',
+		'murielk/androidwptemplate',
+		'blockifywp/theme',
+		'robbinjohansson/sage-laravel-mix',
+		'jongrover/building-a-wordpress-theme-from-scratch',
+		'isakfagerlund/wordpress-webpack-starter',
+		'19h47/19h47.fr',
+		'ebisucom/wp-blocktheme',
+		'mirucon/coldbox',
+		'piperhaywood/commonplace-wp-theme',
+		'shockdesign/terminal-wordpress-theme',
+		'andersnoren/beaumont',
+		'italystrap/theme-json-generator',
+		'knowthecode/genesis-developer-starter-lab',
+		'brettsmason/luxe',
+		'jessehanley/wordpress-amp-theme',
+	);
+
+	/**
 	 * The personal access token.
 	 *
 	 * @var string
@@ -47,6 +226,9 @@ class H2WP_GitHub_API {
 	 */
 	public function search_plugins( $query = 'topic:wordpress-plugin', $page = 1, $sort = 'stars', $order = 'desc' ) {
 
+		$type  = ( false !== strpos( strtolower( $query ), 'topic:wordpress-theme' ) ) ? 'theme' : 'plugin';
+		$query = $this->append_excluded_repository_qualifiers( $query, $type );
+
 		$cache_key = 'search_' . md5( $query . $page . $sort . $order . $this->access_token );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
@@ -79,8 +261,78 @@ class H2WP_GitHub_API {
 			return new WP_Error( 'h2wp_api_error', __( 'Invalid response from GitHub API.', 'hub2wp' ) );
 		}
 
+		if ( is_array( $data['items'] ) ) {
+			$excluded        = $this->get_excluded_repositories( $type );
+			$data['items'] = array_values(
+				array_filter(
+					$data['items'],
+					function( $item ) use ( $excluded ) {
+						if ( ! is_array( $item ) || empty( $item['full_name'] ) ) {
+							return true;
+						}
+						return ! in_array( strtolower( (string) $item['full_name'] ), $excluded, true );
+					}
+				)
+			);
+		}
+
 		H2WP_Cache::set( $cache_key, $data );
 		return $data;
+	}
+
+	/**
+	 * Return the excluded-repository list for the given type, after applying filters.
+	 *
+	 * @param string $type Repository type: plugin|theme.
+	 * @return string[]
+	 */
+	private function get_excluded_repositories( $type = 'plugin' ) {
+		if ( 'theme' === $type ) {
+			/**
+			 * Filter the list of theme repositories excluded from search results.
+			 *
+			 * Each entry must be a lowercase "owner/repo" string.
+			 *
+			 * @param string[] $excluded Default list of excluded theme repositories.
+			 */
+			return apply_filters( 'hub2wp_excluded_theme_repositories', $this->excluded_theme_repositories );
+		}
+
+		/**
+		 * Filter the list of plugin repositories excluded from search results.
+		 *
+		 * Each entry must be a lowercase "owner/repo" string.
+		 *
+		 * @param string[] $excluded Default list of excluded plugin repositories.
+		 */
+		return apply_filters( 'hub2wp_excluded_plugin_repositories', $this->excluded_plugin_repositories );
+	}
+
+	/**
+	 * Add hardcoded excluded repositories to a GitHub search query.
+	 *
+	 * @param string $query Search query.
+	 * @param string $type  Repository type: plugin|theme.
+	 * @return string
+	 */
+	private function append_excluded_repository_qualifiers( $query, $type = 'plugin' ) {
+		$normalized_query = strtolower( $query );
+
+		foreach ( $this->get_excluded_repositories( $type ) as $repository ) {
+			$repository = strtolower( trim( (string) $repository ) );
+			if ( '' === $repository ) {
+				continue;
+			}
+
+			if ( false !== strpos( $normalized_query, 'repo:' . $repository ) ) {
+				continue;
+			}
+
+			$query           .= ' -repo:' . $repository;
+			$normalized_query = strtolower( $query );
+		}
+
+		return trim( $query );
 	}
 
 	/**
@@ -300,7 +552,7 @@ class H2WP_GitHub_API {
 
 		if ( is_wp_error( $response ) ) {
 			$error_code = $response->get_error_code();
-			
+
 			// Provide more specific error messages based on HTTP status
 			if ( 'h2wp_api_error_404' === $error_code ) {
 				return new WP_Error(

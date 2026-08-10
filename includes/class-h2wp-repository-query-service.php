@@ -1,12 +1,17 @@
 <?php
 /**
  * Shared repository lookup and normalization helpers.
+ *
+ * @package hub2wp
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Provides normalized repository details and compatibility results.
+ */
 class H2WP_Repository_Query_Service {
 
 	/**
@@ -29,19 +34,27 @@ class H2WP_Repository_Query_Service {
 	 * @param string $owner Repository owner.
 	 * @param string $repo Repository name.
 	 * @param string $repo_type Repository type.
+	 * @param string $subdirectory Optional project subdirectory.
 	 * @return array<string, mixed>|WP_Error
 	 */
-	public function get_repository_details( $owner, $repo, $repo_type = 'plugin' ) {
-		$repo_type      = $this->normalize_repo_type( $repo_type );
-		$tracking       = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type );
-		$source_context = $this->api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'] );
+	public function get_repository_details( $owner, $repo, $repo_type = 'plugin', $subdirectory = '' ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) ) {
+			return new WP_Error( 'h2wp_invalid_repository', __( 'A valid GitHub repository is required.', 'hub2wp' ) );
+		}
+		$repo_type    = $this->normalize_repo_type( $repo_type );
+		$subdirectory = H2WP_Settings::normalize_subdirectory( $subdirectory );
+		if ( is_wp_error( $subdirectory ) ) {
+			return $subdirectory;
+		}
+		$tracking       = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type, $subdirectory );
+		$source_context = $this->api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'], $subdirectory );
 		$repo_details   = $this->api->get_repo_details( $owner, $repo );
 
 		if ( is_wp_error( $repo_details ) ) {
 			return $repo_details;
 		}
 
-		$readme_html = $this->api->get_readme_html( $owner, $repo, $source_context['ref'] );
+		$readme_html = $this->api->get_readme_html( $owner, $repo, $source_context['ref'], $subdirectory );
 		if ( is_wp_error( $readme_html ) ) {
 			$readme_html = __( 'No README available.', 'hub2wp' );
 		}
@@ -57,27 +70,35 @@ class H2WP_Repository_Query_Service {
 			$watchers = 0;
 		}
 
+		$project_slug = '' === $subdirectory ? $repo : basename( $subdirectory );
+		$project_url  = isset( $repo_details['html_url'] ) ? $repo_details['html_url'] : '';
+		if ( '' !== $subdirectory && '' !== $project_url ) {
+			$source_ref   = ! empty( $source_context['ref'] ) ? $source_context['ref'] : ( isset( $repo_details['default_branch'] ) ? $repo_details['default_branch'] : 'HEAD' );
+			$project_url .= '/tree/' . rawurlencode( $source_ref ) . '/' . implode( '/', array_map( 'rawurlencode', explode( '/', $subdirectory ) ) );
+		}
+
 		return array(
-			'name'                => isset( $repo_details['name'] ) ? $repo_details['name'] : '',
-			'display_name'        => isset( $repo_details['name'] ) ? $this->format_display_name( $repo_details['name'] ) : '',
+			'name'                => $project_slug,
+			'display_name'        => $this->format_display_name( $project_slug ),
 			'owner'               => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'repo'                => isset( $repo_details['name'] ) ? sanitize_text_field( $repo_details['name'] ) : '',
 			'repo_type'           => $repo_type,
+			'subdirectory'        => $subdirectory,
 			'description'         => isset( $repo_details['description'] ) ? esc_html( $repo_details['description'] ) : '',
 			'readme'              => $readme_html,
 			'stargazers'          => isset( $repo_details['stargazers_count'] ) ? number_format_i18n( $repo_details['stargazers_count'] ) : '0',
 			'forks'               => isset( $repo_details['forks_count'] ) ? number_format_i18n( $repo_details['forks_count'] ) : '0',
 			'watchers'            => number_format_i18n( (int) $watchers ),
 			'open_issues'         => isset( $repo_details['open_issues_count'] ) ? number_format_i18n( $repo_details['open_issues_count'] ) : '0',
-			'html_url'            => isset( $repo_details['html_url'] ) ? esc_url_raw( $repo_details['html_url'] ) : '',
+			'html_url'            => esc_url_raw( $project_url ),
 			'homepage'            => isset( $repo_details['homepage'] ) ? esc_url_raw( $repo_details['homepage'] ) : '',
 			'og_image'            => esc_url_raw( $og_image ),
 			'owner_avatar_url'    => isset( $repo_details['owner']['avatar_url'] ) ? esc_url_raw( $repo_details['owner']['avatar_url'] ) : '',
 			'author'              => isset( $repo_details['owner']['login'] ) ? sanitize_text_field( $repo_details['owner']['login'] ) : '',
 			'author_url'          => isset( $repo_details['owner']['html_url'] ) ? esc_url_raw( $repo_details['owner']['html_url'] ) : '',
 			'updated_at'          => $this->calculate_last_updated( $owner, $repo, $repo_type, $tracking, $repo_details, $source_context ),
-			'topics'              => isset( $repo_details['topics'] ) ? $this->extract_topics( $repo_details['topics'], $repo_type ) : array(),
-			'is_installed'        => H2WP_Admin_Page::is_repo_installed( $owner, $repo, $repo_type ),
+			'topics'              => isset( $repo_details['topics'] ) && is_array( $repo_details['topics'] ) ? $this->extract_topics( $repo_details['topics'], $repo_type ) : array(),
+			'is_installed'        => H2WP_Admin_Page::is_repo_installed( $owner, $project_slug, $repo_type ),
 			'prioritize_releases' => ! empty( $tracking['prioritize_releases'] ),
 			'uses_releases'       => ! empty( $source_context['uses_releases'] ),
 			'version_source'      => isset( $source_context['source'] ) ? $source_context['source'] : 'branch',
@@ -90,19 +111,46 @@ class H2WP_Repository_Query_Service {
 	 * @param string $owner Repository owner.
 	 * @param string $repo Repository name.
 	 * @param string $repo_type Repository type.
+	 * @param string $subdirectory Optional project subdirectory.
 	 * @return array<string, mixed>
 	 */
-	public function check_repository_compatibility( $owner, $repo, $repo_type = 'plugin' ) {
-		$repo_type      = $this->normalize_repo_type( $repo_type );
-		$tracking       = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type );
-		$source_context = $this->api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'] );
-		$compatibility  = $this->api->check_compatibility( $owner, $repo, $repo_type, $tracking['branch'], $tracking['prioritize_releases'], $source_context );
+	public function check_repository_compatibility( $owner, $repo, $repo_type = 'plugin', $subdirectory = '' ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) ) {
+			return array(
+				'is_compatible'  => false,
+				'reason'         => __( 'A valid GitHub repository is required.', 'hub2wp' ),
+				'headers'        => array(),
+				'source_context' => array(),
+			);
+		}
+		$repo_type    = $this->normalize_repo_type( $repo_type );
+		$subdirectory = H2WP_Settings::normalize_subdirectory( $subdirectory );
+		if ( is_wp_error( $subdirectory ) ) {
+			return array(
+				'is_compatible'  => false,
+				'reason'         => $subdirectory->get_error_message(),
+				'headers'        => array(),
+				'source_context' => array(),
+			);
+		}
+		$tracking       = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type, $subdirectory );
+		$source_context = $this->api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'], $subdirectory );
+		$compatibility  = $this->api->check_compatibility( $owner, $repo, $repo_type, $tracking['branch'], $tracking['prioritize_releases'], $source_context, $subdirectory );
+		if ( is_wp_error( $compatibility ) ) {
+			return array(
+				'is_compatible'  => false,
+				'reason'         => $compatibility->get_error_message(),
+				'headers'        => array(),
+				'source_context' => $source_context,
+			);
+		}
+		$compatibility = is_array( $compatibility ) ? $compatibility : array();
 
 		return array(
-			'is_compatible' => ! empty( $compatibility['is_compatible'] ),
-			'reason'        => isset( $compatibility['reason'] ) ? $compatibility['reason'] : '',
-			'headers'       => isset( $compatibility['headers'] ) && is_array( $compatibility['headers'] ) ? $compatibility['headers'] : array(),
-			'source_context'=> $source_context,
+			'is_compatible'  => ! empty( $compatibility['is_compatible'] ),
+			'reason'         => isset( $compatibility['reason'] ) ? $compatibility['reason'] : '',
+			'headers'        => isset( $compatibility['headers'] ) && is_array( $compatibility['headers'] ) ? $compatibility['headers'] : array(),
+			'source_context' => $source_context,
 		);
 	}
 
@@ -111,10 +159,19 @@ class H2WP_Repository_Query_Service {
 	 *
 	 * @param string $owner Repository owner.
 	 * @param string $repo Repository name.
+	 * @param string $subdirectory Optional project subdirectory.
 	 * @return array<int, array<string, mixed>>|WP_Error
 	 */
-	public function get_changelog( $owner, $repo ) {
-		return $this->api->get_changelog( $owner, $repo );
+	public function get_changelog( $owner, $repo, $subdirectory = '' ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) ) {
+			return new WP_Error( 'h2wp_invalid_repository', __( 'A valid GitHub repository is required.', 'hub2wp' ) );
+		}
+		$subdirectory = H2WP_Settings::normalize_subdirectory( $subdirectory );
+		if ( is_wp_error( $subdirectory ) ) {
+			return $subdirectory;
+		}
+
+		return $this->api->get_changelog( $owner, $repo, $subdirectory );
 	}
 
 	/**
@@ -258,6 +315,7 @@ class H2WP_Repository_Query_Service {
 	 * @return array<int, array<string, string>>
 	 */
 	private function extract_topics( $topics, $repo_type = 'plugin' ) {
+		$topics   = is_array( $topics ) ? $topics : array();
 		$base_url = ( 'theme' === $repo_type )
 			? admin_url( 'themes.php?page=h2wp-theme-browser' )
 			: admin_url( 'plugins.php?page=h2wp-plugin-browser' );

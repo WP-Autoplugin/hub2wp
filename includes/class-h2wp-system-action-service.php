@@ -1,12 +1,17 @@
 <?php
 /**
  * Shared system actions for cache clearing and update checks.
+ *
+ * @package hub2wp
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Runs system-level maintenance actions.
+ */
 class H2WP_System_Action_Service {
 
 	/**
@@ -38,9 +43,9 @@ class H2WP_System_Action_Service {
 		wp_update_themes();
 
 		return array(
-			'message'       => __( 'Update check completed for monitored plugins and themes.', 'hub2wp' ),
-			'tracked_plugins' => count( get_option( 'h2wp_plugins', array() ) ),
-			'tracked_themes'  => count( get_option( 'h2wp_themes', array() ) ),
+			'message'         => __( 'Update check completed for monitored plugins and themes.', 'hub2wp' ),
+			'tracked_plugins' => count( H2WP_Settings::get_monitored_repositories( 'plugin' ) ),
+			'tracked_themes'  => count( H2WP_Settings::get_monitored_repositories( 'theme' ) ),
 			'ran_at'          => time(),
 		);
 	}

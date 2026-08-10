@@ -1,4 +1,10 @@
 <?php
+/**
+ * WordPress update integration for tracked GitHub extensions.
+ *
+ * @package hub2wp
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -19,19 +25,19 @@ class H2WP_Plugin_Updater {
 	 * Initialize the updater.
 	 */
 	public static function init() {
-		// Schedule the daily update check if not already scheduled
+		// Schedule the daily update check if not already scheduled.
 		if ( ! wp_next_scheduled( 'h2wp_daily_update_check' ) ) {
 			wp_schedule_event( time(), 'daily', 'h2wp_daily_update_check' );
 		}
 
-		// Hook into the update check
+		// Hook into the update check.
 		add_action( 'h2wp_daily_update_check', array( __CLASS__, 'check_for_updates' ) );
 
-		// Filter the update_plugins transient
+		// Filter the update_plugins transient.
 		add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'inject_plugin_updates' ) );
 		add_filter( 'pre_set_site_transient_update_themes', array( __CLASS__, 'inject_theme_updates' ) );
 
-		// Filter plugin information
+		// Filter plugin information.
 		add_filter( 'plugins_api', array( __CLASS__, 'plugin_info' ), 99, 3 );
 
 		// Intercept downloads for private-repo updates so they are authenticated.
@@ -50,43 +56,67 @@ class H2WP_Plugin_Updater {
 	 */
 	private static function log_debug( $message ) {
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional WP_DEBUG-only diagnostics.
 			error_log( '[hub2wp] ' . $message );
 		}
+	}
+
+	/**
+	 * Read a tracked-repository option defensively.
+	 *
+	 * @param string $option_name Option name.
+	 * @return array Tracked records.
+	 */
+	private static function get_tracked_option( $option_name ) {
+		$value = get_option( $option_name, array() );
+		return is_array( $value ) ? $value : array();
 	}
 
 	/**
 	 * Check for updates for all monitored GitHub plugins and themes.
 	 */
 	public static function check_for_updates() {
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-		$h2wp_themes  = get_option( 'h2wp_themes', array() );
-		$api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+		$h2wp_plugins    = self::get_tracked_option( 'h2wp_plugins' );
+		$h2wp_themes     = self::get_tracked_option( 'h2wp_themes' );
+		$api             = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
 		$plugins_updated = false;
 		$themes_updated  = false;
 		$now             = time();
 
 		foreach ( $h2wp_plugins as $plugin_id => &$plugin ) {
-			$parts        = explode( '/', $plugin_id );
-			$owner        = $parts[0];
-			$repo         = $parts[1];
-			$subdirectory = isset( $plugin['subdirectory'] ) ? $plugin['subdirectory'] : '';
+			if ( ! is_array( $plugin ) ) {
+				self::log_debug( sprintf( 'Invalid tracked plugin payload: %s', $plugin_id ) );
+				continue;
+			}
+			$identity = H2WP_Settings::get_tracked_repo_identity( $plugin_id, $plugin );
+			if ( is_wp_error( $identity ) ) {
+				self::log_debug( sprintf( 'Invalid tracked plugin record: %s', $plugin_id ) );
+				continue;
+			}
+
+			$owner                  = $identity['owner'];
+			$repo                   = $identity['repo'];
+			$subdirectory           = $identity['subdirectory'];
+			$plugin['owner']        = $owner;
+			$plugin['repo']         = $repo;
+			$plugin['subdirectory'] = $subdirectory;
 
 			$tracking_preferences = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, 'plugin', $subdirectory );
 			$branch               = $tracking_preferences['branch'];
 			$prioritize_releases  = $tracking_preferences['prioritize_releases'];
-			$source_context       = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
+			$source_context       = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
 
-			// Get readme headers, passing subdirectory for monorepo plugins
-			$headers = $api->get_readme_headers( $owner, $repo, $branch, $prioritize_releases, $source_context, $subdirectory );
-			if ( is_wp_error( $headers ) || empty( $headers['stable tag'] ) ) {
+			// The installed package version comes from the plugin PHP header.
+			$headers = $api->get_plugin_headers( $owner, $repo, $branch, $prioritize_releases, $source_context, $subdirectory );
+			if ( is_wp_error( $headers ) || empty( $headers['version'] ) ) {
 				if ( is_wp_error( $headers ) ) {
 					self::log_debug( sprintf( 'Plugin update check failed for %s: %s', $plugin_id, $headers->get_error_message() ) );
 				}
 				continue;
 			}
 
-			// Update plugin data
-			$plugin['version']             = $headers['stable tag'];
+			// Update plugin data.
+			$plugin['version']             = $headers['version'];
 			$plugin['requires']            = isset( $headers['requires at least'] ) ? $headers['requires at least'] : '';
 			$plugin['tested']              = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
 			$plugin['requires_php']        = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
@@ -94,14 +124,11 @@ class H2WP_Plugin_Updater {
 			$plugin['uses_releases']       = ! empty( $source_context['uses_releases'] );
 			$plugin['version_source']      = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
 			$plugin['prioritize_releases'] = $prioritize_releases;
-
-			// For monorepo plugins use the per-plugin release asset; fall back to full repo zip
-			if ( ! empty( $subdirectory ) ) {
-				$plugin_slug              = basename( $subdirectory );
-				$asset_url                = $api->get_monorepo_release_asset_url( $owner, $repo, $plugin_slug );
-				$plugin['download_url']   = is_wp_error( $asset_url ) ? $source_context['download_url'] : $asset_url;
-			} else {
-				$plugin['download_url'] = $source_context['download_url'];
+			$plugin['download_url']        = isset( $source_context['download_url'] ) ? $source_context['download_url'] : '';
+			$plugin['package_scope']       = isset( $source_context['package_scope'] ) ? $source_context['package_scope'] : 'repository';
+			if ( empty( $plugin['plugin_file'] ) ) {
+				$lookup_slug           = '' === $subdirectory ? $repo : basename( $subdirectory );
+				$plugin['plugin_file'] = H2WP_Admin_Page::get_installed_plugin_file( $owner, $lookup_slug );
 			}
 
 			$plugins_updated = true;
@@ -113,13 +140,28 @@ class H2WP_Plugin_Updater {
 		}
 
 		foreach ( $h2wp_themes as $theme_id => &$theme ) {
-			list( $owner, $repo ) = explode( '/', $theme_id );
-			$tracking_preferences = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, 'theme' );
-			$branch               = $tracking_preferences['branch'];
-			$prioritize_releases  = $tracking_preferences['prioritize_releases'];
-			$source_context      = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
+			if ( ! is_array( $theme ) ) {
+				self::log_debug( sprintf( 'Invalid tracked theme payload: %s', $theme_id ) );
+				continue;
+			}
+			$identity = H2WP_Settings::get_tracked_repo_identity( $theme_id, $theme );
+			if ( is_wp_error( $identity ) ) {
+				self::log_debug( sprintf( 'Invalid tracked theme record: %s', $theme_id ) );
+				continue;
+			}
 
-			$headers = $api->get_theme_headers( $owner, $repo, $branch, $prioritize_releases, $source_context );
+			$owner                 = $identity['owner'];
+			$repo                  = $identity['repo'];
+			$subdirectory          = $identity['subdirectory'];
+			$theme['owner']        = $owner;
+			$theme['repo']         = $repo;
+			$theme['subdirectory'] = $subdirectory;
+			$tracking_preferences  = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, 'theme', $subdirectory );
+			$branch                = $tracking_preferences['branch'];
+			$prioritize_releases   = $tracking_preferences['prioritize_releases'];
+			$source_context        = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
+
+			$headers = $api->get_theme_headers( $owner, $repo, $branch, $prioritize_releases, $source_context, $subdirectory );
 			if ( is_wp_error( $headers ) || empty( $headers['version'] ) ) {
 				if ( is_wp_error( $headers ) ) {
 					self::log_debug( sprintf( 'Theme update check failed for %s: %s', $theme_id, $headers->get_error_message() ) );
@@ -127,18 +169,20 @@ class H2WP_Plugin_Updater {
 				continue;
 			}
 
-			$theme['version']      = $headers['version'];
-			$theme['requires']     = isset( $headers['requires at least'] ) ? $headers['requires at least'] : '';
-			$theme['tested']       = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
-			$theme['requires_php'] = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
-			$theme['last_checked'] = $now;
-			$theme['download_url'] = $source_context['download_url'];
-			$theme['uses_releases'] = ! empty( $source_context['uses_releases'] );
-			$theme['version_source'] = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
+			$theme['version']             = $headers['version'];
+			$theme['requires']            = isset( $headers['requires at least'] ) ? $headers['requires at least'] : '';
+			$theme['tested']              = isset( $headers['tested up to'] ) ? $headers['tested up to'] : '';
+			$theme['requires_php']        = isset( $headers['requires php'] ) ? $headers['requires php'] : '';
+			$theme['last_checked']        = $now;
+			$theme['download_url']        = isset( $source_context['download_url'] ) ? $source_context['download_url'] : '';
+			$theme['uses_releases']       = ! empty( $source_context['uses_releases'] );
+			$theme['version_source']      = isset( $source_context['source'] ) ? $source_context['source'] : 'branch';
 			$theme['prioritize_releases'] = $prioritize_releases;
+			$theme['package_scope']       = isset( $source_context['package_scope'] ) ? $source_context['package_scope'] : 'repository';
 
 			if ( empty( $theme['stylesheet'] ) ) {
-				$theme['stylesheet'] = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );
+				$lookup_slug         = '' === $subdirectory ? $repo : basename( $subdirectory );
+				$theme['stylesheet'] = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $lookup_slug );
 			}
 
 			$themes_updated = true;
@@ -190,11 +234,21 @@ class H2WP_Plugin_Updater {
 		// being much more responsive than the once-daily cron (which may never
 		// run in some environments).
 		self::ensure_update_data_fresh();
+		if ( ! isset( $transient->response ) || ! is_array( $transient->response ) ) {
+			$transient->response = array();
+		}
 
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$h2wp_plugins = self::get_tracked_option( 'h2wp_plugins' );
 
 		foreach ( $h2wp_plugins as $plugin_id => $plugin ) {
-			if ( empty( $plugin['plugin_file'] ) || empty( $plugin['version'] ) ) {
+			if ( ! is_array( $plugin ) ) {
+				continue;
+			}
+			if ( empty( $plugin['plugin_file'] ) || empty( $plugin['version'] ) || empty( $plugin['download_url'] ) ) {
+				continue;
+			}
+			$identity = H2WP_Settings::get_tracked_repo_identity( $plugin_id, $plugin );
+			if ( is_wp_error( $identity ) ) {
 				continue;
 			}
 
@@ -202,7 +256,11 @@ class H2WP_Plugin_Updater {
 				continue;
 			}
 
-			$installed_version = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin['plugin_file'] )['Version'];
+			$installed_data    = get_plugin_data( WP_PLUGIN_DIR . '/' . $plugin['plugin_file'] );
+			$installed_version = isset( $installed_data['Version'] ) ? $installed_data['Version'] : '';
+			if ( '' === $installed_version ) {
+				continue;
+			}
 
 			if ( version_compare( $installed_version, $plugin['version'], '<' ) ) {
 				$item = (object) array(
@@ -210,13 +268,16 @@ class H2WP_Plugin_Updater {
 					'slug'          => dirname( $plugin['plugin_file'] ),
 					'plugin'        => $plugin['plugin_file'],
 					'new_version'   => $plugin['version'],
-					'url'           => "https://github.com/{$plugin_id}",
+					'url'           => 'https://github.com/' . $identity['owner'] . '/' . $identity['repo'],
 					'package'       => $plugin['download_url'],
-					'icons'         => ! empty( $plugin['owner_avatar_url'] ) ? array( '1x' => $plugin['owner_avatar_url'], '2x' => $plugin['owner_avatar_url'] ) : array(),
+					'icons'         => ! empty( $plugin['owner_avatar_url'] ) ? array(
+						'1x' => $plugin['owner_avatar_url'],
+						'2x' => $plugin['owner_avatar_url'],
+					) : array(),
 					'banners'       => array(),
 					'banners_rtl'   => array(),
-					'tested'        => $plugin['tested'],
-					'requires_php'  => $plugin['requires_php'],
+					'tested'        => isset( $plugin['tested'] ) ? $plugin['tested'] : '',
+					'requires_php'  => isset( $plugin['requires_php'] ) ? $plugin['requires_php'] : '',
 					'compatibility' => new stdClass(),
 				);
 
@@ -240,19 +301,29 @@ class H2WP_Plugin_Updater {
 		}
 
 		self::ensure_update_data_fresh();
+		if ( ! isset( $transient->response ) || ! is_array( $transient->response ) ) {
+			$transient->response = array();
+		}
 
-		$h2wp_themes = get_option( 'h2wp_themes', array() );
+		$h2wp_themes = self::get_tracked_option( 'h2wp_themes' );
 		$themes      = wp_get_themes();
 
 		foreach ( $h2wp_themes as $theme_id => $theme ) {
-			if ( empty( $theme['version'] ) ) {
+			if ( ! is_array( $theme ) ) {
+				continue;
+			}
+			if ( empty( $theme['version'] ) || empty( $theme['download_url'] ) ) {
+				continue;
+			}
+			$identity = H2WP_Settings::get_tracked_repo_identity( $theme_id, $theme );
+			if ( is_wp_error( $identity ) ) {
 				continue;
 			}
 
 			$stylesheet = isset( $theme['stylesheet'] ) ? $theme['stylesheet'] : '';
 			if ( empty( $stylesheet ) || ! isset( $themes[ $stylesheet ] ) ) {
-				list( $owner, $repo ) = explode( '/', $theme_id );
-				$stylesheet = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );
+				$lookup_slug = '' === $identity['subdirectory'] ? $identity['repo'] : basename( $identity['subdirectory'] );
+				$stylesheet  = H2WP_Admin_Page::get_installed_theme_stylesheet( $identity['owner'], $lookup_slug );
 			}
 
 			if ( empty( $stylesheet ) || ! isset( $themes[ $stylesheet ] ) ) {
@@ -262,11 +333,11 @@ class H2WP_Plugin_Updater {
 			$installed_version = $themes[ $stylesheet ]->get( 'Version' );
 			if ( version_compare( $installed_version, $theme['version'], '<' ) ) {
 				$transient->response[ $stylesheet ] = array(
-					'theme'       => $stylesheet,
-					'new_version' => $theme['version'],
-					'url'         => "https://github.com/{$theme_id}",
-					'package'     => isset( $theme['download_url'] ) ? $theme['download_url'] : '',
-					'requires'    => isset( $theme['requires'] ) ? $theme['requires'] : '',
+					'theme'        => $stylesheet,
+					'new_version'  => $theme['version'],
+					'url'          => 'https://github.com/' . $identity['owner'] . '/' . $identity['repo'],
+					'package'      => isset( $theme['download_url'] ) ? $theme['download_url'] : '',
+					'requires'     => isset( $theme['requires'] ) ? $theme['requires'] : '',
 					'requires_php' => isset( $theme['requires_php'] ) ? $theme['requires_php'] : '',
 				);
 				self::log_debug( sprintf( 'Theme update available: %s %s -> %s', $stylesheet, $installed_version, $theme['version'] ) );
@@ -285,32 +356,45 @@ class H2WP_Plugin_Updater {
 	 */
 	public static function plugin_info( $result, $action, $args ) {
 		// Only proceed if we're getting plugin information.
-		if ( $action !== 'plugin_information' ) {
+		if ( 'plugin_information' !== $action || ! is_object( $args ) || empty( $args->slug ) ) {
 			return $result;
 		}
 
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
+		$h2wp_plugins = self::get_tracked_option( 'h2wp_plugins' );
 
 		// Find the plugin by slug.
 		foreach ( $h2wp_plugins as $plugin_id => $plugin ) {
+			if ( ! is_array( $plugin ) ) {
+				continue;
+			}
+			if ( empty( $plugin['plugin_file'] ) ) {
+				continue;
+			}
+
 			$plugin_slug = dirname( $plugin['plugin_file'] );
 
 			if ( $plugin_slug === $args->slug ) {
-				$parts        = explode( '/', $plugin_id );
-				$owner        = $parts[0];
-				$repo         = $parts[1];
-				$subdirectory = isset( $plugin['subdirectory'] ) ? $plugin['subdirectory'] : '';
+				$identity = H2WP_Settings::get_tracked_repo_identity( $plugin_id, $plugin );
+				if ( is_wp_error( $identity ) ) {
+					continue;
+				}
+				$owner                = $identity['owner'];
+				$repo                 = $identity['repo'];
+				$subdirectory         = $identity['subdirectory'];
 				$tracking_preferences = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, 'plugin', $subdirectory );
 				$branch               = $tracking_preferences['branch'];
 				$prioritize_releases  = $tracking_preferences['prioritize_releases'];
 
-				$api          = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
-				$source_context = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases );
-				$repo_details = $api->get_repo_details( $owner, $repo );
-				$readme_html  = $api->get_readme_html( $owner, $repo, $source_context['ref'] );
+				$api            = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+				$source_context = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
+				$repo_details   = $api->get_repo_details( $owner, $repo );
+				$readme_html    = $api->get_readme_html( $owner, $repo, $source_context['ref'], $subdirectory );
 
-				if ( is_wp_error( $repo_details ) || is_wp_error( $readme_html ) ) {
+				if ( is_wp_error( $repo_details ) ) {
 					return $result;
+				}
+				if ( is_wp_error( $readme_html ) ) {
+					$readme_html = '<p>' . esc_html__( 'No README available.', 'hub2wp' ) . '</p>';
 				}
 
 				// watchers and og_image are scraped from the public GitHub HTML page,
@@ -332,7 +416,7 @@ class H2WP_Plugin_Updater {
 					isset( $plugin['author'] ) ? $plugin['author'] : $owner
 				);
 				$info->author_profile = esc_url( "https://github.com/{$owner}" );
-				$info->homepage       = esc_url( "https://github.com/{$plugin_id}" );
+				$info->homepage       = esc_url( 'https://github.com/' . $owner . '/' . $repo );
 				$info->requires       = isset( $plugin['requires'] ) ? $plugin['requires'] : '';
 				$info->tested         = isset( $plugin['tested'] ) ? $plugin['tested'] : '';
 				$info->requires_php   = isset( $plugin['requires_php'] ) ? $plugin['requires_php'] : '';
@@ -344,7 +428,7 @@ class H2WP_Plugin_Updater {
 					'description'  => $readme_html,
 					'installation' => self::get_installation_instructions( $plugin_id ),
 					'github'       => self::get_github_tab_content( $repo_details, $watchers ),
-					'changelog'    => self::get_changelog_content( $owner, $repo, $api ),
+					'changelog'    => self::get_changelog_content( $owner, $repo, $api, $subdirectory ),
 				);
 
 				// Add GitHub-specific banners and icons.
@@ -367,14 +451,14 @@ class H2WP_Plugin_Updater {
 
 				// GitHub-specific metadata.
 				$info->github = array(
-					'stars'        => isset( $repo_details['stargazers_count'] ) ? intval( $repo_details['stargazers_count'] ) : 0,
-					'forks'        => isset( $repo_details['forks_count'] ) ? intval( $repo_details['forks_count'] ) : 0,
-					'open_issues'  => isset( $repo_details['open_issues_count'] ) ? intval( $repo_details['open_issues_count'] ) : 0,
-					'watchers'     => intval( $watchers ),
-					'language'     => isset( $repo_details['language'] ) ? esc_html( $repo_details['language'] ) : '',
-					'last_commit'  => isset( $repo_details['updated_at'] ) ? esc_html( $repo_details['updated_at'] ) : '',
-					'created_at'   => isset( $repo_details['created_at'] ) ? esc_html( $repo_details['created_at'] ) : '',
-					'license'      => esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'hub2wp' ) ),
+					'stars'       => isset( $repo_details['stargazers_count'] ) ? intval( $repo_details['stargazers_count'] ) : 0,
+					'forks'       => isset( $repo_details['forks_count'] ) ? intval( $repo_details['forks_count'] ) : 0,
+					'open_issues' => isset( $repo_details['open_issues_count'] ) ? intval( $repo_details['open_issues_count'] ) : 0,
+					'watchers'    => intval( $watchers ),
+					'language'    => isset( $repo_details['language'] ) ? esc_html( $repo_details['language'] ) : '',
+					'last_commit' => isset( $repo_details['updated_at'] ) ? esc_html( $repo_details['updated_at'] ) : '',
+					'created_at'  => isset( $repo_details['created_at'] ) ? esc_html( $repo_details['created_at'] ) : '',
+					'license'     => esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'hub2wp' ) ),
 				);
 
 				// Short description from GitHub.
@@ -397,10 +481,10 @@ class H2WP_Plugin_Updater {
 	public static function get_installation_instructions( $plugin_id = '', $repo_type = 'plugin' ) {
 		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
 
-		$is_theme    = ( 'theme' === $repo_type );
-		$admin_path  = $is_theme ? esc_html__( 'Appearance &rarr; Themes &rarr; GitHub Themes', 'hub2wp' ) : esc_html__( 'Plugins &rarr; Add GitHub Plugin', 'hub2wp' );
+		$is_theme     = ( 'theme' === $repo_type );
+		$admin_path   = $is_theme ? esc_html__( 'Appearance &rarr; Themes &rarr; GitHub Themes', 'hub2wp' ) : esc_html__( 'Plugins &rarr; Add GitHub Plugin', 'hub2wp' );
 		$install_verb = $is_theme ? esc_html__( 'theme', 'hub2wp' ) : esc_html__( 'plugin', 'hub2wp' );
-		$manual_path = $is_theme ? '/wp-content/themes/' : '/wp-content/plugins/';
+		$manual_path  = $is_theme ? '/wp-content/themes/' : '/wp-content/plugins/';
 
 		$instructions  = '<h4>' . esc_html__( 'Installation via hub2wp', 'hub2wp' ) . '</h4>';
 		$instructions .= '<ol>';
@@ -443,38 +527,46 @@ class H2WP_Plugin_Updater {
 	/**
 	 * Format GitHub tab content.
 	 *
-	 * @param array  $repo_details      Repository details.
-	 * @param int    $watchers          Number of watchers.
+	 * @param array $repo_details      Repository details.
+	 * @param int   $watchers          Number of watchers.
 	 * @return string Formatted GitHub information.
 	 */
 	private static function get_github_tab_content( $repo_details, $watchers ) {
-		$content  = '<div class="github-info">';
+		$stars       = isset( $repo_details['stargazers_count'] ) ? (int) $repo_details['stargazers_count'] : 0;
+		$forks       = isset( $repo_details['forks_count'] ) ? (int) $repo_details['forks_count'] : 0;
+		$open_issues = isset( $repo_details['open_issues_count'] ) ? (int) $repo_details['open_issues_count'] : 0;
+		$created_at  = ! empty( $repo_details['created_at'] ) ? strtotime( $repo_details['created_at'] ) : false;
+		$updated_at  = ! empty( $repo_details['updated_at'] ) ? strtotime( $repo_details['updated_at'] ) : false;
+		$html_url    = isset( $repo_details['html_url'] ) ? (string) $repo_details['html_url'] : '';
+		$content     = '<div class="github-info">';
 
 		// Repository Statistics.
 		$content .= '<h3>' . esc_html__( 'Repository Statistics', 'hub2wp' ) . '</h3>';
 		$content .= '<ul class="github-stats">';
-		$content .= '<li>⭐ ' . esc_html__( 'Stars:', 'hub2wp' ) . ' ' . number_format_i18n( $repo_details['stargazers_count'] ) . '</li>';
-		$content .= '<li>🔀 ' . esc_html__( 'Forks:', 'hub2wp' ) . ' ' . number_format_i18n( $repo_details['forks_count'] ) . '</li>';
+		$content .= '<li>⭐ ' . esc_html__( 'Stars:', 'hub2wp' ) . ' ' . number_format_i18n( $stars ) . '</li>';
+		$content .= '<li>🔀 ' . esc_html__( 'Forks:', 'hub2wp' ) . ' ' . number_format_i18n( $forks ) . '</li>';
 		$content .= '<li>👀 ' . esc_html__( 'Watchers:', 'hub2wp' ) . ' ' . number_format_i18n( $watchers ) . '</li>';
-		$content .= '<li>❗ ' . esc_html__( 'Open Issues:', 'hub2wp' ) . ' ' . number_format_i18n( $repo_details['open_issues_count'] ) . '</li>';
+		$content .= '<li>❗ ' . esc_html__( 'Open Issues:', 'hub2wp' ) . ' ' . number_format_i18n( $open_issues ) . '</li>';
 		$content .= '</ul>';
 
 		// Technical Details.
 		$content .= '<h3>' . esc_html__( 'Technical Details', 'hub2wp' ) . '</h3>';
 		$content .= '<ul class="github-technical">';
 		$content .= '<li>' . esc_html__( 'License:', 'hub2wp' ) . ' ' . esc_html( isset( $repo_details['license']['name'] ) ? $repo_details['license']['name'] : __( 'Unknown', 'hub2wp' ) ) . '</li>';
-		$content .= '<li>' . esc_html__( 'Created:', 'hub2wp' ) . ' ' . human_time_diff( strtotime( $repo_details['created_at'] ) ) . ' ' . esc_html__( 'ago', 'hub2wp' ) . '</li>';
-		$content .= '<li>' . esc_html__( 'Last Updated:', 'hub2wp' ) . ' ' . human_time_diff( strtotime( $repo_details['updated_at'] ) ) . ' ' . esc_html__( 'ago', 'hub2wp' ) . '</li>';
+		$content .= '<li>' . esc_html__( 'Created:', 'hub2wp' ) . ' ' . ( false !== $created_at ? human_time_diff( $created_at ) . ' ' . esc_html__( 'ago', 'hub2wp' ) : esc_html__( 'Unknown', 'hub2wp' ) ) . '</li>';
+		$content .= '<li>' . esc_html__( 'Last Updated:', 'hub2wp' ) . ' ' . ( false !== $updated_at ? human_time_diff( $updated_at ) . ' ' . esc_html__( 'ago', 'hub2wp' ) : esc_html__( 'Unknown', 'hub2wp' ) ) . '</li>';
 		$content .= '</ul>';
 
 		// Quick Links.
 		$content .= '<h3>' . esc_html__( 'Quick Links', 'hub2wp' ) . '</h3>';
 		$content .= '<ul class="github-links">';
-		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] ) . '" target="_blank">' . esc_html__( 'View on GitHub', 'hub2wp' ) . '</a></li>';
-		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/issues' ) . '" target="_blank">' . esc_html__( 'Issue Tracker', 'hub2wp' ) . '</a></li>';
-		$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/releases' ) . '" target="_blank">' . esc_html__( 'Releases', 'hub2wp' ) . '</a></li>';
-		if ( ! empty( $repo_details['wiki'] ) ) {
-			$content .= '<li><a href="' . esc_url( $repo_details['html_url'] . '/wiki' ) . '" target="_blank">' . esc_html__( 'Documentation Wiki', 'hub2wp' ) . '</a></li>';
+		if ( '' !== $html_url ) {
+			$content .= '<li><a href="' . esc_url( $html_url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'View on GitHub', 'hub2wp' ) . '</a></li>';
+			$content .= '<li><a href="' . esc_url( $html_url . '/issues' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Issue Tracker', 'hub2wp' ) . '</a></li>';
+			$content .= '<li><a href="' . esc_url( $html_url . '/releases' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Releases', 'hub2wp' ) . '</a></li>';
+			if ( ! empty( $repo_details['wiki'] ) ) {
+				$content .= '<li><a href="' . esc_url( $html_url . '/wiki' ) . '" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Documentation Wiki', 'hub2wp' ) . '</a></li>';
+			}
 		}
 		$content .= '</ul>';
 
@@ -486,40 +578,29 @@ class H2WP_Plugin_Updater {
 	/**
 	 * Format changelog content from GitHub releases.
 	 *
-	 * @param string         $owner Repository owner.
-	 * @param string         $repo  Repository name.
+	 * @param string          $owner Repository owner.
+	 * @param string          $repo  Repository name.
 	 * @param H2WP_GitHub_API $api   GitHub API instance.
+	 * @param string          $subdirectory Optional project subdirectory.
 	 * @return string Formatted changelog content.
 	 */
-	private static function get_changelog_content( $owner, $repo, $api ) {
-		$url      = "https://api.github.com/repos/{$owner}/{$repo}/releases";
-		$response = wp_remote_get(
-			$url,
-			array(
-				'headers' => array(
-					'Accept'        => 'application/vnd.github.v3+json',
-					'Authorization' => 'token ' . H2WP_Settings::get_access_token(),
-				),
-			)
-		);
-
-		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
+	private static function get_changelog_content( $owner, $repo, $api, $subdirectory = '' ) {
+		$releases = $api->get_changelog( $owner, $repo, $subdirectory );
+		if ( is_wp_error( $releases ) ) {
 			return '<p>' . esc_html__( 'No changelog information available.', 'hub2wp' ) . '</p>';
 		}
 
-		$releases = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( empty( $releases ) ) {
 			return '<p>' . esc_html__( 'No release information available.', 'hub2wp' ) . '</p>';
 		}
 
 		$changelog = '';
 		foreach ( $releases as $release ) {
-			$changelog .= '<h4>' . esc_html( $release['tag_name'] ) . ' - ' . esc_html( date( 'F j, Y', strtotime( $release['published_at'] ) ) ) . '</h4>';
+			$changelog .= '<h4>' . esc_html( $release['version'] ) . ' - ' . esc_html( date_i18n( get_option( 'date_format' ), strtotime( $release['date'] ) ) ) . '</h4>';
 
-			if ( ! empty( $release['body'] ) ) {
+			if ( ! empty( $release['description'] ) ) {
 				$changelog .= '<div class="release-notes">';
-				//$changelog .= wp_kses_post( Parsedown::instance()->text( $release['body'] ) );
-				$changelog .= wp_kses_post( $release['body'] );
+				$changelog .= wp_kses_post( $release['description'] );
 				$changelog .= '</div>';
 			}
 		}
@@ -549,7 +630,7 @@ class H2WP_Plugin_Updater {
 	 * Add "hub2wp" to the list of update sources on activation.
 	 */
 	public static function activate() {
-		$h2wp_sources = get_option( 'h2wp_plugins', array() );
+		$h2wp_sources = self::get_tracked_option( 'h2wp_plugins' );
 		if ( ! isset( $h2wp_sources['hub2wp'] ) ) {
 			$h2wp_sources['hub2wp'] = array(
 				'directory'    => H2WP_PLUGIN_BASENAME,
@@ -599,60 +680,111 @@ class H2WP_Plugin_Updater {
 		if ( empty( $hook_extra['plugin'] ) && empty( $hook_extra['theme'] ) ) {
 			return $source;
 		}
+		if ( ! $wp_filesystem || ! method_exists( $wp_filesystem, 'move' ) ) {
+			return $source;
+		}
 
 		$is_plugin      = ! empty( $hook_extra['plugin'] );
 		$correct_folder = '';
+		$tracked        = null;
 
 		if ( $is_plugin ) {
-			$plugin_file = $hook_extra['plugin'];
-			$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-			$found        = false;
+			$plugin_file  = $hook_extra['plugin'];
+			$h2wp_plugins = self::get_tracked_option( 'h2wp_plugins' );
 			foreach ( $h2wp_plugins as $plugin ) {
 				if ( isset( $plugin['plugin_file'] ) && $plugin['plugin_file'] === $plugin_file ) {
-					$found = true;
+					$tracked = $plugin;
 					break;
 				}
 			}
-			if ( ! $found ) {
+			if ( null === $tracked ) {
 				return $source;
 			}
 			$correct_folder = dirname( $plugin_file );
 		} else {
 			$stylesheet  = $hook_extra['theme'];
-			$h2wp_themes = get_option( 'h2wp_themes', array() );
-			$found       = false;
+			$h2wp_themes = self::get_tracked_option( 'h2wp_themes' );
 			foreach ( $h2wp_themes as $theme ) {
 				if ( isset( $theme['stylesheet'] ) && $theme['stylesheet'] === $stylesheet ) {
-					$found = true;
+					$tracked = $theme;
 					break;
 				}
 			}
-			if ( ! $found ) {
+			if ( null === $tracked ) {
 				return $source;
 			}
 			$correct_folder = $stylesheet;
 		}
 
-		$new_source     = trailingslashit( $remote_source ) . $correct_folder;
-
-		// Nothing to do if it already has the right name.
-		if ( trailingslashit( $new_source ) === trailingslashit( $source ) ) {
+		if ( '.' === $correct_folder || '' === $correct_folder ) {
 			return $source;
 		}
+		$normalized_folder = H2WP_Settings::normalize_subdirectory( $correct_folder );
+		if ( is_wp_error( $normalized_folder ) || basename( $normalized_folder ) !== $normalized_folder ) {
+			return new WP_Error( 'h2wp_invalid_destination', __( 'The tracked extension has an invalid destination folder.', 'hub2wp' ) );
+		}
+		$correct_folder = $normalized_folder;
 
-		if ( ! $wp_filesystem->move( untrailingslashit( $source ), $new_source ) ) {
+		$subdirectory = isset( $tracked['subdirectory'] ) ? H2WP_Settings::normalize_subdirectory( $tracked['subdirectory'] ) : '';
+		if ( is_wp_error( $subdirectory ) ) {
+			return $subdirectory;
+		}
+
+		$project_source = $source;
+		if ( '' !== $subdirectory ) {
+			$nested_source = trailingslashit( $source ) . $subdirectory;
+			if ( $wp_filesystem->is_dir( $nested_source ) ) {
+				$project_source = $nested_source;
+			}
+		}
+
+		$new_source = trailingslashit( $remote_source ) . $correct_folder;
+
+		// Nothing to do if it already has the right name.
+		if ( trailingslashit( $new_source ) === trailingslashit( $project_source ) ) {
+			return $project_source;
+		}
+
+		if ( $wp_filesystem->exists( $new_source ) ) {
+			if ( ! self::is_path_within( $new_source, $remote_source ) || ! $wp_filesystem->delete( $new_source, true ) ) {
+				return new WP_Error( 'h2wp_temp_destination_error', __( 'Could not prepare the temporary update directory.', 'hub2wp' ) );
+			}
+		}
+
+		if ( ! $wp_filesystem->move( untrailingslashit( $project_source ), $new_source ) ) {
 			return new WP_Error(
 				'h2wp_rename_error',
 				sprintf(
 					/* translators: 1: extracted folder, 2: expected folder */
 					__( 'Could not rename extracted folder from "%1$s" to "%2$s".', 'hub2wp' ),
-					basename( $source ),
+					basename( $project_source ),
 					$correct_folder
 				)
 			);
 		}
 
+		if (
+			untrailingslashit( $project_source ) !== untrailingslashit( $source ) &&
+			self::is_path_within( $source, $remote_source )
+		) {
+			$wp_filesystem->delete( untrailingslashit( $source ), true );
+		}
+
 		return trailingslashit( $new_source );
+	}
+
+	/**
+	 * Check that a path is inside a root directory.
+	 *
+	 * @param string $path Candidate path.
+	 * @param string $root Root directory.
+	 * @return bool
+	 */
+	private static function is_path_within( $path, $root ) {
+		$path = wp_normalize_path( $path );
+		$root = trailingslashit( wp_normalize_path( $root ) );
+
+		return 0 === strpos( trailingslashit( $path ), $root );
 	}
 
 	/**
@@ -677,8 +809,8 @@ class H2WP_Plugin_Updater {
 			return $reply;
 		}
 
-		// Only intercept GitHub API zipball URLs.
-		if ( false === strpos( $package, 'api.github.com/repos/' ) ) {
+		// Never send the stored GitHub token to a non-GitHub host.
+		if ( 'api.github.com' !== strtolower( (string) wp_parse_url( $package, PHP_URL_HOST ) ) ) {
 			return $reply;
 		}
 
@@ -760,10 +892,19 @@ class H2WP_Plugin_Updater {
 			return $package_repo_key === $upgrade_repo_key;
 		}
 
-		$h2wp_plugins = get_option( 'h2wp_plugins', array() );
-		$h2wp_themes  = get_option( 'h2wp_themes', array() );
+		$h2wp_plugins = self::get_tracked_option( 'h2wp_plugins' );
+		$h2wp_themes  = self::get_tracked_option( 'h2wp_themes' );
 
-		return isset( $h2wp_plugins[ $package_repo_key ] ) || isset( $h2wp_themes[ $package_repo_key ] );
+		foreach ( array( $h2wp_plugins, $h2wp_themes ) as $tracked_repositories ) {
+			foreach ( $tracked_repositories as $repo_key => $repo_data ) {
+				$identity = H2WP_Settings::get_tracked_repo_identity( $repo_key, $repo_data );
+				if ( ! is_wp_error( $identity ) && strtolower( $identity['owner'] . '/' . $identity['repo'] ) === $package_repo_key ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -783,18 +924,20 @@ class H2WP_Plugin_Updater {
 
 		if ( ! empty( $hook_extra['plugin'] ) ) {
 			$plugin_file = (string) $hook_extra['plugin'];
-			foreach ( get_option( 'h2wp_plugins', array() ) as $repo_key => $plugin ) {
+			foreach ( self::get_tracked_option( 'h2wp_plugins' ) as $repo_key => $plugin ) {
 				if ( isset( $plugin['plugin_file'] ) && $plugin['plugin_file'] === $plugin_file ) {
-					return strtolower( (string) $repo_key );
+					$identity = H2WP_Settings::get_tracked_repo_identity( $repo_key, $plugin );
+					return is_wp_error( $identity ) ? '' : strtolower( $identity['owner'] . '/' . $identity['repo'] );
 				}
 			}
 		}
 
 		if ( ! empty( $hook_extra['theme'] ) ) {
 			$stylesheet = (string) $hook_extra['theme'];
-			foreach ( get_option( 'h2wp_themes', array() ) as $repo_key => $theme ) {
+			foreach ( self::get_tracked_option( 'h2wp_themes' ) as $repo_key => $theme ) {
 				if ( isset( $theme['stylesheet'] ) && $theme['stylesheet'] === $stylesheet ) {
-					return strtolower( (string) $repo_key );
+					$identity = H2WP_Settings::get_tracked_repo_identity( $repo_key, $theme );
+					return is_wp_error( $identity ) ? '' : strtolower( $identity['owner'] . '/' . $identity['repo'] );
 				}
 			}
 		}
@@ -814,12 +957,12 @@ class H2WP_Plugin_Updater {
 			return '';
 		}
 
-		// Standard zipball: /repos/{owner}/{repo}/zipball/...
+		// Standard zipball: /repos/{owner}/{repo}/zipball/....
 		if ( preg_match( '#/repos/([^/]+)/([^/]+)/zipball(?:/.*)?$#', $path, $matches ) ) {
 			return strtolower( $matches[1] . '/' . $matches[2] );
 		}
 
-		// Release asset: /repos/{owner}/{repo}/releases/assets/{id}
+		// Release asset: /repos/{owner}/{repo}/releases/assets/{id}.
 		if ( preg_match( '#/repos/([^/]+)/([^/]+)/releases/assets/#', $path, $matches ) ) {
 			return strtolower( $matches[1] . '/' . $matches[2] );
 		}

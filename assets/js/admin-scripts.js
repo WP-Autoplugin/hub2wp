@@ -1,11 +1,34 @@
 jQuery(document).ready(function($) {
-    function getDetailsUrl(owner, repo, repoType) {
+    function getResponseMessage(response, fallback) {
+        return response && response.data && response.data.message ? response.data.message : fallback;
+    }
+
+    function findProjectElements(selector, owner, repo, repoType, subdirectory) {
+        var normalizedOwner = String(owner || '').toLowerCase();
+        var normalizedRepo = String(repo || '').toLowerCase();
+        var normalizedType = repoType || h2wp_ajax_object.repo_type || 'plugin';
+        var normalizedSubdirectory = subdirectory || '';
+
+        return $(selector).filter(function() {
+            return String($(this).data('owner') || '').toLowerCase() === normalizedOwner &&
+                String($(this).data('repo') || '').toLowerCase() === normalizedRepo &&
+                ($(this).data('type') || h2wp_ajax_object.repo_type || 'plugin') === normalizedType &&
+                ($(this).data('subdirectory') || '') === normalizedSubdirectory;
+        });
+    }
+
+    function getDetailsUrl(owner, repo, repoType, subdirectory) {
         var url = new URL(window.location.href);
 
         url.searchParams.set('h2wp_modal', 'details');
         url.searchParams.set('h2wp_modal_owner', owner);
         url.searchParams.set('h2wp_modal_repo', repo);
         url.searchParams.set('repo_type', repoType || h2wp_ajax_object.repo_type || 'plugin');
+        if (subdirectory) {
+            url.searchParams.set('h2wp_modal_subdirectory', subdirectory);
+        } else {
+            url.searchParams.delete('h2wp_modal_subdirectory');
+        }
 
         return url.toString();
     }
@@ -17,19 +40,20 @@ jQuery(document).ready(function($) {
         url.searchParams.delete('h2wp_modal_owner');
         url.searchParams.delete('h2wp_modal_repo');
         url.searchParams.delete('repo_type');
+        url.searchParams.delete('h2wp_modal_subdirectory');
 
         window.history.replaceState({}, document.title, url.toString());
     }
 
-    function maybeUpdateDetailsUrl(owner, repo, repoType) {
-        var nextUrl = getDetailsUrl(owner, repo, repoType);
+    function maybeUpdateDetailsUrl(owner, repo, repoType, subdirectory) {
+        var nextUrl = getDetailsUrl(owner, repo, repoType, subdirectory);
 
         if (nextUrl !== window.location.href) {
             window.history.replaceState({}, document.title, nextUrl);
         }
     }
 
-    function openRepositoryDetails(owner, repo, repoType, shouldUpdateUrl) {
+    function openRepositoryDetails(owner, repo, repoType, subdirectory, shouldUpdateUrl) {
         if (!owner || !repo) {
             return;
         }
@@ -37,7 +61,7 @@ jQuery(document).ready(function($) {
         repoType = repoType || h2wp_ajax_object.repo_type || 'plugin';
 
         if (shouldUpdateUrl !== false) {
-            maybeUpdateDetailsUrl(owner, repo, repoType);
+            maybeUpdateDetailsUrl(owner, repo, repoType, subdirectory);
         }
 
         // Make AJAX request to get plugin details.
@@ -49,7 +73,8 @@ jQuery(document).ready(function($) {
                 nonce: h2wp_ajax_object.nonce,
                 owner: owner,
                 repo: repo,
-                repo_type: repoType
+                repo_type: repoType,
+                subdirectory: subdirectory || ''
             },
             beforeSend: function() {
                 $('#h2wp-plugin-modal').addClass('h2wp-modal-loading').fadeIn();
@@ -60,7 +85,7 @@ jQuery(document).ready(function($) {
                 } else {
                     clearDetailsUrl();
                     $('#h2wp-plugin-modal').hide();
-                    alert(response.data.message);
+                    alert(getResponseMessage(response, h2wp_ajax_object.error_message || 'An error occurred.'));
                 }
             },
             error: function() {
@@ -79,8 +104,10 @@ jQuery(document).ready(function($) {
         var modal = $('#h2wp-plugin-modal');
         var repoType = data.repo_type || h2wp_ajax_object.repo_type || 'plugin';
         modal.find('.h2wp-modal-title').text(data.display_name);
-        modal.find('.h2wp-modal-author').html('<a href="' + data.author_url + '" target="_blank">' + data.author + '</a>');
-        modal.find('.h2wp-modal-description').html(data.description);
+        modal.find('.h2wp-modal-author').empty().append(
+            $('<a>').attr({ href: data.author_url, target: '_blank', rel: 'noopener noreferrer' }).text(data.author)
+        );
+        modal.find('.h2wp-modal-description').text(data.description);
         modal.find('.h2wp-modal-stars').text(data.stargazers);
         modal.find('.h2wp-modal-forks').text(data.forks);
         modal.find('.h2wp-modal-watchers').text(data.watchers);
@@ -93,12 +120,12 @@ jQuery(document).ready(function($) {
         } else {
             modal.find('.h2wp-install-plugin').removeClass('h2wp-installed h2wp-button-disabled').text('Install Now');
         }
-        modal.find('.h2wp-install-plugin').data('owner', data.owner).data('repo', data.repo).data('type', repoType);
-        modal.find('.h2wp-activate-plugin').data('owner', data.owner).data('repo', data.repo).data('type', repoType);
+        modal.find('.h2wp-install-plugin').data('owner', data.owner).data('repo', data.repo).data('type', repoType).data('subdirectory', data.subdirectory || '');
+        modal.find('.h2wp-activate-plugin').data('owner', data.owner).data('repo', data.repo).data('type', repoType).data('subdirectory', data.subdirectory || '');
         modal.find('.h2wp-activate-plugin').addClass('h2wp-hidden');
 
         // Also update the updated_at in the plugin card (.h2wp-meta-updated)
-        $('.h2wp-meta-updated[data-owner="' + data.owner + '"][data-repo="' + data.repo + '"][data-type="' + repoType + '"] span').text(data.updated_at);
+        findProjectElements('.h2wp-meta-updated', data.owner, data.repo, repoType, data.subdirectory).find('span').text(data.updated_at);
 
         // Set current tab to "readme" and show the content.
         modal.find('.h2wp-modal-tab-active').removeClass('h2wp-modal-tab-active');
@@ -109,13 +136,11 @@ jQuery(document).ready(function($) {
         modal.find('.h2wp-modal-changelog-content').data('loaded', false);
 
         // Add topics to the modal.
-        modal.find('.h2wp-modal-topics').html(function() {
-            var topics = '';
-            data.topics.forEach(function(topic) {
-                var topicLink = '<a href="' + topic.url + '">' + topic.name + '</a>';
-                topics += '<span class="h2wp-modal-topic">' + topicLink + '</span>';
-            });
-            return topics;
+        var $topics = modal.find('.h2wp-modal-topics').empty();
+        data.topics.forEach(function(topic) {
+            $('<span>').addClass('h2wp-modal-topic').append(
+                $('<a>').attr('href', topic.url).text(topic.name)
+            ).appendTo($topics);
         });
 
         // Show or hide the p right before .h2wp-modal-topics based on whether there are topics.
@@ -139,7 +164,8 @@ jQuery(document).ready(function($) {
             nonce: h2wp_ajax_object.nonce,
             owner: data.owner,
             repo: data.repo,
-            repo_type: data.repo_type || h2wp_ajax_object.repo_type || 'plugin'
+            repo_type: data.repo_type || h2wp_ajax_object.repo_type || 'plugin',
+            subdirectory: data.subdirectory || ''
         };
 
         modal.find('.h2wp-modal-compatibility').html('Checking compatibility...').parent().addClass('h2wp-loading');
@@ -167,11 +193,14 @@ jQuery(document).ready(function($) {
                         modal.find('.h2wp-install-plugin').addClass('h2wp-hidden');
                         modal.find('.h2wp-activate-plugin').addClass('h2wp-hidden');
                         // Also disable the "Install Now" button inside the plugin card.
-                        $('.h2wp-install-plugin[data-owner="' + data.owner + '"][data-repo="' + data.repo + '"][data-type="' + (data.repo_type || h2wp_ajax_object.repo_type || 'plugin') + '"]').addClass('h2wp-installed h2wp-button-disabled').text('Incompatible');
+                        findProjectElements('.h2wp-install-plugin', data.owner, data.repo, data.repo_type, data.subdirectory)
+                            .addClass('h2wp-installed h2wp-button-disabled').text('Incompatible');
                     }
 
                     if (response.data.reason) {
-                        modal.find('.h2wp-modal-compatibility').append('<p class="h2wp-modal-incompatibility-reason">' + response.data.reason + '</p>');
+                        modal.find('.h2wp-modal-compatibility').append(
+                            $('<p>').addClass('h2wp-modal-incompatibility-reason').text(response.data.reason)
+                        );
                     }
 
                     // Update compatibility details in the modal sidebar
@@ -182,7 +211,7 @@ jQuery(document).ready(function($) {
                         modal.find('.h2wp-modal-compatibility-required-php-version').text(response.data.headers['requires php'] || 'Unknown');
                     }
                 } else {
-                    alert(response.data.message);
+                    alert(getResponseMessage(response, h2wp_ajax_object.error_message || 'An error occurred.'));
                 }
             },
             error: function() {
@@ -206,13 +235,14 @@ jQuery(document).ready(function($) {
         var owner = $(this).data('owner');
         var repo = $(this).data('repo');
         var repoType = $(this).data('type') || h2wp_ajax_object.repo_type || 'plugin';
+        var subdirectory = $(this).data('subdirectory') || '';
 
         if (!owner || !repo || isModifiedAnchorClick) {
             return;
         }
 
         e.preventDefault();
-        openRepositoryDetails(owner, repo, repoType, true);
+        openRepositoryDetails(owner, repo, repoType, subdirectory, true);
     });
 
     // Click event to close the modal.
@@ -307,6 +337,7 @@ jQuery(document).ready(function($) {
         var owner = $(this).closest('#h2wp-plugin-modal').find('.h2wp-install-plugin').data('owner');
         var repo = $(this).closest('#h2wp-plugin-modal').find('.h2wp-install-plugin').data('repo');
         var repoType = $(this).closest('#h2wp-plugin-modal').find('.h2wp-install-plugin').data('type') || h2wp_ajax_object.repo_type || 'plugin';
+        var subdirectory = $(this).closest('#h2wp-plugin-modal').find('.h2wp-install-plugin').data('subdirectory') || '';
 
         if (!owner || !repo) {
             return;
@@ -321,7 +352,8 @@ jQuery(document).ready(function($) {
                 nonce: h2wp_ajax_object.nonce,
                 owner: owner,
                 repo: repo,
-                repo_type: repoType
+                repo_type: repoType,
+                subdirectory: subdirectory
             },
             beforeSend: function() {
                 tabContent.html('<div class="h2wp-loading">Loading changelog...</div>');
@@ -331,11 +363,11 @@ jQuery(document).ready(function($) {
                     tabContent.html(response.data.changelog_html);
                     tabContent.data('loaded', true);
                 } else {
-                    tabContent.html('<div class="h2wp-error">' + response.data.message + '</div>');
+                    tabContent.empty().append($('<div>').addClass('h2wp-error').text(getResponseMessage(response, 'No changelog available.')));
                 }
             },
             error: function() {
-                tabContent.html('<div class="h2wp-error">' + (h2wp_ajax_object.error_message || 'Failed to load changelog.') + '</div>');
+                tabContent.empty().append($('<div>').addClass('h2wp-error').text(h2wp_ajax_object.error_message || 'Failed to load changelog.'));
             }
         });
     });
@@ -346,13 +378,14 @@ jQuery(document).ready(function($) {
         var owner = params.get('h2wp_modal_owner');
         var repo = params.get('h2wp_modal_repo');
         var repoType = params.get('repo_type') || h2wp_ajax_object.repo_type || 'plugin';
+        var subdirectory = params.get('h2wp_modal_subdirectory') || '';
         repoType = ('plugin' === repoType || 'theme' === repoType) ? repoType : 'plugin';
 
         if ('details' !== modalType || !owner || !repo) {
             return;
         }
 
-        openRepositoryDetails(owner, repo, repoType, false);
+        openRepositoryDetails(owner, repo, repoType, subdirectory, false);
     }());
 
     // Ellipsis text animation to show the user the action is still working
@@ -375,16 +408,15 @@ jQuery(document).ready(function($) {
         $repoInput.closest('td').append('<div id="h2wp-monorepo-picker" style="display:none;margin-top:12px;"></div>');
 
         $addRepoForm.on('submit', function(e) {
+            if ( !$('#h2wp_scan_monorepo').is(':checked') ) {
+                return;
+            }
+
             var repoValue = $.trim( $repoInput.val() );
             var parts     = repoValue.split('/');
 
             // Only intercept clean owner/repo values
             if ( parts.length !== 2 || !parts[0] || !parts[1] ) {
-                return;
-            }
-
-            // If picker already chose a subdirectory, let the form submit normally
-            if ( $('#h2wp-subdirectory-ready').val() === '1' ) {
                 return;
             }
 
@@ -406,17 +438,19 @@ jQuery(document).ready(function($) {
                     action: 'h2wp_detect_repo_type',
                     nonce:  h2wp_ajax_object.nonce,
                     owner:  owner,
-                    repo:   repo
+                    repo:   repo,
+                    branch: $.trim( $('#h2wp_branch_input').val() )
                 },
                 success: function(response) {
                     if ( !response.success ) {
-                        alert( response.data.message || 'Could not detect repository type.' );
+                        alert( getResponseMessage(response, 'Could not detect repository type.') );
                         return;
                     }
 
                     if ( 'single' === response.data.type ) {
-                        // Single repo — detach our handler and submit normally
-                        $addRepoForm.off('submit').submit();
+                        // Single repo — disable the opt-in scan and submit normally.
+                        $('#h2wp_scan_monorepo').prop('checked', false);
+                        $addRepoForm.trigger('submit');
                         return;
                     }
 
@@ -452,8 +486,9 @@ jQuery(document).ready(function($) {
             .replace( /'/g, '&#039;' );
     }
 
-        function h2wpRenderMonorepoPicker( plugins, owner, repo ) {
+    function h2wpRenderMonorepoPicker( plugins, owner, repo ) {
         var $picker = $('#h2wp-monorepo-picker');
+        var monitoredProjects = h2wp_ajax_object.monitored_plugin_projects || [];
 
         var html  = '<p><strong>Monorepo detected</strong> — ';
             html += plugins.length + ' plugin(s) found. Select which to monitor:</p>';
@@ -464,21 +499,23 @@ jQuery(document).ready(function($) {
 
         var availableCount = 0;
         plugins.forEach(function(plugin) {
-            var monitored = h2wp_ajax_object.monitored_subdirs &&
-                            h2wp_ajax_object.monitored_subdirs.indexOf( plugin.subdirectory ) !== -1;
+            var subdirectory = plugin.subdirectory || '';
+            var pathLabel = subdirectory || 'repository root';
+            var projectKey = owner.toLowerCase() + '/' + repo.toLowerCase() + ( subdirectory ? '/' + subdirectory : '' );
+            var monitored = monitoredProjects.indexOf( projectKey ) !== -1;
             if ( monitored ) {
                 html += '<label style="display:block;margin-bottom:6px;opacity:0.55;cursor:default;">'
-                    + '<input type="checkbox" class="h2wp-monorepo-plugin-cb" value="' + h2wpEscHtml( plugin.subdirectory ) + '" disabled /> '
+                    + '<input type="checkbox" class="h2wp-monorepo-plugin-cb" value="' + h2wpEscHtml( subdirectory ) + '" disabled /> '
                     + '<strong>' + h2wpEscHtml( plugin.slug ) + '</strong> '
-                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( plugin.subdirectory ) + ')</span>'
+                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( pathLabel ) + ')</span>'
                     + ' <em style="color:#2271b1;font-size:12px;">— Already Monitoring</em>'
                     + '</label>';
             } else {
                 availableCount++;
                 html += '<label style="display:block;margin-bottom:6px;">'
-                    + '<input type="checkbox" class="h2wp-monorepo-plugin-cb" value="' + h2wpEscHtml( plugin.subdirectory ) + '" checked /> '
+                    + '<input type="checkbox" class="h2wp-monorepo-plugin-cb" value="' + h2wpEscHtml( subdirectory ) + '" checked /> '
                     + '<strong>' + h2wpEscHtml( plugin.slug ) + '</strong> '
-                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( plugin.subdirectory ) + ')</span>'
+                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( pathLabel ) + ')</span>'
                     + '</label>';
             }
         });
@@ -498,13 +535,14 @@ jQuery(document).ready(function($) {
         });
 
         // Keep "select all" in sync when individual boxes are changed
-        $(document).on('change', '.h2wp-monorepo-plugin-cb:not(:disabled)', function() {
+        $(document).off('change.h2wpMonorepoPlugins', '.h2wp-monorepo-plugin-cb:not(:disabled)')
+            .on('change.h2wpMonorepoPlugins', '.h2wp-monorepo-plugin-cb:not(:disabled)', function() {
             var total   = $('.h2wp-monorepo-plugin-cb:not(:disabled)').length;
             var checked = $('.h2wp-monorepo-plugin-cb:not(:disabled):checked').length;
             $('#h2wp-select-all-plugins').prop('checked', total === checked)
                                         .prop('indeterminate', checked > 0 && checked < total);
             $('#h2wp-add-selected-plugins').text( 'Add Selected Plugins (' + checked + ')' );
-        });
+            });
 
         $('#h2wp-cancel-picker').on('click', function() {
             $picker.hide().empty();
@@ -537,14 +575,12 @@ jQuery(document).ready(function($) {
     function h2wpAddPluginsSequentially( subdirs, index, owner, repo, branch, prioritize, $btn, $status, successCount, dotInterval ) {
         if ( index >= subdirs.length ) {
             if ( dotInterval ) { clearInterval( dotInterval ); }
-            // Auto-redirect back to this page with a success param for the WP notice
-            var base = window.location.href.split('&h2wp_added=')[0];
-            window.location.href = base + '&h2wp_added=' + successCount;
+            h2wpRedirectAfterAdd( successCount, 'plugin' );
             return;
         }
 
         var subdirectory = subdirs[ index ];
-        var slug         = subdirectory.split('/').pop();
+        var slug         = subdirectory ? subdirectory.split('/').pop() : repo;
 
         $.ajax({
             url: h2wp_ajax_object.ajax_url,
@@ -560,14 +596,15 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if ( response.success ) {
-                    $status.append('<p style="color:#00a32a;">&#10003; Added: <strong>' + slug + '</strong></p>');
+                    h2wpAppendStatus( $status, '#00a32a', '✓ Added: ' + slug );
                     successCount++;
                 } else {
-                    $status.append('<p style="color:#d63638;">&#10007; ' + slug + ': ' + ( response.data.message || 'Unknown error' ) + '</p>');
+                    var message = getResponseMessage(response, 'Unknown error');
+                    h2wpAppendStatus( $status, '#d63638', '✗ ' + slug + ': ' + message );
                 }
             },
             error: function() {
-                $status.append('<p style="color:#d63638;">&#10007; Error adding <strong>' + slug + '</strong></p>');
+                h2wpAppendStatus( $status, '#d63638', '✗ Error adding ' + slug );
             },
             complete: function() {
                 h2wpAddPluginsSequentially( subdirs, index + 1, owner, repo, branch, prioritize, $btn, $status, successCount, dotInterval );
@@ -584,14 +621,14 @@ jQuery(document).ready(function($) {
         $themeInput.closest('td').append('<div id="h2wp-monorepo-theme-picker" style="display:none;margin-top:12px;"></div>');
 
         $addThemeForm.on('submit', function(e) {
+            if ( !$('#h2wp_scan_theme_monorepo').is(':checked') ) {
+                return;
+            }
+
             var repoValue = $.trim( $themeInput.val() );
             var parts     = repoValue.split('/');
 
             if ( parts.length !== 2 || !parts[0] || !parts[1] ) {
-                return;
-            }
-
-            if ( $('#h2wp-theme-subdirectory-ready').val() === '1' ) {
                 return;
             }
 
@@ -614,15 +651,17 @@ jQuery(document).ready(function($) {
                     nonce:     h2wp_ajax_object.nonce,
                     owner:     owner,
                     repo:      repo,
+                    branch:    $.trim( $('#h2wp_theme_branch_input').val() ),
                     repo_type: 'theme'
                 },
                 success: function(response) {
                     if ( !response.success ) {
-                        alert( response.data.message || 'Could not detect repository type.' );
+                        alert( getResponseMessage(response, 'Could not detect repository type.') );
                         return;
                     }
                     if ( 'single' === response.data.type ) {
-                        $addThemeForm.off('submit').submit();
+                        $('#h2wp_scan_theme_monorepo').prop('checked', false);
+                        $addThemeForm.trigger('submit');
                         return;
                     }
                     h2wpRenderMonorepoThemePicker( response.data.plugins, owner, repo );
@@ -640,7 +679,7 @@ jQuery(document).ready(function($) {
 
     function h2wpRenderMonorepoThemePicker( themes, owner, repo ) {
         var $picker = $('#h2wp-monorepo-theme-picker');
-        var monitoredThemeSubdirs = h2wp_ajax_object.monitored_theme_subdirs || [];
+        var monitoredProjects = h2wp_ajax_object.monitored_theme_projects || [];
 
         var html  = '<p><strong>Theme monorepo detected</strong> — ';
             html += themes.length + ' theme(s) found. Select which to monitor:</p>';
@@ -651,20 +690,23 @@ jQuery(document).ready(function($) {
 
         var availableCount = 0;
         themes.forEach(function(theme) {
-            var monitored = monitoredThemeSubdirs.indexOf( theme.subdirectory ) !== -1;
+            var subdirectory = theme.subdirectory || '';
+            var pathLabel = subdirectory || 'repository root';
+            var projectKey = owner.toLowerCase() + '/' + repo.toLowerCase() + ( subdirectory ? '/' + subdirectory : '' );
+            var monitored = monitoredProjects.indexOf( projectKey ) !== -1;
             if ( monitored ) {
                 html += '<label style="display:block;margin-bottom:6px;opacity:0.55;cursor:default;">'
-                    + '<input type="checkbox" class="h2wp-monorepo-theme-cb" value="' + h2wpEscHtml( theme.subdirectory ) + '" disabled /> '
+                    + '<input type="checkbox" class="h2wp-monorepo-theme-cb" value="' + h2wpEscHtml( subdirectory ) + '" disabled /> '
                     + '<strong>' + h2wpEscHtml( theme.slug ) + '</strong> '
-                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( theme.subdirectory ) + ')</span>'
+                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( pathLabel ) + ')</span>'
                     + ' <em style="color:#2271b1;font-size:12px;">— Already Monitoring</em>'
                     + '</label>';
             } else {
                 availableCount++;
                 html += '<label style="display:block;margin-bottom:6px;">'
-                    + '<input type="checkbox" class="h2wp-monorepo-theme-cb" value="' + h2wpEscHtml( theme.subdirectory ) + '" checked /> '
+                    + '<input type="checkbox" class="h2wp-monorepo-theme-cb" value="' + h2wpEscHtml( subdirectory ) + '" checked /> '
                     + '<strong>' + h2wpEscHtml( theme.slug ) + '</strong> '
-                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( theme.subdirectory ) + ')</span>'
+                    + '<span style="color:#646970;font-size:12px;">(' + h2wpEscHtml( pathLabel ) + ')</span>'
                     + '</label>';
             }
         });
@@ -682,13 +724,14 @@ jQuery(document).ready(function($) {
             $('#h2wp-add-selected-themes').text( 'Add Selected Themes (' + checked + ')' );
         });
 
-        $(document).on('change', '.h2wp-monorepo-theme-cb:not(:disabled)', function() {
+        $(document).off('change.h2wpMonorepoThemes', '.h2wp-monorepo-theme-cb:not(:disabled)')
+            .on('change.h2wpMonorepoThemes', '.h2wp-monorepo-theme-cb:not(:disabled)', function() {
             var total   = $('.h2wp-monorepo-theme-cb:not(:disabled)').length;
             var checked = $('.h2wp-monorepo-theme-cb:not(:disabled):checked').length;
             $('#h2wp-select-all-themes').prop('checked', total === checked)
                                         .prop('indeterminate', checked > 0 && checked < total);
             $('#h2wp-add-selected-themes').text( 'Add Selected Themes (' + checked + ')' );
-        });
+            });
 
         $('#h2wp-cancel-theme-picker').on('click', function() {
             $picker.hide().empty();
@@ -719,13 +762,12 @@ jQuery(document).ready(function($) {
     function h2wpAddThemesSequentially( subdirs, index, owner, repo, branch, prioritize, $btn, $status, successCount, dotInterval ) {
         if ( index >= subdirs.length ) {
             if ( dotInterval ) { clearInterval( dotInterval ); }
-            var base = window.location.href.split('&h2wp_added=')[0];
-            window.location.href = base + '&h2wp_added=' + successCount;
+            h2wpRedirectAfterAdd( successCount, 'theme' );
             return;
         }
 
         var subdirectory = subdirs[ index ];
-        var slug         = subdirectory.split('/').pop();
+        var slug         = subdirectory ? subdirectory.split('/').pop() : repo;
 
         $.ajax({
             url: h2wp_ajax_object.ajax_url,
@@ -742,19 +784,31 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if ( response.success ) {
-                    $status.append('<p style="color:#00a32a;">&#10003; Added: <strong>' + slug + '</strong></p>');
+                    h2wpAppendStatus( $status, '#00a32a', '✓ Added: ' + slug );
                     successCount++;
                 } else {
-                    $status.append('<p style="color:#d63638;">&#10007; ' + slug + ': ' + ( response.data.message || 'Unknown error' ) + '</p>');
+                    var message = getResponseMessage(response, 'Unknown error');
+                    h2wpAppendStatus( $status, '#d63638', '✗ ' + slug + ': ' + message );
                 }
             },
             error: function() {
-                $status.append('<p style="color:#d63638;">&#10007; Error adding <strong>' + slug + '</strong></p>');
+                h2wpAppendStatus( $status, '#d63638', '✗ Error adding ' + slug );
             },
             complete: function() {
                 h2wpAddThemesSequentially( subdirs, index + 1, owner, repo, branch, prioritize, $btn, $status, successCount, dotInterval );
             }
         });
+    }
+
+    function h2wpAppendStatus( $status, color, message ) {
+        $('<p>').css('color', color).text( message ).appendTo( $status );
+    }
+
+    function h2wpRedirectAfterAdd( successCount, type ) {
+        var url = new URL( window.location.href );
+        url.searchParams.set( 'h2wp_added', successCount );
+        url.searchParams.set( 'h2wp_added_type', type );
+        window.location.href = url.toString();
     }
 
 });

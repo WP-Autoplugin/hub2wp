@@ -1,12 +1,17 @@
 <?php
 /**
  * Abilities API bootstrap for hub2wp.
+ *
+ * @package hub2wp
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Registers discovery and management abilities.
+ */
 class H2WP_Abilities {
 
 	/**
@@ -85,7 +90,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_list_tracked_plugins' ),
 				'permission_callback' => array( __CLASS__, 'can_install_plugins' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => true,
 						'destructive' => false,
 					),
@@ -104,7 +109,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_list_tracked_themes' ),
 				'permission_callback' => array( __CLASS__, 'can_install_themes' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => true,
 						'destructive' => false,
 					),
@@ -124,7 +129,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_get_repository_details' ),
 				'permission_callback' => array( __CLASS__, 'can_manage_repository_type' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => true,
 						'destructive' => false,
 					),
@@ -144,7 +149,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_check_repository_compatibility' ),
 				'permission_callback' => array( __CLASS__, 'can_manage_repository_type' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => true,
 						'destructive' => false,
 					),
@@ -164,7 +169,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_install_plugin' ),
 				'permission_callback' => array( __CLASS__, 'can_install_plugins' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => false,
 						'destructive' => false,
 					),
@@ -184,7 +189,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_install_theme' ),
 				'permission_callback' => array( __CLASS__, 'can_install_themes' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => false,
 						'destructive' => false,
 					),
@@ -203,7 +208,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_clear_cache' ),
 				'permission_callback' => array( __CLASS__, 'can_manage_options' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => false,
 						'destructive' => true,
 					),
@@ -222,7 +227,7 @@ class H2WP_Abilities {
 				'execute_callback'    => array( __CLASS__, 'execute_run_update_check' ),
 				'permission_callback' => array( __CLASS__, 'can_manage_options' ),
 				'meta'                => array(
-					'annotations' => array(
+					'annotations'  => array(
 						'readonly'    => false,
 						'destructive' => false,
 					),
@@ -259,8 +264,9 @@ class H2WP_Abilities {
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public static function execute_get_repository_details( $input ) {
-		$service = new H2WP_Repository_Query_Service();
-		return $service->get_repository_details( $input['owner'], $input['repo'], self::get_input_repo_type( $input ) );
+		list( $owner, $repo ) = self::get_input_repository( $input );
+		$service              = new H2WP_Repository_Query_Service();
+		return $service->get_repository_details( $owner, $repo, self::get_input_repo_type( $input ), self::get_input_subdirectory( $input ) );
 	}
 
 	/**
@@ -270,8 +276,9 @@ class H2WP_Abilities {
 	 * @return array<string, mixed>
 	 */
 	public static function execute_check_repository_compatibility( $input ) {
-		$service = new H2WP_Repository_Query_Service();
-		return $service->check_repository_compatibility( $input['owner'], $input['repo'], self::get_input_repo_type( $input ) );
+		list( $owner, $repo ) = self::get_input_repository( $input );
+		$service              = new H2WP_Repository_Query_Service();
+		return $service->check_repository_compatibility( $owner, $repo, self::get_input_repo_type( $input ), self::get_input_subdirectory( $input ) );
 	}
 
 	/**
@@ -281,13 +288,16 @@ class H2WP_Abilities {
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public static function execute_install_plugin( $input ) {
-		$result = H2WP_Repo_Manager::install_repository(
-			$input['owner'],
-			$input['repo'],
+		list( $owner, $repo ) = self::get_input_repository( $input );
+		$input                = is_array( $input ) ? $input : array();
+		$result               = H2WP_Repo_Manager::install_repository(
+			$owner,
+			$repo,
 			array(
 				'repo_type'           => 'plugin',
 				'branch'              => isset( $input['branch'] ) ? sanitize_text_field( $input['branch'] ) : '',
 				'prioritize_releases' => ! isset( $input['prioritize_releases'] ) || ! empty( $input['prioritize_releases'] ),
+				'subdirectory'        => self::get_input_subdirectory( $input ),
 			)
 		);
 
@@ -305,13 +315,16 @@ class H2WP_Abilities {
 	 * @return array<string, mixed>|WP_Error
 	 */
 	public static function execute_install_theme( $input ) {
-		$result = H2WP_Repo_Manager::install_repository(
-			$input['owner'],
-			$input['repo'],
+		list( $owner, $repo ) = self::get_input_repository( $input );
+		$input                = is_array( $input ) ? $input : array();
+		$result               = H2WP_Repo_Manager::install_repository(
+			$owner,
+			$repo,
 			array(
 				'repo_type'           => 'theme',
 				'branch'              => isset( $input['branch'] ) ? sanitize_text_field( $input['branch'] ) : '',
 				'prioritize_releases' => ! isset( $input['prioritize_releases'] ) || ! empty( $input['prioritize_releases'] ),
+				'subdirectory'        => self::get_input_subdirectory( $input ),
 			)
 		);
 
@@ -409,6 +422,7 @@ class H2WP_Abilities {
 	 * @return void
 	 */
 	public static function log_after_execute( $ability_name, $input, $result ) {
+		unset( $result );
 		if ( ! self::should_log_management_ability( $ability_name ) ) {
 			return;
 		}
@@ -450,6 +464,7 @@ class H2WP_Abilities {
 	 */
 	private static function log_debug( $message ) {
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Intentional WP_DEBUG-only diagnostics.
 			error_log( '[hub2wp] ' . $message );
 		}
 	}
@@ -480,6 +495,33 @@ class H2WP_Abilities {
 	}
 
 	/**
+	 * Get a repository project subdirectory from ability input.
+	 *
+	 * @param array<string, mixed>|null $input Ability input.
+	 * @return string
+	 */
+	private static function get_input_subdirectory( $input ) {
+		return is_array( $input ) && isset( $input['subdirectory'] ) ? sanitize_text_field( $input['subdirectory'] ) : '';
+	}
+
+	/**
+	 * Get a repository owner and name from ability input without assuming its shape.
+	 *
+	 * @param array<string, mixed>|null $input Ability input.
+	 * @return array{0:string,1:string}
+	 */
+	private static function get_input_repository( $input ) {
+		if ( ! is_array( $input ) ) {
+			return array( '', '' );
+		}
+
+		return array(
+			isset( $input['owner'] ) ? sanitize_text_field( $input['owner'] ) : '',
+			isset( $input['repo'] ) ? sanitize_text_field( $input['repo'] ) : '',
+		);
+	}
+
+	/**
 	 * Get shared repository input schema.
 	 *
 	 * @return array<string, mixed>
@@ -488,15 +530,18 @@ class H2WP_Abilities {
 		return array(
 			'type'                 => 'object',
 			'properties'           => array(
-				'owner'     => array(
+				'owner'        => array(
 					'type' => 'string',
 				),
-				'repo'      => array(
+				'repo'         => array(
 					'type' => 'string',
 				),
-				'repo_type' => array(
+				'repo_type'    => array(
 					'type' => 'string',
 					'enum' => array( 'plugin', 'theme' ),
+				),
+				'subdirectory' => array(
+					'type' => 'string',
 				),
 			),
 			'required'             => array( 'owner', 'repo' ),
@@ -524,6 +569,9 @@ class H2WP_Abilities {
 				),
 				'prioritize_releases' => array(
 					'type' => 'boolean',
+				),
+				'subdirectory'        => array(
+					'type' => 'string',
 				),
 			),
 			'required'             => array( 'owner', 'repo' ),
@@ -554,7 +602,10 @@ class H2WP_Abilities {
 			'properties'           => array(
 				'name'                => array( 'type' => 'string' ),
 				'repo'                => array( 'type' => 'string' ),
+				'repository'          => array( 'type' => 'string' ),
 				'repo_type'           => array( 'type' => 'string' ),
+				'subdirectory'        => array( 'type' => 'string' ),
+				'github_url'          => array( 'type' => 'string' ),
 				'directory'           => array( 'type' => 'string' ),
 				'installed'           => array( 'type' => 'boolean' ),
 				'branch'              => array( 'type' => 'string' ),
@@ -580,6 +631,7 @@ class H2WP_Abilities {
 				'owner'               => array( 'type' => 'string' ),
 				'repo'                => array( 'type' => 'string' ),
 				'repo_type'           => array( 'type' => 'string' ),
+				'subdirectory'        => array( 'type' => 'string' ),
 				'description'         => array( 'type' => 'string' ),
 				'readme'              => array( 'type' => 'string' ),
 				'html_url'            => array( 'type' => 'string' ),
@@ -608,10 +660,10 @@ class H2WP_Abilities {
 		return array(
 			'type'                 => 'object',
 			'properties'           => array(
-				'is_compatible' => array( 'type' => 'boolean' ),
-				'reason'        => array( 'type' => 'string' ),
-				'headers'       => array( 'type' => 'object' ),
-				'source_context'=> array( 'type' => 'object' ),
+				'is_compatible'  => array( 'type' => 'boolean' ),
+				'reason'         => array( 'type' => 'string' ),
+				'headers'        => array( 'type' => 'object' ),
+				'source_context' => array( 'type' => 'object' ),
 			),
 			'additionalProperties' => true,
 		);

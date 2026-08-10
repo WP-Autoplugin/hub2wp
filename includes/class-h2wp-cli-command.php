@@ -1,12 +1,19 @@
 <?php
 /**
  * WP-CLI integration for hub2wp.
+ *
+ * @package hub2wp
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// phpcs:disable Generic.Files.OneObjectStructurePerFile.MultipleFound -- These related WP-CLI commands share one loader.
+
+/**
+ * Registers hub2wp WP-CLI commands.
+ */
 class H2WP_CLI_Command {
 
 	/**
@@ -130,6 +137,9 @@ class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
 	 * [--branch=<branch>]
 	 * : Track a specific branch instead of the repository default branch.
 	 *
+	 * [--subdirectory=<path>]
+	 * : Install a plugin project from this repository-relative monorepo path.
+	 *
 	 * [--no-release-priority]
 	 * : Do not prefer the latest GitHub release when resolving versions and downloads.
 	 *
@@ -151,7 +161,8 @@ class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
 	 * @return void
 	 */
 	public function install( $args, $assoc_args ) {
-		list( $owner, $repo ) = $this->parse_repository_reference( $args[0] );
+		$repository_reference = isset( $args[0] ) ? $args[0] : '';
+		list( $owner, $repo ) = $this->parse_repository_reference( $repository_reference );
 
 		if ( empty( $owner ) || empty( $repo ) ) {
 			WP_CLI::error( __( 'Repository must be provided as owner/repo or a GitHub repository URL.', 'hub2wp' ) );
@@ -166,6 +177,7 @@ class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
 				'prioritize_releases' => ! \WP_CLI\Utils\get_flag_value( $assoc_args, 'no-release-priority', false ),
 				'access_token'        => isset( $assoc_args['token'] ) ? sanitize_text_field( $assoc_args['token'] ) : '',
 				'private'             => null,
+				'subdirectory'        => isset( $assoc_args['subdirectory'] ) ? sanitize_text_field( $assoc_args['subdirectory'] ) : '',
 			)
 		);
 
@@ -176,14 +188,17 @@ class H2WP_CLI_Plugin_Command extends H2WP_CLI_Repo_Command {
 		if ( \WP_CLI\Utils\get_flag_value( $assoc_args, 'activate', false ) ) {
 			$activation_result = activate_plugin( $result['plugin_file'] );
 			if ( is_wp_error( $activation_result ) ) {
+				/* translators: %s: Activation error message. */
 				WP_CLI::warning( sprintf( __( 'Plugin installed and tracked, but activation failed: %s', 'hub2wp' ), $activation_result->get_error_message() ) );
 			} else {
-				WP_CLI::success( sprintf( __( 'Installed, tracked, and activated %s from %s/%s.', 'hub2wp' ), $result['plugin_file'], $owner, $repo ) );
+				/* translators: 1: Plugin file, 2: Repository owner, 3: Repository name. */
+				WP_CLI::success( sprintf( __( 'Installed, tracked, and activated %1$s from %2$s/%3$s.', 'hub2wp' ), $result['plugin_file'], $owner, $repo ) );
 				return;
 			}
 		}
 
-		WP_CLI::success( sprintf( __( 'Installed and tracked %s from %s/%s.', 'hub2wp' ), $result['plugin_file'], $owner, $repo ) );
+		/* translators: 1: Plugin file, 2: Repository owner, 3: Repository name. */
+		WP_CLI::success( sprintf( __( 'Installed and tracked %1$s from %2$s/%3$s.', 'hub2wp' ), $result['plugin_file'], $owner, $repo ) );
 	}
 }
 
@@ -237,6 +252,9 @@ class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
 	 * [--branch=<branch>]
 	 * : Track a specific branch instead of the repository default branch.
 	 *
+	 * [--subdirectory=<path>]
+	 * : Install a theme project from this repository-relative monorepo path.
+	 *
 	 * [--no-release-priority]
 	 * : Do not prefer the latest GitHub release when resolving versions and downloads.
 	 *
@@ -258,7 +276,8 @@ class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
 	 * @return void
 	 */
 	public function install( $args, $assoc_args ) {
-		list( $owner, $repo ) = $this->parse_repository_reference( $args[0] );
+		$repository_reference = isset( $args[0] ) ? $args[0] : '';
+		list( $owner, $repo ) = $this->parse_repository_reference( $repository_reference );
 
 		if ( empty( $owner ) || empty( $repo ) ) {
 			WP_CLI::error( __( 'Repository must be provided as owner/repo or a GitHub repository URL.', 'hub2wp' ) );
@@ -273,6 +292,7 @@ class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
 				'prioritize_releases' => ! \WP_CLI\Utils\get_flag_value( $assoc_args, 'no-release-priority', false ),
 				'access_token'        => isset( $assoc_args['token'] ) ? sanitize_text_field( $assoc_args['token'] ) : '',
 				'private'             => null,
+				'subdirectory'        => isset( $assoc_args['subdirectory'] ) ? sanitize_text_field( $assoc_args['subdirectory'] ) : '',
 			)
 		);
 
@@ -284,14 +304,17 @@ class H2WP_CLI_Theme_Command extends H2WP_CLI_Repo_Command {
 			switch_theme( $result['stylesheet'] );
 
 			if ( get_stylesheet() === $result['stylesheet'] ) {
-				WP_CLI::success( sprintf( __( 'Installed, tracked, and activated theme %s from %s/%s.', 'hub2wp' ), $result['stylesheet'], $owner, $repo ) );
+				/* translators: 1: Theme stylesheet, 2: Repository owner, 3: Repository name. */
+				WP_CLI::success( sprintf( __( 'Installed, tracked, and activated theme %1$s from %2$s/%3$s.', 'hub2wp' ), $result['stylesheet'], $owner, $repo ) );
 				return;
 			}
 
+			/* translators: %s: Theme stylesheet. */
 			WP_CLI::warning( sprintf( __( 'Theme installed and tracked, but activation could not be confirmed for %s.', 'hub2wp' ), $result['stylesheet'] ) );
 		}
 
-		WP_CLI::success( sprintf( __( 'Installed and tracked theme %s from %s/%s.', 'hub2wp' ), $result['stylesheet'], $owner, $repo ) );
+		/* translators: 1: Theme stylesheet, 2: Repository owner, 3: Repository name. */
+		WP_CLI::success( sprintf( __( 'Installed and tracked theme %1$s from %2$s/%3$s.', 'hub2wp' ), $result['stylesheet'], $owner, $repo ) );
 	}
 }
 
@@ -321,7 +344,9 @@ class H2WP_CLI_Settings_Command {
 	 */
 	public function list_( $args, $assoc_args ) {
 		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
-		$rows     = array(
+		$settings = is_array( $settings ) ? $settings : array();
+		unset( $args );
+		$rows = array(
 			array(
 				'field' => 'access_token',
 				'value' => $this->format_setting_value(
@@ -359,8 +384,10 @@ class H2WP_CLI_Settings_Command {
 	 * @return void
 	 */
 	public function get( $args, $assoc_args ) {
-		$field    = $this->normalize_field_name( $args[0] );
+		$field    = $this->normalize_field_name( isset( $args[0] ) ? $args[0] : '' );
 		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
+		$settings = is_array( $settings ) ? $settings : array();
+		unset( $assoc_args );
 
 		if ( ! $this->is_supported_field( $field ) ) {
 			WP_CLI::error( __( 'Unsupported setting. Supported fields: access_token, cache_duration.', 'hub2wp' ) );
@@ -393,9 +420,11 @@ class H2WP_CLI_Settings_Command {
 	 * @return void
 	 */
 	public function set( $args, $assoc_args ) {
-		$field    = $this->normalize_field_name( $args[0] );
+		$field    = $this->normalize_field_name( isset( $args[0] ) ? $args[0] : '' );
 		$value    = isset( $args[1] ) ? $args[1] : '';
 		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
+		$settings = is_array( $settings ) ? $settings : array();
+		unset( $assoc_args );
 
 		if ( ! $this->is_supported_field( $field ) ) {
 			WP_CLI::error( __( 'Unsupported setting. Supported fields: access_token, cache_duration.', 'hub2wp' ) );
@@ -410,6 +439,7 @@ class H2WP_CLI_Settings_Command {
 
 		update_option( H2WP_Settings::OPTION_NAME, $settings, false );
 
+		/* translators: %s: Setting field name. */
 		WP_CLI::success( sprintf( __( 'Updated hub2wp setting "%s".', 'hub2wp' ), $field ) );
 	}
 
@@ -432,8 +462,10 @@ class H2WP_CLI_Settings_Command {
 	 * @return void
 	 */
 	public function delete( $args, $assoc_args ) {
-		$field    = $this->normalize_field_name( $args[0] );
+		$field    = $this->normalize_field_name( isset( $args[0] ) ? $args[0] : '' );
 		$settings = get_option( H2WP_Settings::OPTION_NAME, array() );
+		$settings = is_array( $settings ) ? $settings : array();
+		unset( $assoc_args );
 
 		if ( ! $this->is_supported_field( $field ) ) {
 			WP_CLI::error( __( 'Unsupported setting. Supported fields: access_token, cache_duration.', 'hub2wp' ) );
@@ -442,6 +474,7 @@ class H2WP_CLI_Settings_Command {
 		unset( $settings[ $field ] );
 		update_option( H2WP_Settings::OPTION_NAME, H2WP_Settings::sanitize_settings( $settings ), false );
 
+		/* translators: %s: Setting field name. */
 		WP_CLI::success( sprintf( __( 'Deleted hub2wp setting "%s".', 'hub2wp' ), $field ) );
 	}
 

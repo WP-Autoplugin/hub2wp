@@ -1,12 +1,17 @@
 <?php
 /**
  * Shared tracked repository read helpers.
+ *
+ * @package hub2wp
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Normalizes tracked plugin and theme records.
+ */
 class H2WP_Tracked_Repo_Service {
 
 	/**
@@ -35,8 +40,7 @@ class H2WP_Tracked_Repo_Service {
 	 */
 	public function get_tracked_items( $repo_type = 'plugin' ) {
 		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
-		$option    = 'theme' === $repo_type ? 'h2wp_themes' : 'h2wp_plugins';
-		$tracked   = get_option( $option, array() );
+		$tracked   = H2WP_Settings::get_monitored_repositories( $repo_type );
 		$items     = array();
 
 		foreach ( $tracked as $repo_key => $repo_data ) {
@@ -59,7 +63,16 @@ class H2WP_Tracked_Repo_Service {
 	 * @return array<string, mixed>
 	 */
 	public function normalize_tracked_item( $repo_key, $repo_data, $repo_type = 'plugin' ) {
-		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$repo_type    = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$identity     = H2WP_Settings::get_tracked_repo_identity( $repo_key, $repo_data );
+		$owner        = is_wp_error( $identity ) ? '' : $identity['owner'];
+		$repository   = is_wp_error( $identity ) ? '' : $identity['repo'];
+		$subdirectory = is_wp_error( $identity ) ? '' : $identity['subdirectory'];
+		$github_url   = '' !== $owner && '' !== $repository ? 'https://github.com/' . $owner . '/' . $repository : '';
+		if ( '' !== $subdirectory && '' !== $github_url ) {
+			$ref         = ! empty( $repo_data['branch'] ) ? (string) $repo_data['branch'] : 'HEAD';
+			$github_url .= '/tree/' . rawurlencode( $ref ) . '/' . implode( '/', array_map( 'rawurlencode', explode( '/', $subdirectory ) ) );
+		}
 
 		$normalized = array(
 			'name'                => isset( $repo_data['name'] ) ? (string) $repo_data['name'] : $repo_key,
@@ -69,6 +82,10 @@ class H2WP_Tracked_Repo_Service {
 			'installed'           => $this->is_tracked_item_installed( $repo_data, $repo_type ),
 			'branch'              => isset( $repo_data['branch'] ) ? (string) $repo_data['branch'] : '',
 			'prioritize_releases' => ! array_key_exists( 'prioritize_releases', $repo_data ) || ! empty( $repo_data['prioritize_releases'] ),
+			'owner'               => $owner,
+			'repository'          => $repository,
+			'subdirectory'        => $subdirectory,
+			'github_url'          => $github_url,
 		);
 
 		if ( 'theme' === $repo_type ) {

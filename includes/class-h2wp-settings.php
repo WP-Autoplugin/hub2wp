@@ -1,4 +1,10 @@
 <?php
+/**
+ * Settings and tracked-repository management.
+ *
+ * @package hub2wp
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -35,7 +41,7 @@ class H2WP_Settings {
 
 		add_settings_section(
 			'h2wp_settings_section',
-			'', // no title
+			'', // No title.
 			'__return_false',
 			'h2wp_settings_page'
 		);
@@ -161,7 +167,7 @@ class H2WP_Settings {
 		$monitored_plugins = $tracked_service->get_tracked_plugins();
 		$count             = count( $monitored_plugins );
 		// Auto-expand if there are form submission notices so feedback is visible.
-		$expanded          = true;
+		$expanded = true;
 		?>
 		<p style="margin:0;">
 			<strong><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></strong>
@@ -212,6 +218,10 @@ class H2WP_Settings {
 								<input type="checkbox" id="h2wp_prioritize_releases" name="h2wp_prioritize_releases" value="1" checked="checked" />
 								<?php esc_html_e( 'Prioritize releases', 'hub2wp' ); ?>
 							</label>
+							<label for="h2wp_scan_monorepo" style="margin-right:8px;display:inline-flex;align-items:center;gap:2px;">
+								<input type="checkbox" id="h2wp_scan_monorepo" value="1" />
+								<?php esc_html_e( 'Scan as monorepo', 'hub2wp' ); ?>
+							</label>
 							<button type="submit" class="button button-secondary">
 								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
 							</button>
@@ -230,50 +240,54 @@ class H2WP_Settings {
 			</form>
 
 			<?php if ( ! empty( $monitored_plugins ) ) : ?>
-                <h3><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></h3>
-                <form method="post" action="" id="h2wp-single-remove-form" style="display:none;">
-                    <?php wp_nonce_field( 'h2wp_remove_private_repo', 'h2wp_remove_repo_nonce' ); ?>
-                    <input type="hidden" name="h2wp_action" value="remove_private_repo" />
-                    <input type="hidden" name="h2wp_repo_key" id="h2wp-single-remove-key" value="" />
-                </form>
-                <form method="post" action="" id="h2wp-bulk-remove-form">
-                    <?php wp_nonce_field( 'h2wp_bulk_remove_repos', 'h2wp_bulk_remove_nonce' ); ?>
-                    <input type="hidden" name="h2wp_action" value="bulk_remove_repos" />
-                    <div class="tablenav top" style="margin-bottom:6px;">
-                        <div class="alignleft actions">
-                            <button type="submit" id="h2wp-bulk-remove-btn" class="button" disabled
-                                onclick="return confirm('<?php echo esc_js( __( 'Stop monitoring the selected repositories?', 'hub2wp' ) ); ?>');">
-                                <?php esc_html_e( 'Remove Selected', 'hub2wp' ); ?>
-                            </button>
-                        </div>
-                    </div>
-                <table class="wp-list-table widefat fixed striped">
-                    <thead>
-                        <tr>
-                            <th scope="col" class="manage-column column-cb check-column" style="padding: 18px 3px 17px;">
-                                <input type="checkbox" id="h2wp-select-all-monitored" />
-                            </th>
-                            <th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
-                            <th style="width:100px;max-width:100px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
-                            <th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ( $monitored_plugins as $repo_data ) : ?>
-                            <?php $repo_key = isset( $repo_data['repo'] ) ? $repo_data['repo'] : ''; ?>
-                            <tr>
-                                <th scope="row" class="check-column">
-                                    <input type="checkbox" name="h2wp_repo_keys[]"
-                                        value="<?php echo esc_attr( $repo_key ); ?>"
-                                        class="h2wp-monitored-cb" />
-                                </th>
-                                <td>
+				<h3><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></h3>
+				<form method="post" action="" id="h2wp-single-remove-form" style="display:none;">
+					<?php wp_nonce_field( 'h2wp_remove_private_repo', 'h2wp_remove_repo_nonce' ); ?>
+					<input type="hidden" name="h2wp_action" value="remove_private_repo" />
+					<input type="hidden" name="h2wp_repo_key" id="h2wp-single-remove-key" value="" />
+				</form>
+				<form method="post" action="" id="h2wp-bulk-remove-form">
+					<?php wp_nonce_field( 'h2wp_bulk_remove_repos', 'h2wp_bulk_remove_nonce' ); ?>
+					<input type="hidden" name="h2wp_action" value="bulk_remove_repos" />
+					<div class="tablenav top" style="margin-bottom:6px;">
+						<div class="alignleft actions">
+							<button type="submit" id="h2wp-bulk-remove-btn" class="button" disabled
+								onclick="return confirm('<?php echo esc_js( __( 'Stop monitoring the selected repositories?', 'hub2wp' ) ); ?>');">
+								<?php esc_html_e( 'Remove Selected', 'hub2wp' ); ?>
+							</button>
+						</div>
+					</div>
+				<table class="wp-list-table widefat fixed striped">
+					<thead>
+						<tr>
+							<th scope="col" class="manage-column column-cb check-column" style="padding: 18px 3px 17px;">
+								<input type="checkbox" id="h2wp-select-all-monitored" />
+							</th>
+							<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
+							<th style="width:100px;max-width:100px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
+							<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $monitored_plugins as $repo_data ) : ?>
+							<?php $repo_key = isset( $repo_data['repo'] ) ? $repo_data['repo'] : ''; ?>
+							<tr>
+								<th scope="row" class="check-column">
+									<input type="checkbox" name="h2wp_repo_keys[]"
+										value="<?php echo esc_attr( $repo_key ); ?>"
+										class="h2wp-monitored-cb" />
+								</th>
+								<td>
 									<strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
 									<br />
 									<small>
-										<a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
+										<a href="<?php echo esc_url( isset( $repo_data['github_url'] ) ? $repo_data['github_url'] : '' ); ?>" target="_blank" rel="noopener noreferrer">
 										<?php echo esc_html( $repo_key ); ?>
-										</a><?php if ( ! empty( $repo_data['branch'] ) ) : ?> (<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
+										</a>
+										<?php
+										if ( ! empty( $repo_data['branch'] ) ) :
+											?>
+											(<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
 										<?php if ( array_key_exists( 'prioritize_releases', $repo_data ) && empty( $repo_data['prioritize_releases'] ) ) : ?>
 											&mdash; <?php esc_html_e( 'branch only', 'hub2wp' ); ?>
 										<?php endif; ?>
@@ -295,30 +309,30 @@ class H2WP_Settings {
 									?>
 								</td>
 								<td>
-                                    <button type="button"
-                                        class="button button-small h2wp-single-remove-btn"
-                                        data-repo-key="<?php echo esc_attr( $repo_key ); ?>"
-                                        data-confirm="<?php echo esc_js( sprintf( __( 'Stop monitoring "%s"?', 'hub2wp' ), $repo_key ) ); ?>">
-                                        <?php esc_html_e( 'Remove', 'hub2wp' ); ?>
-                                    </button>
-                                </td>
+									<button type="button"
+										class="button button-small h2wp-single-remove-btn"
+										data-repo-key="<?php echo esc_attr( $repo_key ); ?>"
+									data-confirm="<?php /* translators: %s: Repository key. */ echo esc_attr( sprintf( __( 'Stop monitoring "%s"?', 'hub2wp' ), $repo_key ) ); ?>">
+										<?php esc_html_e( 'Remove', 'hub2wp' ); ?>
+									</button>
+								</td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
 				</form>
-                <p class="description">
-                    <?php
-                    echo wp_kses_post(
-                        sprintf(
-                            /* translators: %s: URL to the Private tab */
-                            __( 'These repositories will be monitored for updates. Private repositories can be installed via the <a href="%s">Private tab</a> in Plugins > Add GitHub Plugin.', 'hub2wp' ),
-                            esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser&tab=private' ) )
-                        )
-                    );
-                    ?>
-                </p>
-            <?php else : ?>
+				<p class="description">
+					<?php
+					echo wp_kses_post(
+						sprintf(
+							/* translators: %s: URL to the Private tab */
+							__( 'These repositories will be monitored for updates. Private repositories can be installed via the <a href="%s">Private tab</a> in Plugins > Add GitHub Plugin.', 'hub2wp' ),
+							esc_url( admin_url( 'plugins.php?page=h2wp-plugin-browser&tab=private' ) )
+						)
+					);
+					?>
+				</p>
+			<?php else : ?>
 				<p class="description">
 					<?php esc_html_e( 'No repositories added yet.', 'hub2wp' ); ?>
 				</p>
@@ -332,7 +346,7 @@ class H2WP_Settings {
 			var icon    = btn ? btn.querySelector( '.dashicons' ) : null;
 			if ( ! btn || ! content ) { return; }
 
-			// Bulk remove: select all / deselect all
+			// Bulk remove: select all / deselect all.
 			var selectAll   = document.getElementById( 'h2wp-select-all-monitored' );
 			var bulkBtn     = document.getElementById( 'h2wp-bulk-remove-btn' );
 			var updateBulkBtn = function() {
@@ -347,7 +361,7 @@ class H2WP_Settings {
 					updateBulkBtn();
 				} );
 			}
-			// Individual remove buttons — use the shared hidden form to avoid nested forms
+			// Individual remove buttons use the shared hidden form to avoid nested forms.
 			document.querySelectorAll( '.h2wp-single-remove-btn' ).forEach( function( btn ) {
 				btn.addEventListener( 'click', function() {
 					var repoKey    = this.getAttribute( 'data-repo-key' );
@@ -446,6 +460,10 @@ class H2WP_Settings {
 								<input type="checkbox" id="h2wp_theme_prioritize_releases" name="h2wp_theme_prioritize_releases" value="1" checked="checked" />
 								<?php esc_html_e( 'Prioritize releases', 'hub2wp' ); ?>
 							</label>
+							<label for="h2wp_scan_theme_monorepo" style="margin-right:8px;display:inline-flex;align-items:center;gap:2px;">
+								<input type="checkbox" id="h2wp_scan_theme_monorepo" value="1" />
+								<?php esc_html_e( 'Scan as monorepo', 'hub2wp' ); ?>
+							</label>
 							<button type="submit" class="button button-secondary">
 								<?php esc_html_e( 'Add Repository', 'hub2wp' ); ?>
 							</button>
@@ -464,60 +482,64 @@ class H2WP_Settings {
 			</form>
 
 			<?php if ( ! empty( $monitored_themes ) ) : ?>
-                <h3><?php esc_html_e( 'Monitored Themes', 'hub2wp' ); ?></h3>
-                <form method="post" action="" id="h2wp-single-remove-theme-form" style="display:none;">
-                    <?php wp_nonce_field( 'h2wp_remove_private_theme_repo', 'h2wp_remove_theme_repo_nonce' ); ?>
-                    <input type="hidden" name="h2wp_action" value="remove_private_theme_repo" />
-                    <input type="hidden" name="h2wp_repo_key" id="h2wp-single-remove-theme-key" value="" />
-                </form>
-                <form method="post" action="" id="h2wp-bulk-remove-theme-form">
-                    <?php wp_nonce_field( 'h2wp_bulk_remove_theme_repos', 'h2wp_bulk_remove_theme_nonce' ); ?>
-                    <input type="hidden" name="h2wp_action" value="bulk_remove_theme_repos" />
-                    <div class="tablenav top" style="margin-bottom:6px;">
-                        <div class="alignleft actions">
-                            <button type="submit" id="h2wp-bulk-remove-theme-btn" class="button" disabled
-                                onclick="return confirm('<?php echo esc_js( __( 'Stop monitoring the selected theme repositories?', 'hub2wp' ) ); ?>');">
-                                <?php esc_html_e( 'Remove Selected', 'hub2wp' ); ?>
-                            </button>
-                        </div>
-                    </div>
-                    <table class="wp-list-table widefat fixed striped">
-                        <thead>
-                            <tr>
-                                <th scope="col" class="manage-column column-cb check-column" style="padding: 18px 3px 17px;">
-                                    <input type="checkbox" id="h2wp-select-all-monitored-themes" />
-                                </th>
-                                <th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
-                                <th style="width:100px;max-width:100px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
-                                <th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ( $monitored_themes as $repo_data ) : ?>
-                                <?php $repo_key = isset( $repo_data['repo'] ) ? $repo_data['repo'] : ''; ?>
-                                <tr>
-                                    <th scope="row" class="check-column">
-                                        <input type="checkbox" name="h2wp_repo_keys[]"
-                                            value="<?php echo esc_attr( $repo_key ); ?>"
-                                            class="h2wp-monitored-theme-cb" />
-                                    </th>
-                                    <td>
-                                        <strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
-                                        <br />
-                                        <small>
-                                            <a href="<?php echo esc_url( 'https://github.com/' . $repo_key ); ?>" target="_blank">
-                                                <?php echo esc_html( $repo_key ); ?>
-                                            </a><?php if ( ! empty( $repo_data['branch'] ) ) : ?> (<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
-                                            <?php if ( array_key_exists( 'prioritize_releases', $repo_data ) && empty( $repo_data['prioritize_releases'] ) ) : ?>
-                                                &mdash; <?php esc_html_e( 'branch only', 'hub2wp' ); ?>
-                                            <?php endif; ?>
-                                            <?php if ( ! empty( $repo_data['stylesheet'] ) ) : ?>
-                                                &rarr; <code><?php echo esc_html( $repo_data['stylesheet'] ); ?></code>
-                                            <?php endif; ?>
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <?php
+				<h3><?php esc_html_e( 'Monitored Themes', 'hub2wp' ); ?></h3>
+				<form method="post" action="" id="h2wp-single-remove-theme-form" style="display:none;">
+					<?php wp_nonce_field( 'h2wp_remove_private_theme_repo', 'h2wp_remove_theme_repo_nonce' ); ?>
+					<input type="hidden" name="h2wp_action" value="remove_private_theme_repo" />
+					<input type="hidden" name="h2wp_repo_key" id="h2wp-single-remove-theme-key" value="" />
+				</form>
+				<form method="post" action="" id="h2wp-bulk-remove-theme-form">
+					<?php wp_nonce_field( 'h2wp_bulk_remove_theme_repos', 'h2wp_bulk_remove_theme_nonce' ); ?>
+					<input type="hidden" name="h2wp_action" value="bulk_remove_theme_repos" />
+					<div class="tablenav top" style="margin-bottom:6px;">
+						<div class="alignleft actions">
+							<button type="submit" id="h2wp-bulk-remove-theme-btn" class="button" disabled
+								onclick="return confirm('<?php echo esc_js( __( 'Stop monitoring the selected theme repositories?', 'hub2wp' ) ); ?>');">
+								<?php esc_html_e( 'Remove Selected', 'hub2wp' ); ?>
+							</button>
+						</div>
+					</div>
+					<table class="wp-list-table widefat fixed striped">
+						<thead>
+							<tr>
+								<th scope="col" class="manage-column column-cb check-column" style="padding: 18px 3px 17px;">
+									<input type="checkbox" id="h2wp-select-all-monitored-themes" />
+								</th>
+								<th><?php esc_html_e( 'Repository', 'hub2wp' ); ?></th>
+								<th style="width:100px;max-width:100px;"><?php esc_html_e( 'Status', 'hub2wp' ); ?></th>
+								<th style="width:80px;max-width:80px;"><?php esc_html_e( 'Actions', 'hub2wp' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $monitored_themes as $repo_data ) : ?>
+								<?php $repo_key = isset( $repo_data['repo'] ) ? $repo_data['repo'] : ''; ?>
+								<tr>
+									<th scope="row" class="check-column">
+										<input type="checkbox" name="h2wp_repo_keys[]"
+											value="<?php echo esc_attr( $repo_key ); ?>"
+											class="h2wp-monitored-theme-cb" />
+									</th>
+									<td>
+										<strong><?php echo esc_html( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo_key ); ?></strong>
+										<br />
+										<small>
+											<a href="<?php echo esc_url( isset( $repo_data['github_url'] ) ? $repo_data['github_url'] : '' ); ?>" target="_blank" rel="noopener noreferrer">
+												<?php echo esc_html( $repo_key ); ?>
+											</a>
+											<?php
+											if ( ! empty( $repo_data['branch'] ) ) :
+												?>
+												(<?php echo esc_html( $repo_data['branch'] ); ?>)<?php endif; ?>
+											<?php if ( array_key_exists( 'prioritize_releases', $repo_data ) && empty( $repo_data['prioritize_releases'] ) ) : ?>
+												&mdash; <?php esc_html_e( 'branch only', 'hub2wp' ); ?>
+											<?php endif; ?>
+											<?php if ( ! empty( $repo_data['stylesheet'] ) ) : ?>
+												&rarr; <code><?php echo esc_html( $repo_data['stylesheet'] ); ?></code>
+											<?php endif; ?>
+										</small>
+									</td>
+									<td>
+										<?php
 										if ( ! empty( $repo_data['installed'] ) ) {
 											esc_html_e( 'Installed', 'hub2wp' );
 										} else {
@@ -527,21 +549,21 @@ class H2WP_Settings {
 											echo '<span class="dashicons dashicons-lock" title="' . esc_attr__( 'Private Repository', 'hub2wp' ) . '" style="font-size:14px;width:14px;height:16px;vertical-align:middle;margin-left:3px;"></span>';
 										}
 										?>
-                                    </td>
-                                    <td>
-                                        <button type="button"
-                                            class="button button-small h2wp-single-remove-theme-btn"
-                                            data-repo-key="<?php echo esc_attr( $repo_key ); ?>"
-                                            data-confirm="<?php echo esc_js( sprintf( __( 'Stop monitoring "%s"?', 'hub2wp' ), $repo_key ) ); ?>">
-                                            <?php esc_html_e( 'Remove', 'hub2wp' ); ?>
-                                        </button>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </form>
-            <?php else : ?>
+									</td>
+									<td>
+										<button type="button"
+											class="button button-small h2wp-single-remove-theme-btn"
+											data-repo-key="<?php echo esc_attr( $repo_key ); ?>"
+										data-confirm="<?php /* translators: %s: Repository key. */ echo esc_attr( sprintf( __( 'Stop monitoring "%s"?', 'hub2wp' ), $repo_key ) ); ?>">
+											<?php esc_html_e( 'Remove', 'hub2wp' ); ?>
+										</button>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				</form>
+			<?php else : ?>
 				<p class="description">
 					<?php esc_html_e( 'No theme repositories added yet.', 'hub2wp' ); ?>
 				</p>
@@ -554,7 +576,7 @@ class H2WP_Settings {
 			var label   = document.getElementById( 'h2wp-toggle-monitored-themes-label' );
 			var icon    = btn ? btn.querySelector( '.dashicons' ) : null;
 			if ( ! btn || ! content ) { return; }
-			// Individual remove
+			// Individual remove.
 			document.querySelectorAll( '.h2wp-single-remove-theme-btn' ).forEach( function( btn ) {
 				btn.addEventListener( 'click', function() {
 					var repoKey    = this.getAttribute( 'data-repo-key' );
@@ -565,7 +587,7 @@ class H2WP_Settings {
 				} );
 			} );
 
-			// Bulk remove select all
+			// Bulk remove select all.
 			var selectAllThemes = document.getElementById( 'h2wp-select-all-monitored-themes' );
 			var bulkThemeBtn    = document.getElementById( 'h2wp-bulk-remove-theme-btn' );
 			var updateBulkThemeBtn = function() {
@@ -621,16 +643,21 @@ class H2WP_Settings {
 	 * @param string $repo         Repository name.
 	 * @param string $branch       Optional branch.
 	 * @param bool   $prioritize   Whether to prioritize releases.
-	 * @param string $subdirectory Subdirectory path for monorepo plugins (empty for single repos).
+	 * @param string $subdirectory Subdirectory path for a monorepo project (empty for single repos).
+	 * @param string $repo_type    Repository type: plugin|theme.
 	 * @return string|WP_Error     The stored repo key on success, WP_Error on failure.
 	 */
 	public static function add_repo_to_monitored( $owner, $repo, $branch = '', $prioritize = true, $subdirectory = '', $repo_type = 'plugin' ) {
-		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$repo_type    = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
 		$owner        = strtolower( sanitize_text_field( trim( (string) $owner ) ) );
 		$repo         = strtolower( sanitize_text_field( trim( (string) $repo ) ) );
-		$subdirectory = trim( sanitize_text_field( (string) $subdirectory ), '/' );
+		$subdirectory = self::normalize_subdirectory( $subdirectory );
 
-		if ( empty( $owner ) || empty( $repo ) ) {
+		if ( is_wp_error( $subdirectory ) ) {
+			return $subdirectory;
+		}
+
+		if ( ! self::validate_repo_format( $owner . '/' . $repo ) ) {
 			return new WP_Error( 'h2wp_invalid_repo', __( 'Invalid repository owner or name.', 'hub2wp' ) );
 		}
 
@@ -642,23 +669,24 @@ class H2WP_Settings {
 			return $repo_data;
 		}
 
-		// Monorepo plugins get owner/repo/slug as their key to avoid collisions
-		$repo_key = ! empty( $subdirectory )
-			? $owner . '/' . $repo . '/' . basename( $subdirectory )
-			: $owner . '/' . $repo;
+		$repo_key = self::get_tracked_repo_key( $owner, $repo, $subdirectory );
+		if ( is_wp_error( $repo_key ) ) {
+			return $repo_key;
+		}
 
 		$option_name       = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
-        $monitored_plugins = get_option( $option_name, array() );
+		$monitored_plugins = self::get_monitored_repositories( $repo_type );
 
-        if ( isset( $monitored_plugins[ $repo_key ] ) ) {
+		$existing_key = self::find_tracked_repo_key( $monitored_plugins, $owner, $repo, $subdirectory );
+		if ( '' !== $existing_key ) {
 			return new WP_Error(
 				'h2wp_repo_exists',
 				// Translators: %s is the repository key.
-				sprintf( __( 'Repository "%s" is already in your monitored plugins list.', 'hub2wp' ), $repo_key )
+				sprintf( __( 'Repository project "%s" is already being monitored.', 'hub2wp' ), $repo_key )
 			);
 		}
 
-		// For monorepo entries the installed folder matches the slug, not the repo name
+		// For monorepo entries, the installed folder matches the slug, not the repo name.
 		$lookup_slug = ! empty( $subdirectory ) ? basename( $subdirectory ) : $repo;
 		$plugin_file = false;
 		$stylesheet  = false;
@@ -674,6 +702,7 @@ class H2WP_Settings {
 		$entry = array(
 			'owner'               => $owner,
 			'repo'                => $repo,
+			'repo_type'           => $repo_type,
 			'name'                => ! empty( $subdirectory ) ? basename( $subdirectory ) : ( isset( $repo_data['name'] ) ? $repo_data['name'] : $repo ),
 			'private'             => isset( $repo_data['private'] ) ? (bool) $repo_data['private'] : false,
 			'branch'              => (string) $branch,
@@ -706,15 +735,15 @@ class H2WP_Settings {
 	 */
 	public static function handle_private_repo_actions() {
 		// Verify at least one of the expected nonces before reading any POST data.
-		$add_nonce_valid    = isset( $_POST['h2wp_private_repo_nonce'] )
+		$add_nonce_valid               = isset( $_POST['h2wp_private_repo_nonce'] )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo_nonce'] ) ), 'h2wp_add_private_repo' );
-		$remove_nonce_valid = isset( $_POST['h2wp_remove_repo_nonce'] )
+		$remove_nonce_valid            = isset( $_POST['h2wp_remove_repo_nonce'] )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_remove_repo_nonce'] ) ), 'h2wp_remove_private_repo' );
-		$add_theme_nonce_valid = isset( $_POST['h2wp_private_theme_repo_nonce'] )
+		$add_theme_nonce_valid         = isset( $_POST['h2wp_private_theme_repo_nonce'] )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo_nonce'] ) ), 'h2wp_add_private_theme_repo' );
-		$remove_theme_nonce_valid = isset( $_POST['h2wp_remove_theme_repo_nonce'] )
+		$remove_theme_nonce_valid      = isset( $_POST['h2wp_remove_theme_repo_nonce'] )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_remove_theme_repo_nonce'] ) ), 'h2wp_remove_private_theme_repo' );
-		$bulk_remove_nonce_valid = isset( $_POST['h2wp_bulk_remove_nonce'] )
+		$bulk_remove_nonce_valid       = isset( $_POST['h2wp_bulk_remove_nonce'] )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_bulk_remove_nonce'] ) ), 'h2wp_bulk_remove_repos' );
 		$bulk_remove_theme_nonce_valid = isset( $_POST['h2wp_bulk_remove_theme_nonce'] )
 			&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['h2wp_bulk_remove_theme_nonce'] ) ), 'h2wp_bulk_remove_theme_repos' );
@@ -764,8 +793,8 @@ class H2WP_Settings {
 		wp_safe_redirect(
 			add_query_arg(
 				array(
-					'page'                  => 'h2wp_settings_page',
-					'h2wp_update_checked'   => '1',
+					'page'                    => 'h2wp_settings_page',
+					'h2wp_update_checked'     => '1',
 					'h2wp_update_check_nonce' => wp_create_nonce( 'h2wp_update_checked' ),
 				),
 				admin_url( 'options-general.php' )
@@ -808,11 +837,11 @@ class H2WP_Settings {
 			return;
 		}
 
-		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo'] ) );
-		$branch = isset( $_POST['h2wp_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_branch'] ) ) : '';
+		$repo_input          = sanitize_text_field( wp_unslash( $_POST['h2wp_private_repo'] ) );
+		$branch              = isset( $_POST['h2wp_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_branch'] ) ) : '';
 		$prioritize_releases = isset( $_POST['h2wp_prioritize_releases'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['h2wp_prioritize_releases'] ) );
 
-		// Validate format: owner/repo
+		// Validate format: owner/repo.
 		if ( ! self::validate_repo_format( $repo_input ) ) {
 			add_settings_error(
 				'h2wp_private_repos',
@@ -823,68 +852,15 @@ class H2WP_Settings {
 			return;
 		}
 
-		// Normalize to lowercase
-		$repo_key = strtolower( $repo_input );
-
-		// Check if already exists
-		$monitored_plugins = get_option( 'h2wp_plugins', array() );
-		if ( isset( $monitored_plugins[ $repo_key ] ) ) {
-			add_settings_error(
-				'h2wp_private_repos',
-				'h2wp_repo_exists',
-				// Translators: %s is the repository name (owner/repo).
-				sprintf( __( 'Repository "%s" is already in your monitored plugins list.', 'hub2wp' ), $repo_key ),
-				'warning'
-			);
-			return;
-		}
-
-		$access_token = self::get_access_token();
-
-		// Verify the repository exists and is accessible
-		$repo_data = self::verify_repo( $repo_key, $access_token );
-		if ( is_wp_error( $repo_data ) ) {
-			add_settings_error(
-				'h2wp_private_repos',
-				'h2wp_verification_failed',
-				$repo_data->get_error_message(),
-				'error'
-			);
-			return;
-		}
-
-		// Add the repository
+		$repo_key             = strtolower( $repo_input );
 		list( $owner, $repo ) = explode( '/', $repo_key, 2 );
-		
-		$plugin_file = false;
-		if ( class_exists( 'H2WP_Admin_Page' ) ) {
-			$plugin_file = H2WP_Admin_Page::get_installed_plugin_file( $owner, $repo );
-		}
-
-		$monitored_plugins[ $repo_key ] = array(
-			'owner'            => $owner,
-			'repo'             => $repo,
-			'name'             => isset( $repo_data['name'] ) ? $repo_data['name'] : $repo,
-			'private'          => isset( $repo_data['private'] ) ? $repo_data['private'] : false,
-			'branch'           => $branch,
-			'prioritize_releases' => $prioritize_releases,
-			'added'            => time(),
-			'added_by'         => get_current_user_id(),
-			'last_checked'     => time(),
-			'last_updated'     => time(),
-		);
-
-		if ( $plugin_file ) {
-			$monitored_plugins[ $repo_key ]['plugin_file'] = $plugin_file;
-		}
-
-		$result = update_option( 'h2wp_plugins', $monitored_plugins );
-		if ( ! $result ) {
+		$result               = self::add_repo_to_monitored( $owner, $repo, $branch, $prioritize_releases, '', 'plugin' );
+		if ( is_wp_error( $result ) ) {
 			add_settings_error(
 				'h2wp_private_repos',
-				'h2wp_add_failed',
-				__( 'Failed to save repository. Please try again.', 'hub2wp' ),
-				'error'
+				$result->get_error_code(),
+				$result->get_error_message(),
+				'h2wp_repo_exists' === $result->get_error_code() ? 'warning' : 'error'
 			);
 			return;
 		}
@@ -934,7 +910,7 @@ class H2WP_Settings {
 
 		$repo_key = sanitize_text_field( wp_unslash( $_POST['h2wp_repo_key'] ) );
 
-		$monitored_plugins = get_option( 'h2wp_plugins', array() );
+		$monitored_plugins = self::get_monitored_repositories( 'plugin' );
 		if ( ! isset( $monitored_plugins[ $repo_key ] ) ) {
 			add_settings_error(
 				'h2wp_private_repos',
@@ -985,55 +961,23 @@ class H2WP_Settings {
 			return;
 		}
 
-		$repo_input = sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo'] ) );
-		$branch = isset( $_POST['h2wp_theme_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_theme_branch'] ) ) : '';
+		$repo_input          = sanitize_text_field( wp_unslash( $_POST['h2wp_private_theme_repo'] ) );
+		$branch              = isset( $_POST['h2wp_theme_branch'] ) ? sanitize_text_field( wp_unslash( $_POST['h2wp_theme_branch'] ) ) : '';
 		$prioritize_releases = isset( $_POST['h2wp_theme_prioritize_releases'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['h2wp_theme_prioritize_releases'] ) );
 		if ( ! self::validate_repo_format( $repo_input ) ) {
 			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_invalid_format', __( 'Invalid repository format. Please use "owner/repo" format.', 'hub2wp' ), 'error' );
 			return;
 		}
 
-		$repo_key          = strtolower( $repo_input );
-		$monitored_themes  = get_option( 'h2wp_themes', array() );
-		if ( isset( $monitored_themes[ $repo_key ] ) ) {
-			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_repo_exists', sprintf( __( 'Repository "%s" is already in your monitored themes list.', 'hub2wp' ), $repo_key ), 'warning' );
-			return;
-		}
-
-		$repo_data = self::verify_repo( $repo_key, self::get_access_token() );
-		if ( is_wp_error( $repo_data ) ) {
-			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_verification_failed', $repo_data->get_error_message(), 'error' );
-			return;
-		}
-
+		$repo_key             = strtolower( $repo_input );
 		list( $owner, $repo ) = explode( '/', $repo_key, 2 );
-		$stylesheet = false;
-		if ( class_exists( 'H2WP_Admin_Page' ) ) {
-			$stylesheet = H2WP_Admin_Page::get_installed_theme_stylesheet( $owner, $repo );
-		}
-
-		$monitored_themes[ $repo_key ] = array(
-			'owner'        => $owner,
-			'repo'         => $repo,
-			'name'         => isset( $repo_data['name'] ) ? $repo_data['name'] : $repo,
-			'private'      => isset( $repo_data['private'] ) ? $repo_data['private'] : false,
-			'branch'       => $branch,
-			'prioritize_releases' => $prioritize_releases,
-			'added'        => time(),
-			'added_by'     => get_current_user_id(),
-			'last_checked' => time(),
-			'last_updated' => time(),
-		);
-
-		if ( $stylesheet ) {
-			$monitored_themes[ $repo_key ]['stylesheet'] = $stylesheet;
-		}
-
-		if ( ! update_option( 'h2wp_themes', $monitored_themes ) ) {
-			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_add_failed', __( 'Failed to save theme repository. Please try again.', 'hub2wp' ), 'error' );
+		$result               = self::add_repo_to_monitored( $owner, $repo, $branch, $prioritize_releases, '', 'theme' );
+		if ( is_wp_error( $result ) ) {
+			add_settings_error( 'h2wp_theme_repos', $result->get_error_code(), $result->get_error_message(), 'h2wp_repo_exists' === $result->get_error_code() ? 'warning' : 'error' );
 			return;
 		}
 
+		/* translators: %s: Repository name in owner/repo format. */
 		add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_repo_added', sprintf( __( 'Theme repository "%s" has been added successfully.', 'hub2wp' ), $repo_key ), 'success' );
 	}
 
@@ -1055,8 +999,9 @@ class H2WP_Settings {
 		}
 
 		$repo_key         = sanitize_text_field( wp_unslash( $_POST['h2wp_repo_key'] ) );
-		$monitored_themes = get_option( 'h2wp_themes', array() );
+		$monitored_themes = self::get_monitored_repositories( 'theme' );
 		if ( ! isset( $monitored_themes[ $repo_key ] ) ) {
+			/* translators: %s: Repository name in owner/repo format. */
 			add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_remove_missing', sprintf( __( 'Theme repository "%s" not found.', 'hub2wp' ), $repo_key ), 'error' );
 			return;
 		}
@@ -1067,6 +1012,7 @@ class H2WP_Settings {
 			return;
 		}
 
+		/* translators: %s: Repository name in owner/repo format. */
 		add_settings_error( 'h2wp_theme_repos', 'h2wp_theme_repo_removed', sprintf( __( 'Theme repository "%s" has been removed.', 'hub2wp' ), $repo_key ), 'success' );
 	}
 
@@ -1090,13 +1036,13 @@ class H2WP_Settings {
 		}
 
 		$repo_keys         = array_map( 'sanitize_text_field', wp_unslash( $_POST['h2wp_repo_keys'] ) );
-		$monitored_plugins = get_option( 'h2wp_plugins', array() );
+		$monitored_plugins = self::get_monitored_repositories( 'plugin' );
 		$removed           = 0;
 
 		foreach ( $repo_keys as $repo_key ) {
 			if ( isset( $monitored_plugins[ $repo_key ] ) ) {
 				unset( $monitored_plugins[ $repo_key ] );
-				$removed++;
+				++$removed;
 			}
 		}
 
@@ -1132,13 +1078,13 @@ class H2WP_Settings {
 		}
 
 		$repo_keys        = array_map( 'sanitize_text_field', wp_unslash( $_POST['h2wp_repo_keys'] ) );
-		$monitored_themes = get_option( 'h2wp_themes', array() );
+		$monitored_themes = self::get_monitored_repositories( 'theme' );
 		$removed          = 0;
 
 		foreach ( $repo_keys as $repo_key ) {
 			if ( isset( $monitored_themes[ $repo_key ] ) ) {
 				unset( $monitored_themes[ $repo_key ] );
-				$removed++;
+				++$removed;
 			}
 		}
 
@@ -1148,6 +1094,7 @@ class H2WP_Settings {
 			'h2wp_theme_repos',
 			'h2wp_bulk_theme_removed',
 			sprintf(
+				/* translators: %d: Number of repositories removed. */
 				_n( '%d theme repository removed from monitoring.', '%d theme repositories removed from monitoring.', $removed, 'hub2wp' ),
 				$removed
 			),
@@ -1203,7 +1150,7 @@ class H2WP_Settings {
 	 * Display notices for private repository actions.
 	 */
 	public static function display_private_repo_notices() {
-		// Only show on our settings page
+		// Only show on our settings page.
 		$screen = get_current_screen();
 		if ( ! $screen || 'settings_page_h2wp_settings_page' !== $screen->id ) {
 			return;
@@ -1229,7 +1176,7 @@ class H2WP_Settings {
 	}
 
 	/**
-	 * Display a success notice after monorepo plugins are added via AJAX redirect.
+	 * Display a success notice after monorepo projects are added via AJAX redirect.
 	 */
 	public static function display_plugins_added_notice() {
 		if ( ! isset( $_GET['page'] ) || 'h2wp_settings_page' !== sanitize_key( $_GET['page'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -1238,18 +1185,22 @@ class H2WP_Settings {
 		if ( empty( $_GET['h2wp_added'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
 		}
-		$count = absint( $_GET['h2wp_added'] );
+		$count = absint( $_GET['h2wp_added'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only admin notice.
 		if ( ! $count ) {
 			return;
 		}
+		$repo_type = isset( $_GET['h2wp_added_type'] ) ? sanitize_key( wp_unslash( $_GET['h2wp_added_type'] ) ) : 'plugin'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$is_theme  = 'theme' === $repo_type;
+		if ( $is_theme ) {
+			/* translators: %d: Number of themes added. */
+			$message = _n( '%d theme added to monitoring successfully.', '%d themes added to monitoring successfully.', $count, 'hub2wp' );
+		} else {
+			/* translators: %d: Number of plugins added. */
+			$message = _n( '%d plugin added to monitoring successfully.', '%d plugins added to monitoring successfully.', $count, 'hub2wp' );
+		}
+
 		echo '<div class="notice notice-success is-dismissible"><p>';
-		echo esc_html(
-			sprintf(
-				// Translators: %d is the number of plugins added.
-				_n( '%d plugin added to monitoring successfully.', '%d plugins added to monitoring successfully.', $count, 'hub2wp' ),
-				$count
-			)
-		);
+		echo esc_html( sprintf( $message, $count ) );
 		echo '</p></div>';
 	}
 
@@ -1260,9 +1211,9 @@ class H2WP_Settings {
 	 * @return bool True if valid, false otherwise.
 	 */
 	public static function validate_repo_format( $repo ) {
-		// Format: owner/repo where both parts contain only allowed characters
-		// GitHub usernames/repos can contain alphanumeric, hyphens, underscores
-		// but cannot start or end with hyphens
+		// Format: owner/repo where both parts contain only allowed characters.
+		// GitHub usernames/repos can contain alphanumeric, hyphens, and underscores,
+		// but cannot start or end with hyphens.
 		$pattern = '/^[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/';
 		return preg_match( $pattern, $repo ) === 1;
 	}
@@ -1323,7 +1274,7 @@ class H2WP_Settings {
 			$body = wp_remote_retrieve_body( $response );
 			$data = json_decode( $body, true );
 
-			if ( isset( $data['message'] ) && strpos( $data['message'], 'rate limit' ) !== false ) {
+			if ( isset( $data['message'] ) && is_string( $data['message'] ) && false !== strpos( $data['message'], 'rate limit' ) ) {
 				return new WP_Error(
 					'rate_limited',
 					__( 'GitHub API rate limit exceeded. Please wait a few minutes before trying again.', 'hub2wp' )
@@ -1345,16 +1296,26 @@ class H2WP_Settings {
 		}
 
 		$body = wp_remote_retrieve_body( $response );
-		return json_decode( $body, true );
+		$data = json_decode( $body, true );
+		if ( ! is_array( $data ) ) {
+			return new WP_Error( 'invalid_response', __( 'GitHub returned an invalid repository response.', 'hub2wp' ) );
+		}
+
+		return $data;
 	}
 
+	/**
+	 * Render the next scheduled update-check time.
+	 *
+	 * @return void
+	 */
 	public static function next_run_schedule() {
 		?>
 		<p>
 			<?php
 			$next_check = wp_next_scheduled( 'h2wp_daily_update_check' );
 			printf(
-				// translators: %s: human-readable time difference (e.g. "1 hour"), %s: link to run the update check, %d: number of API calls
+				/* translators: 1: Human-readable time difference, 2: Link to run the update check, 3: Number of API calls. */
 				esc_html__( 'The daily update check is scheduled to run in %1$s. %2$s (note: the GitHub API will be called %3$d times).', 'hub2wp' ),
 				'<span>' . esc_html( $next_check ? human_time_diff( time(), $next_check ) : __( 'less than 1 minute', 'hub2wp' ) ) . '</span>',
 				sprintf(
@@ -1362,7 +1323,7 @@ class H2WP_Settings {
 					esc_html( wp_nonce_url( admin_url( 'options-general.php?page=h2wp_settings_page&action=h2wp_run_update_check' ), 'h2wp_run_update_check' ) ),
 					esc_html__( 'Run now', 'hub2wp' )
 				),
-				count( get_option( 'h2wp_plugins', array() ) ) + count( get_option( 'h2wp_themes', array() ) )
+				count( self::get_monitored_repositories( 'plugin' ) ) + count( self::get_monitored_repositories( 'theme' ) )
 			);
 			?>
 		</p>
@@ -1374,16 +1335,19 @@ class H2WP_Settings {
 	 */
 	public static function access_token_field() {
 		$options      = get_option( self::OPTION_NAME, array() );
+		$options      = is_array( $options ) ? $options : array();
 		$access_token = isset( $options['access_token'] ) ? $options['access_token'] : '';
 		?>
 		<input type="password" name="h2wp_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
 		<p class="description">
 			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'hub2wp' ); ?>
-			<?php printf(
+			<?php
+			printf(
 				/* translators: %s: URL to create a personal access token */
 				esc_html__( 'Get a free token from %s.', 'hub2wp' ),
 				'<a href="https://github.com/settings/tokens" target="_blank">GitHub</a>'
-			); ?>
+			);
+			?>
 		</p>
 		<?php
 	}
@@ -1392,8 +1356,9 @@ class H2WP_Settings {
 	 * Cache duration field callback.
 	 */
 	public static function cache_duration_field() {
-		$options         = get_option( self::OPTION_NAME, array() );
-		$cache_duration  = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
+		$options        = get_option( self::OPTION_NAME, array() );
+		$options        = is_array( $options ) ? $options : array();
+		$cache_duration = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
 		?>
 		<input type="number" name="h2wp_settings[cache_duration]" value="<?php echo esc_attr( $cache_duration ); ?>" min="1" />
 		<p class="description"><?php esc_html_e( 'How long to cache search results and plugin data in hours.', 'hub2wp' ); ?></p>
@@ -1407,6 +1372,7 @@ class H2WP_Settings {
 	 * @return array Sanitized options.
 	 */
 	public static function sanitize_settings( $input ) {
+		$input  = is_array( $input ) ? $input : array();
 		$output = array();
 
 		if ( isset( $input['access_token'] ) ) {
@@ -1427,6 +1393,7 @@ class H2WP_Settings {
 	 */
 	public static function get_access_token() {
 		$options = get_option( self::OPTION_NAME, array() );
+		$options = is_array( $options ) ? $options : array();
 		return isset( $options['access_token'] ) ? $options['access_token'] : '';
 	}
 
@@ -1437,8 +1404,173 @@ class H2WP_Settings {
 	 */
 	public static function get_cache_duration() {
 		$options = get_option( self::OPTION_NAME, array() );
+		$options = is_array( $options ) ? $options : array();
 		$hours   = isset( $options['cache_duration'] ) ? (int) $options['cache_duration'] : 12;
+		$hours   = $hours > 0 ? $hours : 12;
 		return $hours * HOUR_IN_SECONDS;
+	}
+
+	/**
+	 * Read monitored repository records defensively.
+	 *
+	 * @param string $repo_type Repository type: plugin|theme.
+	 * @return array Tracked records.
+	 */
+	public static function get_monitored_repositories( $repo_type = 'plugin' ) {
+		$option_name = 'theme' === $repo_type ? 'h2wp_themes' : 'h2wp_plugins';
+		$monitored   = get_option( $option_name, array() );
+
+		return is_array( $monitored ) ? $monitored : array();
+	}
+
+	/**
+	 * Normalize and validate a repository subdirectory.
+	 *
+	 * GitHub paths are always forward-slash separated relative paths. Reject dot
+	 * segments and empty path components before a value is used in an option key,
+	 * API request, or filesystem path.
+	 *
+	 * @param mixed $subdirectory Candidate subdirectory.
+	 * @return string|WP_Error Normalized path, an empty string, or an error.
+	 */
+	public static function normalize_subdirectory( $subdirectory ) {
+		if ( null === $subdirectory ) {
+			return '';
+		}
+		if ( ! is_string( $subdirectory ) && ! is_numeric( $subdirectory ) ) {
+			return new WP_Error( 'h2wp_invalid_subdirectory', __( 'Invalid repository subdirectory.', 'hub2wp' ) );
+		}
+
+		$subdirectory = str_replace( '\\', '/', trim( (string) $subdirectory ) );
+		$subdirectory = trim( $subdirectory, '/' );
+
+		if ( '' === $subdirectory ) {
+			return '';
+		}
+
+		$segments = explode( '/', $subdirectory );
+		foreach ( $segments as $segment ) {
+			if (
+				'' === $segment ||
+				'.' === $segment ||
+				'..' === $segment ||
+				false !== strpos( $segment, "\0" ) ||
+				preg_match( '/[\x00-\x1F\x7F]/', $segment )
+			) {
+				return new WP_Error( 'h2wp_invalid_subdirectory', __( 'Invalid repository subdirectory.', 'hub2wp' ) );
+			}
+		}
+
+		return implode( '/', $segments );
+	}
+
+	/**
+	 * Build the canonical option key for a tracked repository project.
+	 *
+	 * The complete subdirectory is preserved so two projects with the same leaf
+	 * directory name do not collide.
+	 *
+	 * @param string $owner        Repository owner.
+	 * @param string $repo         Repository name.
+	 * @param string $subdirectory Optional project subdirectory.
+	 * @return string|WP_Error Canonical key or an error.
+	 */
+	public static function get_tracked_repo_key( $owner, $repo, $subdirectory = '' ) {
+		$owner        = strtolower( sanitize_text_field( trim( (string) $owner ) ) );
+		$repo         = strtolower( sanitize_text_field( trim( (string) $repo ) ) );
+		$subdirectory = self::normalize_subdirectory( $subdirectory );
+
+		if ( is_wp_error( $subdirectory ) || ! self::validate_repo_format( $owner . '/' . $repo ) ) {
+			return new WP_Error( 'h2wp_invalid_repository', __( 'A valid GitHub repository and subdirectory are required.', 'hub2wp' ) );
+		}
+
+		$repo_key = $owner . '/' . $repo;
+		return '' === $subdirectory ? $repo_key : $repo_key . '/' . $subdirectory;
+	}
+
+	/**
+	 * Resolve a tracked record's repository identity without relying on its key.
+	 *
+	 * Stored owner/repo fields are authoritative. Parsing the first two key
+	 * components is retained only for legacy records.
+	 *
+	 * @param string $repo_key  Stored option key.
+	 * @param array  $repo_data Stored record.
+	 * @return array|WP_Error Identity containing owner, repo, and subdirectory.
+	 */
+	public static function get_tracked_repo_identity( $repo_key, $repo_data ) {
+		$repo_data  = is_array( $repo_data ) ? $repo_data : array();
+		$parts      = explode( '/', trim( (string) $repo_key, '/' ) );
+		$owner      = ! empty( $repo_data['owner'] ) ? $repo_data['owner'] : ( isset( $parts[0] ) ? $parts[0] : '' );
+		$repo       = ! empty( $repo_data['repo'] ) ? $repo_data['repo'] : ( isset( $parts[1] ) ? $parts[1] : '' );
+		$key_subdir = count( $parts ) > 2 ? implode( '/', array_slice( $parts, 2 ) ) : '';
+		$subdir     = array_key_exists( 'subdirectory', $repo_data ) ? self::normalize_subdirectory( $repo_data['subdirectory'] ) : self::normalize_subdirectory( $key_subdir );
+
+		$owner = strtolower( sanitize_text_field( trim( (string) $owner ) ) );
+		$repo  = strtolower( sanitize_text_field( trim( (string) $repo ) ) );
+		if ( is_wp_error( $subdir ) || ! self::validate_repo_format( $owner . '/' . $repo ) ) {
+			return new WP_Error( 'h2wp_invalid_tracked_repository', __( 'Invalid tracked repository data.', 'hub2wp' ) );
+		}
+
+		return array(
+			'owner'        => $owner,
+			'repo'         => $repo,
+			'subdirectory' => $subdir,
+		);
+	}
+
+	/**
+	 * Find a canonical or legacy option key for a tracked repository project.
+	 *
+	 * @param array  $monitored    Tracked option value.
+	 * @param string $owner        Repository owner.
+	 * @param string $repo         Repository name.
+	 * @param string $subdirectory Optional project subdirectory.
+	 * @return string Empty when no matching record exists.
+	 */
+	public static function find_tracked_repo_key( $monitored, $owner, $repo, $subdirectory = '' ) {
+		$monitored = is_array( $monitored ) ? $monitored : array();
+		$canonical = self::get_tracked_repo_key( $owner, $repo, $subdirectory );
+		if ( is_wp_error( $canonical ) ) {
+			return '';
+		}
+
+		if ( isset( $monitored[ $canonical ] ) ) {
+			return $canonical;
+		}
+
+		$normalized_subdir = self::normalize_subdirectory( $subdirectory );
+		if ( is_wp_error( $normalized_subdir ) ) {
+			return '';
+		}
+
+		// PR #19 initially stored owner/repo/basename; keep it readable and
+		// migrate it the next time the record is written.
+		if ( '' !== $normalized_subdir ) {
+			$legacy_key = strtolower( trim( (string) $owner ) ) . '/' . strtolower( trim( (string) $repo ) ) . '/' . basename( $normalized_subdir );
+			if ( isset( $monitored[ $legacy_key ] ) ) {
+				$identity = self::get_tracked_repo_identity( $legacy_key, $monitored[ $legacy_key ] );
+				if ( ! is_wp_error( $identity ) && $normalized_subdir === $identity['subdirectory'] ) {
+					return $legacy_key;
+				}
+			}
+		}
+
+		// Handle special and older keys (for example the built-in "hub2wp"
+		// record) by comparing their stored identity instead of key shape.
+		foreach ( $monitored as $candidate_key => $repo_data ) {
+			$identity = self::get_tracked_repo_identity( $candidate_key, $repo_data );
+			if (
+				! is_wp_error( $identity ) &&
+				strtolower( trim( (string) $owner ) ) === $identity['owner'] &&
+				strtolower( trim( (string) $repo ) ) === $identity['repo'] &&
+				$normalized_subdir === $identity['subdirectory']
+			) {
+				return (string) $candidate_key;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -1449,22 +1581,16 @@ class H2WP_Settings {
 	 *
 	 * @param string $owner     Repository owner.
 	 * @param string $repo      Repository name.
-	 * @param string $repo_type Repository type: plugin|theme.
+	 * @param string $repo_type    Repository type: plugin|theme.
+	 * @param string $subdirectory Optional project subdirectory.
 	 * @return array
 	 */
 	public static function get_repo_tracking_preferences( $owner, $repo, $repo_type = 'plugin', $subdirectory = '' ) {
-		$repo_type   = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
-		$option_name = ( 'theme' === $repo_type ) ? 'h2wp_themes' : 'h2wp_plugins';
-		$monitored   = get_option( $option_name, array() );
+		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$monitored = self::get_monitored_repositories( $repo_type );
 
-		// For monorepo entries the key includes the slug: owner/repo/slug.
-		// Fall back to the base owner/repo key for single-repo entries.
-		$repo_key      = $owner . '/' . $repo;
-		$monorepo_key  = ! empty( $subdirectory ) ? $repo_key . '/' . basename( $subdirectory ) : '';
-		$lookup_key    = ( ! empty( $monorepo_key ) && isset( $monitored[ $monorepo_key ] ) )
-			? $monorepo_key
-			: $repo_key;
-		$repo_data     = isset( $monitored[ $lookup_key ] ) && is_array( $monitored[ $lookup_key ] ) ? $monitored[ $lookup_key ] : array();
+		$lookup_key = self::find_tracked_repo_key( $monitored, $owner, $repo, $subdirectory );
+		$repo_data  = isset( $monitored[ $lookup_key ] ) && is_array( $monitored[ $lookup_key ] ) ? $monitored[ $lookup_key ] : array();
 
 		$preferences = array(
 			'branch'              => isset( $repo_data['branch'] ) ? (string) $repo_data['branch'] : '',
@@ -1483,7 +1609,10 @@ class H2WP_Settings {
 		 * @param string $repo_type   Repository type: plugin|theme.
 		 * @param array  $repo_data   Stored repository data.
 		 */
-		$preferences = apply_filters( 'hub2wp_repo_tracking_preferences', $preferences, $owner, $repo, $repo_type, $repo_data );
+		$filtered_preferences = apply_filters( 'hub2wp_repo_tracking_preferences', $preferences, $owner, $repo, $repo_type, $repo_data );
+		if ( is_array( $filtered_preferences ) ) {
+			$preferences = $filtered_preferences;
+		}
 
 		return array(
 			'branch'              => isset( $preferences['branch'] ) ? (string) $preferences['branch'] : '',

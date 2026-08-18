@@ -217,6 +217,27 @@ class H2WP_GitHub_API {
 	}
 
 	/**
+	 * Return a consistent error when monorepo support is used without a token.
+	 *
+	 * @return WP_Error Token-required error.
+	 */
+	private function get_monorepo_token_error() {
+		return new WP_Error(
+			'h2wp_monorepo_token_required',
+			__( 'Monorepo support requires a saved GitHub access token. Add one in hub2wp Settings and try again.', 'hub2wp' )
+		);
+	}
+
+	/**
+	 * Build a cache-key segment that cannot mix public and authenticated data.
+	 *
+	 * @return string Authentication cache-key segment.
+	 */
+	private function get_auth_cache_key_segment() {
+		return empty( $this->access_token ) ? 'public' : 'auth_' . md5( $this->access_token );
+	}
+
+	/**
 	 * Search plugins by query.
 	 *
 	 * @param string $query Search query.
@@ -422,6 +443,11 @@ class H2WP_GitHub_API {
 			'download_url'         => $this->get_download_url( $owner, $repo, $branch ),
 			'package_scope'        => 'repository',
 		);
+		if ( ! empty( $subdirectory ) && empty( $this->access_token ) ) {
+			$context['download_url']   = '';
+			$context['token_required'] = true;
+			return $this->filter_install_source_context( $context, $owner, $repo, $subdirectory );
+		}
 
 		if ( ! $prioritize_releases ) {
 			return $this->filter_install_source_context( $context, $owner, $repo, $subdirectory );
@@ -661,6 +687,10 @@ class H2WP_GitHub_API {
 	 * @return string|WP_Error Rendered README HTML or error.
 	 */
 	public function get_readme_html( $owner, $repo, $branch = '', $subdirectory = '' ) {
+		if ( ! empty( $subdirectory ) && empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
+
 		$subdir_key = empty( $subdirectory ) ? '' : '_' . md5( $subdirectory );
 		$cache_key  = 'readme_html_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch ) . $subdir_key;
 		$cached     = H2WP_Cache::get( $cache_key );
@@ -903,7 +933,10 @@ class H2WP_GitHub_API {
 	 * @return array Compatibility data (is_compatible, reason) or error.
 	 */
 	public function check_compatibility( $owner, $repo, $repo_type = 'plugin', $branch = '', $prioritize_releases = true, $source_context = null, $subdirectory = '' ) {
-		$repo_type      = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
+		if ( ! empty( $subdirectory ) && empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
 		$source_context = is_array( $source_context ) ? $source_context : $this->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
 		$ref            = isset( $source_context['ref'] ) ? (string) $source_context['ref'] : $branch;
 		$subdir_key     = ! empty( $subdirectory ) ? '_' . md5( $subdirectory ) : '';
@@ -940,7 +973,7 @@ class H2WP_GitHub_API {
 
 			// readme.txt is optional. When present, use it only to supplement
 			// compatibility fields missing from the authoritative plugin header.
-			$readme_content = $this->fetch_readme_content( $owner, $repo, $ref, $subdirectory );
+			$readme_content = $this->fetch_readme_content( $owner, $repo, $ref, $subdirectory, false );
 			if ( ! is_wp_error( $readme_content ) ) {
 				$readme_headers = $this->extract_headers_from_readme( $readme_content );
 				foreach ( array( 'requires at least', 'tested up to', 'requires php' ) as $field ) {
@@ -988,42 +1021,29 @@ class H2WP_GitHub_API {
 	 * @param string $owner Owner of the repo.
 	 * @param string $repo  Repo name.
 	 * @param string $branch Optional branch name.
-	 * @param string $path_prefix Optional project subdirectory.
+	 * @param string $path_prefix        Optional project subdirectory.
+	 * @param bool   $allow_root_fallback Whether to call GitHub's generic README endpoint.
 	 * @return string|WP_Error Readme content or error.
 	 */
-	private function fetch_readme_content( $owner, $repo, $branch = '', $path_prefix = '' ) {
-		$filenames = array( 'readme.txt', 'README.txt' );
-
-		if ( ! empty( $path_prefix ) ) {
-			$filenames = array_map(
-				function ( $f ) use ( $path_prefix ) {
-					return trailingslashit( $path_prefix ) . $f;
-				},
-				$filenames
-			);
+	private function fetch_readme_content( $owner, $repo, $branch = '', $path_prefix = '', $allow_root_fallback = true ) {
+		$contents = $this->get_directory_contents( $owner, $repo, $path_prefix, $branch );
+		if ( is_wp_error( $contents ) ) {
+			return $contents;
 		}
 
-		foreach ( $filenames as $filename ) {
-			$url = $this->base_url . '/repos/' . rawurlencode( $owner ) . '/' . rawurlencode( $repo ) . '/contents/' . $this->encode_repository_path( $filename );
-			if ( ! empty( $branch ) ) {
-				$url = add_query_arg( 'ref', $branch, $url );
-			}
-			$response = $this->request( $url );
-
-			if ( ! is_wp_error( $response ) ) {
-				$data = json_decode( wp_remote_retrieve_body( $response ), true );
-				if ( isset( $data['content'] ) ) {
-					return $this->decode_file_content( $data['content'] );
-				}
-			}
-
-			if ( is_wp_error( $response ) && 'h2wp_api_error_404' !== $response->get_error_code() ) {
-				return $response;
+		foreach ( $contents as $item ) {
+			if (
+				is_array( $item ) &&
+				'file' === ( isset( $item['type'] ) ? $item['type'] : '' ) &&
+				isset( $item['name'] ) &&
+				'readme.txt' === strtolower( $item['name'] )
+			) {
+				return $this->get_file_content_from_directory_item( $owner, $repo, $item, $branch );
 			}
 		}
 
 		// Fall back to the readme endpoint - only for single-repo plugins which will find README.md/readme.md/README etc. (always fetches root).
-		if ( ! empty( $path_prefix ) ) {
+		if ( ! empty( $path_prefix ) || ! $allow_root_fallback ) {
 			return new WP_Error( 'h2wp_readme_not_found', __( 'No valid readme file found.', 'hub2wp' ) );
 		}
 		$url = $this->base_url . '/repos/' . rawurlencode( $owner ) . '/' . rawurlencode( $repo ) . '/readme';
@@ -1103,20 +1123,40 @@ class H2WP_GitHub_API {
 			return $contents;
 		}
 
-		$files_checked = 0;
+		$candidates = array();
 		foreach ( $contents as $item ) {
-			if ( $files_checked >= 20 ) {
-				break;
-			}
 			if ( ! is_array( $item ) || 'file' !== ( isset( $item['type'] ) ? $item['type'] : '' ) || empty( $item['path'] ) ) {
 				continue;
 			}
 			if ( '.php' !== strtolower( substr( isset( $item['name'] ) ? $item['name'] : '', -4 ) ) ) {
 				continue;
 			}
+			$candidates[] = $item;
+		}
 
-			++$files_checked;
-			$content = $this->get_file_content( $owner, $repo, $item['path'], $branch );
+		$preferred_names = array_unique(
+			array_filter(
+				array(
+					strtolower( $repo ) . '.php',
+					! empty( $path_prefix ) ? strtolower( basename( $path_prefix ) ) . '.php' : '',
+				)
+			)
+		);
+		usort(
+			$candidates,
+			function ( $left, $right ) use ( $preferred_names ) {
+				$left_name  = isset( $left['name'] ) ? strtolower( $left['name'] ) : '';
+				$right_name = isset( $right['name'] ) ? strtolower( $right['name'] ) : '';
+				$left_rank  = array_search( $left_name, $preferred_names, true );
+				$right_rank = array_search( $right_name, $preferred_names, true );
+				$left_rank  = false === $left_rank ? count( $preferred_names ) : $left_rank;
+				$right_rank = false === $right_rank ? count( $preferred_names ) : $right_rank;
+				return $left_rank - $right_rank;
+			}
+		);
+
+		foreach ( array_slice( $candidates, 0, 20 ) as $item ) {
+			$content = $this->get_file_content_from_directory_item( $owner, $repo, $item, $branch );
 			if ( ! is_wp_error( $content ) && $this->has_plugin_header( $content ) ) {
 				return $content;
 			}
@@ -1274,6 +1314,10 @@ class H2WP_GitHub_API {
 	 * @return array|WP_Error Parsed headers or error.
 	 */
 	public function get_plugin_headers( $owner, $repo, $branch = '', $prioritize_releases = true, $source_context = null, $subdirectory = '' ) {
+		if ( ! empty( $subdirectory ) && empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
+
 		$source_context = is_array( $source_context ) ? $source_context : $this->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
 		$ref            = isset( $source_context['ref'] ) ? (string) $source_context['ref'] : $branch;
 		$subdir_key     = ! empty( $subdirectory ) ? '_' . md5( $subdirectory ) : '';
@@ -1289,7 +1333,7 @@ class H2WP_GitHub_API {
 		}
 
 		$headers = $this->extract_headers_from_plugin( $plugin_content );
-		$readme  = $this->fetch_readme_content( $owner, $repo, $ref, $subdirectory );
+		$readme  = $this->fetch_readme_content( $owner, $repo, $ref, $subdirectory, false );
 		if ( ! is_wp_error( $readme ) ) {
 			$readme_headers = $this->extract_headers_from_readme( $readme );
 			foreach ( array( 'requires at least', 'tested up to', 'requires php' ) as $field ) {
@@ -1315,6 +1359,10 @@ class H2WP_GitHub_API {
 	 * @return array|WP_Error Parsed headers or error.
 	 */
 	public function get_readme_headers( $owner, $repo, $branch = '', $prioritize_releases = true, $source_context = null, $subdirectory = '' ) {
+		if ( ! empty( $subdirectory ) && empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
+
 		$source_context = is_array( $source_context ) ? $source_context : $this->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
 		$ref            = isset( $source_context['ref'] ) ? (string) $source_context['ref'] : $branch;
 		$subdir_key     = ! empty( $subdirectory ) ? '_' . md5( $subdirectory ) : '';
@@ -1346,6 +1394,10 @@ class H2WP_GitHub_API {
 	 * @return array|WP_Error Parsed headers or error.
 	 */
 	public function get_theme_headers( $owner, $repo, $branch = '', $prioritize_releases = true, $source_context = null, $subdirectory = '' ) {
+		if ( ! empty( $subdirectory ) && empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
+
 		$source_context = is_array( $source_context ) ? $source_context : $this->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
 		$ref            = isset( $source_context['ref'] ) ? (string) $source_context['ref'] : $branch;
 		$subdir_key     = ! empty( $subdirectory ) ? '_' . md5( $subdirectory ) : '';
@@ -1434,6 +1486,51 @@ class H2WP_GitHub_API {
 	}
 
 	/**
+	 * Fetch and cache repository-wide release pages once for all projects.
+	 *
+	 * Monorepo tags share the same GitHub releases endpoint. Caching the raw
+	 * pages at repository level prevents every sibling project from repeating
+	 * the same paginated requests.
+	 *
+	 * @param string $owner Repository owner.
+	 * @param string $repo  Repository name.
+	 * @return array|WP_Error Release payloads or an error.
+	 */
+	private function get_repository_releases( $owner, $repo ) {
+		$releases = array();
+		for ( $page = 1; $page <= 5; $page++ ) {
+			$cache_key     = 'repository_releases_page_' . md5( strtolower( $owner . '/' . $repo ) . '|' . $this->get_auth_cache_key_segment() . '|' . $page );
+			$page_releases = H2WP_Cache::get( $cache_key );
+			if ( false === $page_releases ) {
+				$url      = add_query_arg(
+					array(
+						'per_page' => 100,
+						'page'     => $page,
+					),
+					$this->base_url . '/repos/' . rawurlencode( $owner ) . '/' . rawurlencode( $repo ) . '/releases'
+				);
+				$response = $this->request( $url );
+				if ( is_wp_error( $response ) ) {
+					return $response;
+				}
+
+				$page_releases = json_decode( wp_remote_retrieve_body( $response ), true );
+				if ( ! is_array( $page_releases ) ) {
+					return new WP_Error( 'h2wp_invalid_response', __( 'Invalid response from GitHub API.', 'hub2wp' ) );
+				}
+				H2WP_Cache::set( $cache_key, $page_releases, HOUR_IN_SECONDS );
+			}
+
+			$releases = array_merge( $releases, $page_releases );
+			if ( count( $page_releases ) < 100 ) {
+				break;
+			}
+		}
+
+		return $releases;
+	}
+
+	/**
 	 * Get changelog from GitHub releases.
 	 *
 	 * @since 1.0.0
@@ -1445,9 +1542,11 @@ class H2WP_GitHub_API {
 	 */
 	public function get_changelog( $owner, $repo, $subdirectory = '' ) {
 		$subdirectory = trim( str_replace( '\\', '/', (string) $subdirectory ), '/' );
-		$subdir_key   = empty( $subdirectory ) ? '' : '_' . md5( $subdirectory );
-		$cache_key    = 'changelog_' . sanitize_key( $owner . '_' . $repo ) . $subdir_key;
-		$cached       = H2WP_Cache::get( $cache_key );
+		if ( '' !== $subdirectory && empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
+		$cache_key = 'changelog_' . md5( strtolower( $owner . '/' . $repo ) . '|' . $subdirectory . '|' . $this->get_auth_cache_key_segment() );
+		$cached    = H2WP_Cache::get( $cache_key );
 
 		if ( false !== $cached ) {
 			return $cached;
@@ -1461,47 +1560,29 @@ class H2WP_GitHub_API {
 			}
 		}
 
+		$repository_releases = $this->get_repository_releases( $owner, $repo );
+		if ( is_wp_error( $repository_releases ) ) {
+			return $repository_releases;
+		}
+
 		$releases = array();
-		for ( $page = 1; $page <= 5; $page++ ) {
-			$url      = add_query_arg(
-				array(
-					'per_page' => 100,
-					'page'     => $page,
-				),
-				$this->base_url . '/repos/' . rawurlencode( $owner ) . '/' . rawurlencode( $repo ) . '/releases'
-			);
-			$response = $this->request( $url );
-			if ( is_wp_error( $response ) ) {
-				return $response;
+		foreach ( $repository_releases as $release ) {
+			if ( ! is_array( $release ) || empty( $release['tag_name'] ) || ! empty( $release['draft'] ) || ! empty( $release['prerelease'] ) ) {
+				continue;
 			}
-
-			$page_releases = json_decode( wp_remote_retrieve_body( $response ), true );
-			if ( ! is_array( $page_releases ) ) {
-				return new WP_Error( 'h2wp_invalid_response', __( 'Invalid response from GitHub API', 'hub2wp' ) );
-			}
-
-			foreach ( $page_releases as $release ) {
-				if ( ! is_array( $release ) || empty( $release['tag_name'] ) || ! empty( $release['draft'] ) || ! empty( $release['prerelease'] ) ) {
+			if ( ! empty( $tag_prefixes ) ) {
+				$matches_project = false;
+				foreach ( $tag_prefixes as $tag_prefix ) {
+					if ( 0 === strpos( $release['tag_name'], $tag_prefix ) ) {
+						$matches_project = true;
+						break;
+					}
+				}
+				if ( ! $matches_project ) {
 					continue;
 				}
-				if ( ! empty( $tag_prefixes ) ) {
-					$matches_project = false;
-					foreach ( $tag_prefixes as $tag_prefix ) {
-						if ( 0 === strpos( $release['tag_name'], $tag_prefix ) ) {
-							$matches_project = true;
-							break;
-						}
-					}
-					if ( ! $matches_project ) {
-						continue;
-					}
-				}
-				$releases[] = $release;
 			}
-
-			if ( count( $page_releases ) < 100 ) {
-				break;
-			}
+			$releases[] = $release;
 		}
 
 		if ( ! empty( $tag_prefixes ) ) {
@@ -1570,8 +1651,12 @@ class H2WP_GitHub_API {
 	 * }
 	 */
 	public function detect_repo_type( $owner, $repo, $branch = '', $repo_type = 'plugin' ) {
+		if ( empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
+
 		$repo_type = in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
-		$cache_key = 'repo_type_' . $repo_type . '_' . $owner . '_' . $repo . '_' . $this->get_branch_cache_key_segment( $branch );
+		$cache_key = 'repo_type_' . md5( $repo_type . '|' . strtolower( $owner . '/' . $repo ) . '|' . $branch . '|' . $this->get_auth_cache_key_segment() );
 		$cached    = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
@@ -1585,8 +1670,8 @@ class H2WP_GitHub_API {
 		$found_root           = null;
 		$files_scanned        = 0;
 		$directory_checks     = 1;
-		$max_file_checks      = empty( $this->access_token ) ? 30 : 100;
-		$max_directory_checks = empty( $this->access_token ) ? 20 : 50;
+		$max_file_checks      = 100;
+		$max_directory_checks = 50;
 
 		// Record a root extension, but continue scanning so hybrid repositories
 		// containing both a root project and nested projects are not misclassified.
@@ -1603,7 +1688,7 @@ class H2WP_GitHub_API {
 			}
 
 			++$files_scanned;
-			$content = $this->get_file_content( $owner, $repo, $item['path'], $branch );
+			$content = $this->get_file_content_from_directory_item( $owner, $repo, $item, $branch );
 			if ( is_wp_error( $content ) ) {
 				continue;
 			}
@@ -1625,7 +1710,7 @@ class H2WP_GitHub_API {
 		// even on large monorepos and account for the lower anonymous rate limit.
 		$found_plugins     = array();
 		$top_level_scanned = 0;
-		$max_top_level     = empty( $this->access_token ) ? 20 : 50;
+		$max_top_level     = 50;
 
 		foreach ( $root_contents as $item ) {
 			if ( $files_scanned >= $max_file_checks || $directory_checks >= $max_directory_checks ) {
@@ -1661,7 +1746,7 @@ class H2WP_GitHub_API {
 					break;
 				}
 				++$files_scanned;
-				$content = $this->get_file_content( $owner, $repo, $file['path'], $branch );
+				$content = $this->get_file_content_from_directory_item( $owner, $repo, $file, $branch );
 				if ( is_wp_error( $content ) ) {
 					continue;
 				}
@@ -1716,7 +1801,7 @@ class H2WP_GitHub_API {
 						break;
 					}
 					++$files_scanned;
-					$content = $this->get_file_content( $owner, $repo, $file['path'], $branch );
+					$content = $this->get_file_content_from_directory_item( $owner, $repo, $file, $branch );
 					if ( is_wp_error( $content ) ) {
 						continue;
 					}
@@ -1759,7 +1844,9 @@ class H2WP_GitHub_API {
 		$message = 'theme' === $repo_type
 			? __( 'No WordPress themes found in this repository.', 'hub2wp' )
 			: __( 'No WordPress plugins found in this repository.', 'hub2wp' );
-		return new WP_Error( 'h2wp_no_extension_found', $message );
+		$result  = new WP_Error( 'h2wp_no_extension_found', $message );
+		H2WP_Cache::set( $cache_key, $result, HOUR_IN_SECONDS );
+		return $result;
 	}
 
 	/**
@@ -1772,6 +1859,12 @@ class H2WP_GitHub_API {
 	 * @return array|WP_Error
 	 */
 	public function get_directory_contents( $owner, $repo, $path = '', $branch = '' ) {
+		$cache_key = 'directory_contents_' . md5( strtolower( $owner . '/' . $repo ) . '|' . trim( $path, '/' ) . '|' . $branch . '|' . $this->get_auth_cache_key_segment() );
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
 		$url = $this->base_url . '/repos/' . rawurlencode( $owner ) . '/' . rawurlencode( $repo ) . '/contents';
 		if ( '' !== trim( $path, '/' ) ) {
 			$url .= '/' . $this->encode_repository_path( $path );
@@ -1787,6 +1880,7 @@ class H2WP_GitHub_API {
 		if ( ! is_array( $contents ) ) {
 			return new WP_Error( 'h2wp_api_error', __( 'Invalid directory contents from GitHub API.', 'hub2wp' ) );
 		}
+		H2WP_Cache::set( $cache_key, $contents );
 		return $contents;
 	}
 
@@ -1800,6 +1894,12 @@ class H2WP_GitHub_API {
 	 * @return string|WP_Error
 	 */
 	public function get_file_content( $owner, $repo, $path, $branch = '' ) {
+		$cache_key = 'file_content_' . md5( strtolower( $owner . '/' . $repo ) . '|' . trim( $path, '/' ) . '|' . $branch . '|' . $this->get_auth_cache_key_segment() );
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
 		$url = $this->base_url . '/repos/' . rawurlencode( $owner ) . '/' . rawurlencode( $repo ) . '/contents/' . $this->encode_repository_path( $path );
 		if ( ! empty( $branch ) ) {
 			$url = add_query_arg( 'ref', $branch, $url );
@@ -1812,7 +1912,62 @@ class H2WP_GitHub_API {
 		if ( ! is_array( $data ) || ! isset( $data['content'] ) ) {
 			return new WP_Error( 'h2wp_api_error', __( 'Invalid file data from GitHub API.', 'hub2wp' ) );
 		}
-		return $this->decode_file_content( $data['content'] );
+		$content = $this->decode_file_content( $data['content'] );
+		if ( ! is_wp_error( $content ) ) {
+			H2WP_Cache::set( $cache_key, $content );
+		}
+		return $content;
+	}
+
+	/**
+	 * Fetch a listed file without spending another core API request when GitHub
+	 * provides a public raw-content URL. Private files fall back to the
+	 * authenticated Contents API.
+	 *
+	 * @param string $owner  Repository owner.
+	 * @param string $repo   Repository name.
+	 * @param array  $item   GitHub directory-listing item.
+	 * @param string $branch Optional branch/ref.
+	 * @return string|WP_Error File content or error.
+	 */
+	private function get_file_content_from_directory_item( $owner, $repo, $item, $branch = '' ) {
+		if ( empty( $item['path'] ) ) {
+			return new WP_Error( 'h2wp_api_error', __( 'Invalid file data from GitHub API.', 'hub2wp' ) );
+		}
+
+		$path      = (string) $item['path'];
+		$cache_key = 'file_content_' . md5( strtolower( $owner . '/' . $repo ) . '|' . trim( $path, '/' ) . '|' . $branch . '|' . $this->get_auth_cache_key_segment() );
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
+		$download_url = isset( $item['download_url'] ) ? (string) $item['download_url'] : '';
+		if (
+			'https' === strtolower( (string) wp_parse_url( $download_url, PHP_URL_SCHEME ) ) &&
+			'raw.githubusercontent.com' === strtolower( (string) wp_parse_url( $download_url, PHP_URL_HOST ) )
+		) {
+			$response    = wp_remote_get(
+				$download_url,
+				array(
+					'timeout'             => 15,
+					'redirection'         => 3,
+					'limit_response_size' => 8192,
+					'headers'             => array( 'Range' => 'bytes=0-8191' ),
+				)
+			);
+			$status_code = is_wp_error( $response ) ? 0 : (int) wp_remote_retrieve_response_code( $response );
+			if ( in_array( $status_code, array( 200, 206 ), true ) ) {
+				$content = wp_remote_retrieve_body( $response );
+				H2WP_Cache::set( $cache_key, $content );
+				return $content;
+			}
+		}
+		if ( empty( $this->access_token ) ) {
+			return new WP_Error( 'h2wp_raw_file_error', __( 'Unable to retrieve the public repository file.', 'hub2wp' ) );
+		}
+
+		return $this->get_file_content( $owner, $repo, $path, $branch );
 	}
 
 	/**
@@ -1884,8 +2039,11 @@ class H2WP_GitHub_API {
 		if ( '' === $project_path ) {
 			return new WP_Error( 'h2wp_invalid_project_path', __( 'A monorepo project path is required.', 'hub2wp' ) );
 		}
+		if ( empty( $this->access_token ) ) {
+			return $this->get_monorepo_token_error();
+		}
 		$project_slug = basename( $project_path );
-		$cache_key    = 'monorepo_release_' . $owner . '_' . $repo . '_' . md5( $project_path ) . ( empty( $this->access_token ) ? '_public' : '_auth' );
+		$cache_key    = 'monorepo_release_' . md5( strtolower( $owner . '/' . $repo ) . '|' . $project_path . '|' . $this->get_auth_cache_key_segment() );
 		$cached       = H2WP_Cache::get( $cache_key );
 		if ( false !== $cached ) {
 			return $cached;
@@ -1895,54 +2053,34 @@ class H2WP_GitHub_API {
 		if ( $project_slug !== $project_path ) {
 			$tag_prefixes[] = $project_slug . '/v';
 		}
-		$max_pages        = 5;
 		$fallback_release = null;
+		$releases         = $this->get_repository_releases( $owner, $repo );
+		if ( is_wp_error( $releases ) ) {
+			return $releases;
+		}
 
-		for ( $page = 1; $page <= $max_pages; $page++ ) {
-			$url      = add_query_arg(
-				array(
-					'per_page' => 100,
-					'page'     => $page,
-				),
-				$this->base_url . '/repos/' . $owner . '/' . $repo . '/releases'
-			);
-			$response = $this->request( $url );
-			if ( is_wp_error( $response ) ) {
-				return $response;
+		foreach ( $releases as $release ) {
+			if (
+				! is_array( $release ) ||
+				empty( $release['tag_name'] ) ||
+				! empty( $release['draft'] ) ||
+				! empty( $release['prerelease'] )
+			) {
+				continue;
 			}
 
-			$releases = json_decode( wp_remote_retrieve_body( $response ), true );
-			if ( ! is_array( $releases ) ) {
-				return new WP_Error( 'h2wp_api_error', __( 'Invalid releases data from GitHub API.', 'hub2wp' ) );
+			if ( 0 === strpos( $release['tag_name'], $tag_prefixes[0] ) ) {
+				$result = $this->format_monorepo_release_details( $release, $project_slug );
+				H2WP_Cache::set( $cache_key, $result );
+				return $result;
 			}
 
-			foreach ( $releases as $release ) {
-				if (
-					! is_array( $release ) ||
-					empty( $release['tag_name'] ) ||
-					! empty( $release['draft'] ) ||
-					! empty( $release['prerelease'] )
-				) {
-					continue;
-				}
-
-				if ( 0 === strpos( $release['tag_name'], $tag_prefixes[0] ) ) {
-					$result = $this->format_monorepo_release_details( $release, $project_slug );
-					H2WP_Cache::set( $cache_key, $result );
-					return $result;
-				}
-
-				if (
-					null === $fallback_release &&
-					isset( $tag_prefixes[1] ) &&
-					0 === strpos( $release['tag_name'], $tag_prefixes[1] )
-				) {
-					$fallback_release = $release;
-				}
-			}
-
-			if ( count( $releases ) < 100 ) {
-				break;
+			if (
+				null === $fallback_release &&
+				isset( $tag_prefixes[1] ) &&
+				0 === strpos( $release['tag_name'], $tag_prefixes[1] )
+			) {
+				$fallback_release = $release;
 			}
 		}
 

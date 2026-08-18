@@ -22,10 +22,18 @@ class H2WP_Repository_Query_Service {
 	private $api;
 
 	/**
+	 * Saved GitHub access token used by this service.
+	 *
+	 * @var string
+	 */
+	private $access_token;
+
+	/**
 	 * Constructor.
 	 */
 	public function __construct() {
-		$this->api = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+		$this->access_token = H2WP_Settings::get_access_token();
+		$this->api          = new H2WP_GitHub_API( $this->access_token );
 	}
 
 	/**
@@ -45,6 +53,12 @@ class H2WP_Repository_Query_Service {
 		$subdirectory = H2WP_Settings::normalize_subdirectory( $subdirectory );
 		if ( is_wp_error( $subdirectory ) ) {
 			return $subdirectory;
+		}
+		if ( '' !== $subdirectory && '' === $this->access_token ) {
+			return new WP_Error(
+				'h2wp_monorepo_token_required',
+				__( 'Monorepo support requires a saved GitHub access token. Add one in hub2wp Settings and try again.', 'hub2wp' )
+			);
 		}
 		$tracking       = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type, $subdirectory );
 		$source_context = $this->api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'], $subdirectory );
@@ -133,6 +147,14 @@ class H2WP_Repository_Query_Service {
 				'source_context' => array(),
 			);
 		}
+		if ( '' !== $subdirectory && '' === $this->access_token ) {
+			return array(
+				'is_compatible'  => false,
+				'reason'         => __( 'Monorepo support requires a saved GitHub access token. Add one in hub2wp Settings and try again.', 'hub2wp' ),
+				'headers'        => array(),
+				'source_context' => array(),
+			);
+		}
 		$tracking       = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type, $subdirectory );
 		$source_context = $this->api->resolve_version_source( $owner, $repo, $tracking['branch'], $tracking['prioritize_releases'], $subdirectory );
 		$compatibility  = $this->api->check_compatibility( $owner, $repo, $repo_type, $tracking['branch'], $tracking['prioritize_releases'], $source_context, $subdirectory );
@@ -169,6 +191,12 @@ class H2WP_Repository_Query_Service {
 		$subdirectory = H2WP_Settings::normalize_subdirectory( $subdirectory );
 		if ( is_wp_error( $subdirectory ) ) {
 			return $subdirectory;
+		}
+		if ( '' !== $subdirectory && '' === $this->access_token ) {
+			return new WP_Error(
+				'h2wp_monorepo_token_required',
+				__( 'Monorepo support requires a saved GitHub access token. Add one in hub2wp Settings and try again.', 'hub2wp' )
+			);
 		}
 
 		return $this->api->get_changelog( $owner, $repo, $subdirectory );

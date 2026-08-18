@@ -53,6 +53,12 @@ class H2WP_Repo_Manager {
 		if ( is_wp_error( $subdirectory ) ) {
 			return $subdirectory;
 		}
+		if ( '' !== $subdirectory && '' === $token ) {
+			return new WP_Error(
+				'h2wp_monorepo_token_required',
+				__( 'Monorepo support requires a GitHub access token.', 'hub2wp' )
+			);
+		}
 
 		$api = new H2WP_GitHub_API( $token );
 		if ( null === $args['private'] ) {

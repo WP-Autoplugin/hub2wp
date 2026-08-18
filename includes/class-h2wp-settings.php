@@ -85,7 +85,7 @@ class H2WP_Settings {
 			<h1><?php esc_html_e( 'hub2wp Settings', 'hub2wp' ); ?></h1>
 			<p style="margin-top:0;">
 				<?php esc_html_e( 'Configure your GitHub access token, cache settings, and manage monitored repositories.', 'hub2wp' ); ?><br>
-				<?php esc_html_e( 'hub2wp works fine without a personal access token, but it is required to access private repositories and to increase the GitHub API rate limit.', 'hub2wp' ); ?>
+				<?php esc_html_e( 'Public single-repository plugins and themes work without a token. Private repositories and monorepo support require a GitHub access token.', 'hub2wp' ); ?>
 			</p>
 			<form method="post" action="options.php" style="margin-bottom: 2em;">
 				<?php settings_fields( 'h2wp_settings_group' ); ?>
@@ -102,6 +102,11 @@ class H2WP_Settings {
 					</div>
 				</div>
 			</form>
+			<?php if ( empty( self::get_access_token() ) && self::has_monitored_monorepo_projects() ) : ?>
+				<div class="notice notice-warning inline">
+					<p><?php esc_html_e( 'Monorepo update checks are paused because no GitHub access token is configured. Save a token above to resume them.', 'hub2wp' ); ?></p>
+				</div>
+			<?php endif; ?>
 			<script>
 			( function() {
 				var btn    = document.getElementById( 'h2wp-clear-cache-btn' );
@@ -166,8 +171,9 @@ class H2WP_Settings {
 		$tracked_service   = new H2WP_Tracked_Repo_Service();
 		$monitored_plugins = $tracked_service->get_tracked_plugins();
 		$count             = count( $monitored_plugins );
+		$monorepo_enabled  = '' !== self::get_access_token();
 		// Auto-expand if there are form submission notices so feedback is visible.
-		$expanded = true;
+		$expanded = ! empty( $_GET['h2wp_notice'] ) || ! empty( $_GET['h2wp_error'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		?>
 		<p style="margin:0;">
 			<strong><?php esc_html_e( 'Monitored Plugins', 'hub2wp' ); ?></strong>
@@ -219,7 +225,7 @@ class H2WP_Settings {
 								<?php esc_html_e( 'Prioritize releases', 'hub2wp' ); ?>
 							</label>
 							<label for="h2wp_scan_monorepo" style="margin-right:8px;display:inline-flex;align-items:center;gap:2px;">
-								<input type="checkbox" id="h2wp_scan_monorepo" value="1" />
+								<input type="checkbox" id="h2wp_scan_monorepo" value="1" <?php disabled( ! $monorepo_enabled ); ?> />
 								<?php esc_html_e( 'Scan as monorepo', 'hub2wp' ); ?>
 							</label>
 							<button type="submit" class="button button-secondary">
@@ -228,10 +234,19 @@ class H2WP_Settings {
 							<p class="description">
 								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-plugin). Optional: specify a branch (defaults to repository default branch).', 'hub2wp' ); ?>
 							</p>
+							<?php if ( ! $monorepo_enabled ) : ?>
+								<p class="description"><?php esc_html_e( 'Save a GitHub access token above to enable monorepo scanning and monitoring.', 'hub2wp' ); ?></p>
+							<?php endif; ?>
 							<details style="margin-top:6px;">
 								<summary><?php esc_html_e( 'What does "Prioritize releases" mean?', 'hub2wp' ); ?></summary>
 								<p class="description" style="margin:6px 0 0;">
 									<?php esc_html_e( 'When enabled, update/version checks use the latest GitHub release files (tag) when releases exist. When disabled, checks only use the selected branch or the default branch.', 'hub2wp' ); ?>
+								</p>
+							</details>
+							<details style="margin-top:6px;">
+								<summary><?php esc_html_e( 'What does "Scan as monorepo" mean?', 'hub2wp' ); ?></summary>
+								<p class="description" style="margin:6px 0 0;">
+									<?php esc_html_e( 'Use this when one GitHub repository contains multiple WordPress plugins in subdirectories. hub2wp scans the repository, lets you choose which plugins to add, and monitors each one separately. A saved GitHub access token is required because the scan may make several API requests. Leave this disabled for a normal repository containing one plugin.', 'hub2wp' ); ?>
 								</p>
 							</details>
 						</td>
@@ -409,7 +424,8 @@ class H2WP_Settings {
 		$tracked_service  = new H2WP_Tracked_Repo_Service();
 		$monitored_themes = $tracked_service->get_tracked_themes();
 		$count            = count( $monitored_themes );
-		$expanded         = true;
+		$expanded         = ! empty( $_GET['h2wp_notice'] ) || ! empty( $_GET['h2wp_error'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$monorepo_enabled = '' !== self::get_access_token();
 		?>
 		<p style="margin:0;">
 			<strong><?php esc_html_e( 'Monitored Themes', 'hub2wp' ); ?></strong>
@@ -461,7 +477,7 @@ class H2WP_Settings {
 								<?php esc_html_e( 'Prioritize releases', 'hub2wp' ); ?>
 							</label>
 							<label for="h2wp_scan_theme_monorepo" style="margin-right:8px;display:inline-flex;align-items:center;gap:2px;">
-								<input type="checkbox" id="h2wp_scan_theme_monorepo" value="1" />
+								<input type="checkbox" id="h2wp_scan_theme_monorepo" value="1" <?php disabled( ! $monorepo_enabled ); ?> />
 								<?php esc_html_e( 'Scan as monorepo', 'hub2wp' ); ?>
 							</label>
 							<button type="submit" class="button button-secondary">
@@ -470,10 +486,19 @@ class H2WP_Settings {
 							<p class="description">
 								<?php esc_html_e( 'Enter the repository in the format: owner/repo (e.g., mycompany/private-theme). Optional: specify a branch (defaults to repository default branch).', 'hub2wp' ); ?>
 							</p>
+							<?php if ( ! $monorepo_enabled ) : ?>
+								<p class="description"><?php esc_html_e( 'Save a GitHub access token above to enable monorepo scanning and monitoring.', 'hub2wp' ); ?></p>
+							<?php endif; ?>
 							<details style="margin-top:6px;">
 								<summary><?php esc_html_e( 'What does "Prioritize releases" mean?', 'hub2wp' ); ?></summary>
 								<p class="description" style="margin:6px 0 0;">
 									<?php esc_html_e( 'When enabled, update/version checks use the latest GitHub release files (tag) when releases exist. When disabled, checks only use the selected branch or the default branch.', 'hub2wp' ); ?>
+								</p>
+							</details>
+							<details style="margin-top:6px;">
+								<summary><?php esc_html_e( 'What does "Scan as monorepo" mean?', 'hub2wp' ); ?></summary>
+								<p class="description" style="margin:6px 0 0;">
+									<?php esc_html_e( 'Use this when one GitHub repository contains multiple WordPress themes in subdirectories. hub2wp scans the repository, lets you choose which themes to add, and monitors each one separately. A saved GitHub access token is required because the scan may make several API requests. Leave this disabled for a normal repository containing one theme.', 'hub2wp' ); ?>
 								</p>
 							</details>
 						</td>
@@ -663,6 +688,12 @@ class H2WP_Settings {
 
 		$access_token  = self::get_access_token();
 		$repo_key_base = $owner . '/' . $repo;
+		if ( '' !== $subdirectory && '' === $access_token ) {
+			return new WP_Error(
+				'h2wp_monorepo_token_required',
+				__( 'Monorepo support requires a saved GitHub access token. Add one in hub2wp Settings and try again.', 'hub2wp' )
+			);
+		}
 
 		$repo_data = self::verify_repo( $repo_key_base, $access_token );
 		if ( is_wp_error( $repo_data ) ) {
@@ -1226,6 +1257,13 @@ class H2WP_Settings {
 	 * @return array|WP_Error Repo data if verified, WP_Error on failure.
 	 */
 	public static function verify_repo( $repo_key, $access_token ) {
+		$auth_key  = empty( $access_token ) ? 'public' : 'auth_' . md5( $access_token );
+		$cache_key = 'verified_repo_' . md5( strtolower( $repo_key ) . '|' . $auth_key );
+		$cached    = H2WP_Cache::get( $cache_key );
+		if ( false !== $cached ) {
+			return $cached;
+		}
+
 		$url = 'https://api.github.com/repos/' . $repo_key;
 
 		$headers = array(
@@ -1301,6 +1339,7 @@ class H2WP_Settings {
 			return new WP_Error( 'invalid_response', __( 'GitHub returned an invalid repository response.', 'hub2wp' ) );
 		}
 
+		H2WP_Cache::set( $cache_key, $data );
 		return $data;
 	}
 
@@ -1315,15 +1354,14 @@ class H2WP_Settings {
 			<?php
 			$next_check = wp_next_scheduled( 'h2wp_daily_update_check' );
 			printf(
-				/* translators: 1: Human-readable time difference, 2: Link to run the update check, 3: Number of API calls. */
-				esc_html__( 'The daily update check is scheduled to run in %1$s. %2$s (note: the GitHub API will be called %3$d times).', 'hub2wp' ),
+				/* translators: 1: Human-readable time difference, 2: Link to run the update check. */
+				esc_html__( 'The daily update check is scheduled to run in %1$s. %2$s', 'hub2wp' ),
 				'<span>' . esc_html( $next_check ? human_time_diff( time(), $next_check ) : __( 'less than 1 minute', 'hub2wp' ) ) . '</span>',
 				sprintf(
 					'<a href="%s">%s</a>',
 					esc_html( wp_nonce_url( admin_url( 'options-general.php?page=h2wp_settings_page&action=h2wp_run_update_check' ), 'h2wp_run_update_check' ) ),
 					esc_html__( 'Run now', 'hub2wp' )
-				),
-				count( self::get_monitored_repositories( 'plugin' ) ) + count( self::get_monitored_repositories( 'theme' ) )
+				)
 			);
 			?>
 		</p>
@@ -1338,9 +1376,9 @@ class H2WP_Settings {
 		$options      = is_array( $options ) ? $options : array();
 		$access_token = isset( $options['access_token'] ) ? $options['access_token'] : '';
 		?>
-		<input type="password" name="h2wp_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
+		<input type="password" id="h2wp_access_token" name="h2wp_settings[access_token]" value="<?php echo esc_attr( $access_token ); ?>" size="50" />
 		<p class="description">
-			<?php esc_html_e( 'Enter your GitHub personal access token to increase your rate limit.', 'hub2wp' ); ?>
+			<?php esc_html_e( 'Enter a GitHub personal access token for private repositories, monorepo support, and a higher API rate limit.', 'hub2wp' ); ?>
 			<?php
 			printf(
 				/* translators: %s: URL to create a personal access token */
@@ -1372,11 +1410,16 @@ class H2WP_Settings {
 	 * @return array Sanitized options.
 	 */
 	public static function sanitize_settings( $input ) {
-		$input  = is_array( $input ) ? $input : array();
-		$output = array();
+		$input   = is_array( $input ) ? $input : array();
+		$output  = array();
+		$current = get_option( self::OPTION_NAME, array() );
+		$current = is_array( $current ) ? $current : array();
 
 		if ( isset( $input['access_token'] ) ) {
 			$output['access_token'] = sanitize_text_field( $input['access_token'] );
+			if ( ( isset( $current['access_token'] ) ? $current['access_token'] : '' ) !== $output['access_token'] ) {
+				delete_transient( 'h2wp_last_update_check' );
+			}
 		}
 
 		if ( isset( $input['cache_duration'] ) ) {
@@ -1395,6 +1438,24 @@ class H2WP_Settings {
 		$options = get_option( self::OPTION_NAME, array() );
 		$options = is_array( $options ) ? $options : array();
 		return isset( $options['access_token'] ) ? $options['access_token'] : '';
+	}
+
+	/**
+	 * Check whether any existing tracked entry represents a monorepo project.
+	 *
+	 * @return bool True when at least one monorepo project is monitored.
+	 */
+	private static function has_monitored_monorepo_projects() {
+		foreach ( array( 'plugin', 'theme' ) as $repo_type ) {
+			foreach ( self::get_monitored_repositories( $repo_type ) as $repo_key => $repo_data ) {
+				$identity = self::get_tracked_repo_identity( $repo_key, $repo_data );
+				if ( ! is_wp_error( $identity ) && '' !== $identity['subdirectory'] ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**

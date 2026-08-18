@@ -78,7 +78,8 @@ class H2WP_Plugin_Updater {
 	public static function check_for_updates() {
 		$h2wp_plugins    = self::get_tracked_option( 'h2wp_plugins' );
 		$h2wp_themes     = self::get_tracked_option( 'h2wp_themes' );
-		$api             = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+		$access_token    = H2WP_Settings::get_access_token();
+		$api             = new H2WP_GitHub_API( $access_token );
 		$plugins_updated = false;
 		$themes_updated  = false;
 		$now             = time();
@@ -100,6 +101,10 @@ class H2WP_Plugin_Updater {
 			$plugin['owner']        = $owner;
 			$plugin['repo']         = $repo;
 			$plugin['subdirectory'] = $subdirectory;
+			if ( '' !== $subdirectory && '' === $access_token ) {
+				self::log_debug( sprintf( 'Skipped monorepo plugin update check without an access token: %s', $plugin_id ) );
+				continue;
+			}
 
 			$tracking_preferences = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, 'plugin', $subdirectory );
 			$branch               = $tracking_preferences['branch'];
@@ -156,10 +161,14 @@ class H2WP_Plugin_Updater {
 			$theme['owner']        = $owner;
 			$theme['repo']         = $repo;
 			$theme['subdirectory'] = $subdirectory;
-			$tracking_preferences  = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, 'theme', $subdirectory );
-			$branch                = $tracking_preferences['branch'];
-			$prioritize_releases   = $tracking_preferences['prioritize_releases'];
-			$source_context        = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
+			if ( '' !== $subdirectory && '' === $access_token ) {
+				self::log_debug( sprintf( 'Skipped monorepo theme update check without an access token: %s', $theme_id ) );
+				continue;
+			}
+			$tracking_preferences = H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, 'theme', $subdirectory );
+			$branch               = $tracking_preferences['branch'];
+			$prioritize_releases  = $tracking_preferences['prioritize_releases'];
+			$source_context       = $api->resolve_version_source( $owner, $repo, $branch, $prioritize_releases, $subdirectory );
 
 			$headers = $api->get_theme_headers( $owner, $repo, $branch, $prioritize_releases, $source_context, $subdirectory );
 			if ( is_wp_error( $headers ) || empty( $headers['version'] ) ) {
@@ -239,6 +248,7 @@ class H2WP_Plugin_Updater {
 		}
 
 		$h2wp_plugins = self::get_tracked_option( 'h2wp_plugins' );
+		$access_token = H2WP_Settings::get_access_token();
 
 		foreach ( $h2wp_plugins as $plugin_id => $plugin ) {
 			if ( ! is_array( $plugin ) ) {
@@ -249,6 +259,9 @@ class H2WP_Plugin_Updater {
 			}
 			$identity = H2WP_Settings::get_tracked_repo_identity( $plugin_id, $plugin );
 			if ( is_wp_error( $identity ) ) {
+				continue;
+			}
+			if ( '' !== $identity['subdirectory'] && '' === $access_token ) {
 				continue;
 			}
 
@@ -305,8 +318,9 @@ class H2WP_Plugin_Updater {
 			$transient->response = array();
 		}
 
-		$h2wp_themes = self::get_tracked_option( 'h2wp_themes' );
-		$themes      = wp_get_themes();
+		$h2wp_themes  = self::get_tracked_option( 'h2wp_themes' );
+		$themes       = wp_get_themes();
+		$access_token = H2WP_Settings::get_access_token();
 
 		foreach ( $h2wp_themes as $theme_id => $theme ) {
 			if ( ! is_array( $theme ) ) {
@@ -317,6 +331,9 @@ class H2WP_Plugin_Updater {
 			}
 			$identity = H2WP_Settings::get_tracked_repo_identity( $theme_id, $theme );
 			if ( is_wp_error( $identity ) ) {
+				continue;
+			}
+			if ( '' !== $identity['subdirectory'] && '' === $access_token ) {
 				continue;
 			}
 
@@ -377,6 +394,9 @@ class H2WP_Plugin_Updater {
 				$identity = H2WP_Settings::get_tracked_repo_identity( $plugin_id, $plugin );
 				if ( is_wp_error( $identity ) ) {
 					continue;
+				}
+				if ( '' !== $identity['subdirectory'] && '' === H2WP_Settings::get_access_token() ) {
+					return $result;
 				}
 				$owner                = $identity['owner'];
 				$repo                 = $identity['repo'];

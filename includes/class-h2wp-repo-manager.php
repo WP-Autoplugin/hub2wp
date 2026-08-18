@@ -1,12 +1,17 @@
 <?php
 /**
  * Shared install and tracking workflows for GitHub plugins and themes.
+ *
+ * @package hub2wp
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Coordinates repository installation and tracking.
+ */
 class H2WP_Repo_Manager {
 
 	/**
@@ -26,6 +31,7 @@ class H2WP_Repo_Manager {
 				'prioritize_releases' => true,
 				'access_token'        => '',
 				'private'             => null,
+				'subdirectory'        => '', // Path to an extension within a monorepo.
 			)
 		);
 
@@ -35,7 +41,7 @@ class H2WP_Repo_Manager {
 		$branch    = is_string( $args['branch'] ) ? trim( $args['branch'] ) : '';
 		$token     = is_string( $args['access_token'] ) ? $args['access_token'] : '';
 
-		if ( '' === $owner || '' === $repo ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) ) {
 			return new WP_Error( 'h2wp_invalid_repository', __( 'A GitHub repository in the form owner/repo is required.', 'hub2wp' ) );
 		}
 
@@ -43,12 +49,32 @@ class H2WP_Repo_Manager {
 			$token = H2WP_Settings::get_access_token();
 		}
 
-		$api            = new H2WP_GitHub_API( $token );
-		$source_context = $api->resolve_version_source( $owner, $repo, $branch, ! empty( $args['prioritize_releases'] ) );
-		$compatibility  = $api->check_compatibility( $owner, $repo, $repo_type, $branch, ! empty( $args['prioritize_releases'] ), $source_context );
+		$subdirectory = H2WP_Settings::normalize_subdirectory( $args['subdirectory'] );
+		if ( is_wp_error( $subdirectory ) ) {
+			return $subdirectory;
+		}
+		if ( '' !== $subdirectory && '' === $token ) {
+			return new WP_Error(
+				'h2wp_monorepo_token_required',
+				__( 'Monorepo support requires a GitHub access token.', 'hub2wp' )
+			);
+		}
 
-		if ( empty( $compatibility['is_compatible'] ) ) {
-			$message = ! empty( $compatibility['reason'] ) ? $compatibility['reason'] : __( 'The repository is not a compatible WordPress extension.', 'hub2wp' );
+		$api = new H2WP_GitHub_API( $token );
+		if ( null === $args['private'] ) {
+			$repo_details = $api->get_repo_details( $owner, $repo );
+			if ( ! is_wp_error( $repo_details ) && array_key_exists( 'private', $repo_details ) ) {
+				$args['private'] = (bool) $repo_details['private'];
+			}
+		}
+		$source_context = $api->resolve_version_source( $owner, $repo, $branch, ! empty( $args['prioritize_releases'] ), $subdirectory );
+		$compatibility  = $api->check_compatibility( $owner, $repo, $repo_type, $branch, ! empty( $args['prioritize_releases'] ), $source_context, $subdirectory );
+
+		if ( is_wp_error( $compatibility ) ) {
+			return $compatibility;
+		}
+		if ( ! is_array( $compatibility ) || empty( $compatibility['is_compatible'] ) ) {
+			$message = is_array( $compatibility ) && ! empty( $compatibility['reason'] ) ? $compatibility['reason'] : __( 'The repository is not a compatible WordPress extension.', 'hub2wp' );
 			return new WP_Error( 'h2wp_incompatible_repository', $message );
 		}
 
@@ -56,10 +82,12 @@ class H2WP_Repo_Manager {
 			return new WP_Error( 'h2wp_missing_download_url', __( 'Could not determine a download URL for this repository.', 'hub2wp' ) );
 		}
 
+		$download_url = $source_context['download_url'];
+
 		$installer = new H2WP_Plugin_Installer();
 		$result    = ( 'theme' === $repo_type )
-			? $installer->install_theme( $source_context['download_url'], $token )
-			: $installer->install_plugin( $source_context['download_url'], $token );
+			? $installer->install_theme( $download_url, $token, $subdirectory )
+			: $installer->install_plugin( $download_url, $token, $subdirectory );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -93,23 +121,32 @@ class H2WP_Repo_Manager {
 
 		$headers      = isset( $compatibility['headers'] ) && is_array( $compatibility['headers'] ) ? $compatibility['headers'] : array();
 		$option_name  = 'h2wp_plugins';
-		$repo_key     = $owner . '/' . $repo;
-		$tracked_repos = get_option( $option_name, array() );
-		$existing     = isset( $tracked_repos[ $repo_key ] ) && is_array( $tracked_repos[ $repo_key ] ) ? $tracked_repos[ $repo_key ] : array();
-		$now          = time();
+		$subdirectory = isset( $args['subdirectory'] ) ? H2WP_Settings::normalize_subdirectory( $args['subdirectory'] ) : '';
+		$repo_key     = H2WP_Settings::get_tracked_repo_key( $owner, $repo, $subdirectory );
+		if ( is_wp_error( $subdirectory ) || is_wp_error( $repo_key ) ) {
+			return new WP_Error( 'h2wp_invalid_subdirectory', __( 'Invalid repository subdirectory.', 'hub2wp' ) );
+		}
+		$tracked_repos = H2WP_Settings::get_monitored_repositories( 'plugin' );
+		$existing_key  = H2WP_Settings::find_tracked_repo_key( $tracked_repos, $owner, $repo, $subdirectory );
+		$existing      = '' !== $existing_key && is_array( $tracked_repos[ $existing_key ] ) ? $tracked_repos[ $existing_key ] : array();
+		if ( '' !== $existing_key && $existing_key !== $repo_key ) {
+			unset( $tracked_repos[ $existing_key ] );
+		}
+		$now = time();
 
 		$tracked_repos[ $repo_key ] = self::build_tracked_repo_data(
 			array_merge(
 				$existing,
 				$plugin_data,
 				array(
-					'owner'       => $owner,
-					'repo'        => $repo,
-					'repo_type'   => 'plugin',
-					'plugin_file' => $plugin_file,
-					'version'     => isset( $headers['version'] ) ? $headers['version'] : ( isset( $plugin_data['version'] ) ? $plugin_data['version'] : '' ),
-					'requires'    => isset( $headers['requires at least'] ) ? $headers['requires at least'] : '',
-					'tested'      => isset( $headers['tested up to'] ) ? $headers['tested up to'] : '',
+					'owner'        => $owner,
+					'repo'         => $repo,
+					'repo_type'    => 'plugin',
+					'plugin_file'  => $plugin_file,
+					'subdirectory' => $subdirectory,
+					'version'      => isset( $headers['version'] ) ? $headers['version'] : ( isset( $plugin_data['version'] ) ? $plugin_data['version'] : '' ),
+					'requires'     => isset( $headers['requires at least'] ) ? $headers['requires at least'] : '',
+					'tested'       => isset( $headers['tested up to'] ) ? $headers['tested up to'] : '',
 					'requires_php' => isset( $headers['requires php'] ) ? $headers['requires php'] : '',
 				)
 			),
@@ -118,7 +155,9 @@ class H2WP_Repo_Manager {
 			$now
 		);
 
-		update_option( $option_name, $tracked_repos, false );
+		if ( ! update_option( $option_name, $tracked_repos, false ) ) {
+			return new WP_Error( 'h2wp_tracking_failed', __( 'The plugin was installed, but its update-tracking data could not be saved.', 'hub2wp' ) );
+		}
 
 		return $tracked_repos[ $repo_key ];
 	}
@@ -144,24 +183,34 @@ class H2WP_Repo_Manager {
 
 		$headers      = isset( $compatibility['headers'] ) && is_array( $compatibility['headers'] ) ? $compatibility['headers'] : array();
 		$option_name  = 'h2wp_themes';
-		$repo_key     = $owner . '/' . $repo;
-		$tracked_repos = get_option( $option_name, array() );
-		$existing     = isset( $tracked_repos[ $repo_key ] ) && is_array( $tracked_repos[ $repo_key ] ) ? $tracked_repos[ $repo_key ] : array();
-		$now          = time();
+		$subdirectory = isset( $args['subdirectory'] ) ? H2WP_Settings::normalize_subdirectory( $args['subdirectory'] ) : '';
+		$repo_key     = H2WP_Settings::get_tracked_repo_key( $owner, $repo, $subdirectory );
+		if ( is_wp_error( $subdirectory ) || is_wp_error( $repo_key ) ) {
+			return new WP_Error( 'h2wp_invalid_subdirectory', __( 'Invalid repository subdirectory.', 'hub2wp' ) );
+		}
+		$tracked_repos = H2WP_Settings::get_monitored_repositories( 'theme' );
+
+		$existing_key = H2WP_Settings::find_tracked_repo_key( $tracked_repos, $owner, $repo, $subdirectory );
+		$existing     = '' !== $existing_key && is_array( $tracked_repos[ $existing_key ] ) ? $tracked_repos[ $existing_key ] : array();
+		if ( '' !== $existing_key && $existing_key !== $repo_key ) {
+			unset( $tracked_repos[ $existing_key ] );
+		}
+		$now = time();
 
 		$tracked_repos[ $repo_key ] = self::build_tracked_repo_data(
 			array_merge(
 				$existing,
 				$theme_data,
 				array(
-					'owner'       => $owner,
-					'repo'        => $repo,
-					'repo_type'   => 'theme',
-					'stylesheet'  => $stylesheet,
-					'template'    => ! empty( $theme_data['template'] ) ? $theme_data['template'] : $stylesheet,
-					'version'     => isset( $headers['version'] ) ? $headers['version'] : ( isset( $theme_data['version'] ) ? $theme_data['version'] : '' ),
-					'requires'    => isset( $headers['requires at least'] ) ? $headers['requires at least'] : '',
-					'tested'      => isset( $headers['tested up to'] ) ? $headers['tested up to'] : '',
+					'owner'        => $owner,
+					'repo'         => $repo,
+					'repo_type'    => 'theme',
+					'stylesheet'   => $stylesheet,
+					'template'     => ! empty( $theme_data['template'] ) ? $theme_data['template'] : $stylesheet,
+					'subdirectory' => $subdirectory,
+					'version'      => isset( $headers['version'] ) ? $headers['version'] : ( isset( $theme_data['version'] ) ? $theme_data['version'] : '' ),
+					'requires'     => isset( $headers['requires at least'] ) ? $headers['requires at least'] : '',
+					'tested'       => isset( $headers['tested up to'] ) ? $headers['tested up to'] : '',
 					'requires_php' => isset( $headers['requires php'] ) ? $headers['requires php'] : '',
 				)
 			),
@@ -170,7 +219,9 @@ class H2WP_Repo_Manager {
 			$now
 		);
 
-		update_option( $option_name, $tracked_repos, false );
+		if ( ! update_option( $option_name, $tracked_repos, false ) ) {
+			return new WP_Error( 'h2wp_tracking_failed', __( 'The theme was installed, but its update-tracking data could not be saved.', 'hub2wp' ) );
+		}
 
 		return $tracked_repos[ $repo_key ];
 	}
@@ -190,6 +241,7 @@ class H2WP_Repo_Manager {
 		$repo_data['uses_releases']       = ! empty( $source_context['uses_releases'] );
 		$repo_data['version_source']      = isset( $source_context['source'] ) ? (string) $source_context['source'] : 'branch';
 		$repo_data['download_url']        = isset( $source_context['download_url'] ) ? (string) $source_context['download_url'] : '';
+		$repo_data['package_scope']       = isset( $source_context['package_scope'] ) && 'extension' === $source_context['package_scope'] ? 'extension' : 'repository';
 		$repo_data['last_checked']        = $timestamp;
 		$repo_data['last_updated']        = $timestamp;
 
@@ -238,7 +290,8 @@ class H2WP_Repo_Manager {
 
 		foreach ( $plugins as $file => $data ) {
 			$data_author = isset( $data['Author'] ) ? wp_strip_all_tags( (string) $data['Author'] ) : '';
-			if ( $name === $data['Name'] && $author === $data_author ) {
+			$data_name   = isset( $data['Name'] ) ? (string) $data['Name'] : '';
+			if ( $name === $data_name && $author === $data_author ) {
 				return $file;
 			}
 		}

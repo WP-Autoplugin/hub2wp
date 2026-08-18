@@ -3,7 +3,7 @@ Contributors: pbalazs
 Tags: github, plugins, installer
 Requires at least: 5.8
 Tested up to: 7.0
-Stable tag: 1.5.2
+Stable tag: 1.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,7 +18,7 @@ Features:
 * Browse and install extensions from private GitHub repositories (requires personal access token with "repo" scope).
 * Install themes and plugins with one click.
 * Receive update notifications and update with one click.
-* Optionally add a personal GitHub access token to increase API rate limits.
+* Optionally add a personal GitHub access token to increase API rate limits; a token is required for monorepo support.
 * Caching to reduce API requests.
 
 == Installation ==
@@ -57,9 +57,26 @@ Manage hub2wp settings with WP-CLI too:
 == Frequently Asked Questions ==
 
 = Do I need a GitHub token? =
-No, but you have a higher request limit if you use one.
+Public plugins and themes stored in a single repository work without one. Private repositories and monorepo discovery, installation, and monitoring require a token.
 
 == Changelog ==
+
+= 1.6.1 =
+* Better sub-menu position for 'Add Github Plugin'
+* Added sub-menu item for 'Add GitHub Theme' under 'Appearance'
+* Added 'Add GitHub Plugin' button next to the 'Add Plugin' button on /wp-admin/plugins.php
+* Changed 'GitHub themes' button next to the 'Add Theme' button to 'Add GitHub Theme' on /wp-admin/themes.php
+* Require a GitHub access token for monorepo support to protect the anonymous API rate limit
+* Reuse cached repository data across monorepo projects and avoid per-file API requests for public plugin headers
+
+= 1.6.0 =
+* Mono-repo support added
+* Animate loading actions and show selected plugins count
+* "Already Monitoring" in 'Add Repository' picker
+* Bulk remove options added to Monitored Plugins table
+* Theme support for monorepo themes
+* Better padlock formatting and expand theme repo by default
+* Fixed a bunch of issues around plugin/theme tracking
 
 = 1.5.2 =
 * Added list of known-incompatible plugins and themes, to exclude them from search results.

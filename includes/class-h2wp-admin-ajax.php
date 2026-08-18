@@ -1,4 +1,10 @@
 <?php
+/**
+ * AJAX handlers for the hub2wp admin interface.
+ *
+ * @package hub2wp
+ */
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -22,6 +28,10 @@ class H2WP_Admin_Ajax {
 	 */
 	private function clean_ajax_buffers( $buffer_level ) {
 		while ( ob_get_level() > $buffer_level ) {
+			$status = ob_get_status();
+			if ( empty( $status['flags'] ) || ! ( $status['flags'] & PHP_OUTPUT_HANDLER_REMOVABLE ) ) {
+				break;
+			}
 			ob_end_clean();
 		}
 	}
@@ -55,7 +65,7 @@ class H2WP_Admin_Ajax {
 	 * @return string plugin|theme
 	 */
 	private function get_repo_type_from_request() {
-		$repo_type = isset( $_POST['repo_type'] ) ? sanitize_key( wp_unslash( $_POST['repo_type'] ) ) : 'plugin';
+		$repo_type = isset( $_POST['repo_type'] ) ? sanitize_key( wp_unslash( $_POST['repo_type'] ) ) : 'plugin'; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Every caller verifies the shared AJAX nonce first.
 		return in_array( $repo_type, array( 'plugin', 'theme' ), true ) ? $repo_type : 'plugin';
 	}
 
@@ -76,16 +86,19 @@ class H2WP_Admin_Ajax {
 	 * @param string $owner     Repository owner.
 	 * @param string $repo      Repository name.
 	 * @param string $repo_type Repository type.
+	 * @param string $subdirectory Optional project subdirectory.
 	 * @return array
 	 */
-	private function get_monitored_tracking_preferences( $owner, $repo, $repo_type = 'plugin' ) {
-		return H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type );
+	private function get_monitored_tracking_preferences( $owner, $repo, $repo_type = 'plugin', $subdirectory = '' ) {
+		return H2WP_Settings::get_repo_tracking_preferences( $owner, $repo, $repo_type, $subdirectory );
 	}
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
+		add_action( 'wp_ajax_h2wp_detect_repo_type', array( $this, 'detect_repo_type' ) );
+		add_action( 'wp_ajax_h2wp_add_monitored_repo', array( $this, 'add_monitored_repo' ) );
 		add_action( 'wp_ajax_h2wp_get_plugin_details', array( $this, 'get_plugin_details' ) );
 		add_action( 'wp_ajax_h2wp_check_compatibility', array( $this, 'check_compatibility' ) );
 		add_action( 'wp_ajax_h2wp_get_changelog', array( $this, 'get_changelog' ) );
@@ -108,15 +121,16 @@ class H2WP_Admin_Ajax {
 		}
 
 		// Get and sanitize parameters.
-		$owner = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
-		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$owner        = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
+		$repo         = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$subdirectory = H2WP_Settings::normalize_subdirectory( isset( $_POST['subdirectory'] ) ? sanitize_text_field( wp_unslash( $_POST['subdirectory'] ) ) : '' );
 
-		if ( empty( $owner ) || empty( $repo ) ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) || is_wp_error( $subdirectory ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		$service = new H2WP_Repository_Query_Service();
-		$data    = $service->get_repository_details( $owner, $repo, $repo_type );
+		$data    = $service->get_repository_details( $owner, $repo, $repo_type, $subdirectory );
 
 		if ( is_wp_error( $data ) ) {
 			wp_send_json_error( array( 'message' => $data->get_error_message() ) );
@@ -140,10 +154,11 @@ class H2WP_Admin_Ajax {
 		}
 
 		// Get and sanitize parameters.
-		$owner = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
-		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$owner        = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
+		$repo         = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$subdirectory = H2WP_Settings::normalize_subdirectory( isset( $_POST['subdirectory'] ) ? sanitize_text_field( wp_unslash( $_POST['subdirectory'] ) ) : '' );
 
-		if ( empty( $owner ) || empty( $repo ) ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) || is_wp_error( $subdirectory ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
@@ -151,20 +166,25 @@ class H2WP_Admin_Ajax {
 		ob_start();
 		$this->suspend_async_translation_updates();
 
-		$tracking = $this->get_monitored_tracking_preferences( $owner, $repo, $repo_type );
+		$tracking = $this->get_monitored_tracking_preferences( $owner, $repo, $repo_type, $subdirectory );
 
-		$result = H2WP_Repo_Manager::install_repository(
-			$owner,
-			$repo,
-			array(
-				'repo_type'           => $repo_type,
-				'branch'              => $tracking['branch'],
-				'prioritize_releases' => $tracking['prioritize_releases'],
-				'access_token'        => H2WP_Settings::get_access_token(),
-			)
-		);
-
-		$this->resume_async_translation_updates();
+		try {
+			$result = H2WP_Repo_Manager::install_repository(
+				$owner,
+				$repo,
+				array(
+					'repo_type'           => $repo_type,
+					'branch'              => $tracking['branch'],
+					'prioritize_releases' => $tracking['prioritize_releases'],
+					'access_token'        => H2WP_Settings::get_access_token(),
+					'subdirectory'        => $subdirectory,
+				)
+			);
+		} catch ( Throwable $exception ) {
+			$result = new WP_Error( 'h2wp_install_exception', $exception->getMessage() );
+		} finally {
+			$this->resume_async_translation_updates();
+		}
 
 		if ( is_wp_error( $result ) ) {
 			$this->clean_ajax_buffers( $buffer_level );
@@ -187,11 +207,14 @@ class H2WP_Admin_Ajax {
 			wp_send_json_success( $result );
 		}
 
-		$result['activate_url'] = add_query_arg( array(
-			'action' => 'activate',
-			'plugin' => $result['plugin_file'],
-			'_wpnonce' => wp_create_nonce( 'activate-plugin_' . $result['plugin_file'] ),
-		), admin_url( 'plugins.php' ) );
+		$result['activate_url'] = add_query_arg(
+			array(
+				'action'   => 'activate',
+				'plugin'   => $result['plugin_file'],
+				'_wpnonce' => wp_create_nonce( 'activate-plugin_' . $result['plugin_file'] ),
+			),
+			admin_url( 'plugins.php' )
+		);
 
 		$this->clean_ajax_buffers( $buffer_level );
 		wp_send_json_success( $result );
@@ -213,23 +236,24 @@ class H2WP_Admin_Ajax {
 		}
 
 		// Get and sanitize parameters.
-		$owner = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
-		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$owner        = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
+		$repo         = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$subdirectory = H2WP_Settings::normalize_subdirectory( isset( $_POST['subdirectory'] ) ? sanitize_text_field( wp_unslash( $_POST['subdirectory'] ) ) : '' );
 
-		if ( empty( $owner ) || empty( $repo ) ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) || is_wp_error( $subdirectory ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		$service       = new H2WP_Repository_Query_Service();
-		$compatibility = $service->check_repository_compatibility( $owner, $repo, $repo_type );
+		$compatibility = $service->check_repository_compatibility( $owner, $repo, $repo_type, $subdirectory );
 
 		wp_send_json_success(
 			array(
-				'is_compatible' => $compatibility['is_compatible'],
-				'reason'        => $compatibility['reason'],
-				'headers'       => ! empty( $compatibility['headers'] ) ? $compatibility['headers'] : array(),
-				'version_source'=> isset( $compatibility['source_context']['source'] ) ? $compatibility['source_context']['source'] : 'branch',
-				'uses_releases' => ! empty( $compatibility['source_context']['uses_releases'] ),
+				'is_compatible'  => $compatibility['is_compatible'],
+				'reason'         => $compatibility['reason'],
+				'headers'        => ! empty( $compatibility['headers'] ) ? $compatibility['headers'] : array(),
+				'version_source' => isset( $compatibility['source_context']['source'] ) ? $compatibility['source_context']['source'] : 'branch',
+				'uses_releases'  => ! empty( $compatibility['source_context']['uses_releases'] ),
 			)
 		);
 	}
@@ -254,7 +278,10 @@ class H2WP_Admin_Ajax {
 		}
 
 		// Activate the plugin.
-		activate_plugin( $plugin_file );
+		$result = activate_plugin( $plugin_file );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
 
 		wp_send_json_success();
 	}
@@ -263,26 +290,27 @@ class H2WP_Admin_Ajax {
 	 * Handle AJAX request to get changelog.
 	 */
 	public function get_changelog() {
-		// Check nonce
+		// Check nonce.
 		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
 
 		$repo_type = $this->get_repo_type_from_request();
 
-		// Check user capabilities
+		// Check user capabilities.
 		if ( ! $this->can_manage_repo_type( $repo_type ) ) {
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
 		}
 
-		// Get and sanitize parameters
-		$owner = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
-		$repo  = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		// Get and sanitize parameters.
+		$owner        = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
+		$repo         = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$subdirectory = H2WP_Settings::normalize_subdirectory( isset( $_POST['subdirectory'] ) ? sanitize_text_field( wp_unslash( $_POST['subdirectory'] ) ) : '' );
 
-		if ( empty( $owner ) || empty( $repo ) ) {
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) || is_wp_error( $subdirectory ) ) {
 			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
 		}
 
 		$service   = new H2WP_Repository_Query_Service();
-		$changelog = $service->get_changelog( $owner, $repo );
+		$changelog = $service->get_changelog( $owner, $repo, $subdirectory );
 		if ( is_wp_error( $changelog ) ) {
 			wp_send_json_error( array( 'message' => $changelog->get_error_message() ) );
 		}
@@ -292,5 +320,68 @@ class H2WP_Admin_Ajax {
 		}
 
 		wp_send_json_success( array( 'changelog_html' => $service->render_changelog_html( $changelog ) ) );
+	}
+
+	/**
+	 * Detect whether a repo is a single plugin or a monorepo.
+	 * Called when the user enters a repo URL in the install UI.
+	 */
+	public function detect_repo_type() {
+		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
+
+		$repo_type = $this->get_repo_type_from_request();
+		if ( ! $this->can_manage_repo_type( $repo_type ) ) {
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
+		}
+
+		$owner  = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
+		$repo   = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$branch = isset( $_POST['branch'] ) ? sanitize_text_field( wp_unslash( $_POST['branch'] ) ) : '';
+
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
+		}
+
+		$api    = new H2WP_GitHub_API( H2WP_Settings::get_access_token() );
+		$result = $api->detect_repo_type( $owner, $repo, $branch, $repo_type );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * Handle AJAX request to add a repository to the monitored list.
+	 * Supports both single repos and monorepo subdirectories.
+	 */
+	public function add_monitored_repo() {
+		check_ajax_referer( 'h2wp_plugin_details_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'hub2wp' ) ) );
+		}
+
+		$owner        = isset( $_POST['owner'] ) ? sanitize_text_field( wp_unslash( $_POST['owner'] ) ) : '';
+		$repo         = isset( $_POST['repo'] ) ? sanitize_text_field( wp_unslash( $_POST['repo'] ) ) : '';
+		$branch       = isset( $_POST['branch'] ) ? sanitize_text_field( wp_unslash( $_POST['branch'] ) ) : '';
+		$prioritize   = isset( $_POST['prioritize_releases'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['prioritize_releases'] ) );
+		$subdirectory = H2WP_Settings::normalize_subdirectory( isset( $_POST['subdirectory'] ) ? sanitize_text_field( wp_unslash( $_POST['subdirectory'] ) ) : '' );
+
+		if ( ! H2WP_Settings::validate_repo_format( $owner . '/' . $repo ) || is_wp_error( $subdirectory ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid parameters.', 'hub2wp' ) ) );
+		}
+
+		$repo_type_for_add = isset( $_POST['repo_type'] ) ? sanitize_key( wp_unslash( $_POST['repo_type'] ) ) : 'plugin';
+		$repo_type_for_add = in_array( $repo_type_for_add, array( 'plugin', 'theme' ), true ) ? $repo_type_for_add : 'plugin';
+
+		$result = H2WP_Settings::add_repo_to_monitored( $owner, $repo, $branch, $prioritize, $subdirectory, $repo_type_for_add );
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+
+		wp_send_json_success( array( 'repo_key' => $result ) );
 	}
 }
